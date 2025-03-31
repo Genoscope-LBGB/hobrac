@@ -1,0 +1,12 @@
+include: "rules/references.smk"
+
+def generate_outputs():
+    outputs = []
+
+    outputs.append("references/references.ckpt")
+
+    return outputs
+
+
+rule all:
+    input: generate_outputs()
