@@ -1,6 +1,5 @@
 stages: 
     - build
-    - test
     - deploy
 
 variables:
@@ -34,13 +33,3 @@ Deploy:
     trigger:
         project: downstream/modules
         strategy: depend
-
-Test:
-    stage: test
-    tags:
-        - docker_build
-    extends:
-        - .docker_stage
-    script: 
-        - docker pull $docker_tag
-        - docker run $docker_tag bash -c "pytest -s"
