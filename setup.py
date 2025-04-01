@@ -17,11 +17,11 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=setuptools.find_packages(),
-    python_requires=">=3.7",
     include_package_data=True,
     package_data = { "hobrac": ["workflow/*"] },
     install_requires=[
-        "snakemake", "snakemake-executor-plugin-slurm",
+        "snakemake", 
+        "snakemake-executor-plugin-slurm",
         "find_reference_genomes",
     ],
     dependency_links=['http://github.com/user/repo/tarball/master#egg=package-1.0'],

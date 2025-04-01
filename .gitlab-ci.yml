@@ -1,35 +1,18 @@
-stages: 
-    - build
-    - deploy
+stages:
+  - deploy
 
 variables:
-    deploygroup   : "lbgb"
-    modulename    : "hobrac"
-    moduleversion : "0.1"
-    PROJECT_PATH  : $CI_PROJECT_PATH
-    GIT_STRATEGY  : clone
-    docker_tag    : $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
-
-.docker_stage:
-    before_script:
-        - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    after_script:
-        - docker logout $CI_REGISTRY
-
-Build:
-    stage: build
-    tags:
-        - docker_build
-    extends:
-        - .docker_stage
-    script:
-        - docker build -t $docker_tag .
-        - docker push $docker_tag
-
+  deploygroup: "lbgb"
+  moduleversion: "0.1"
+  modulesnapshot: "false"
+  
 Deploy:
-    stage: deploy
-    rules:
-        - if: '$CI_COMMIT_BRANCH == "master"'
-    trigger:
-        project: downstream/modules
-        strategy: depend
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  variables:
+    PROJECT_PATH: $CI_PROJECT_PATH
+    modulename: "hobrac"
+  trigger:
+    project: downstream/modules
+    strategy: depend

@@ -1,9 +1,12 @@
 include: "rules/references.smk"
+include: "rules/busco.smk"
+
 
 def generate_outputs():
     outputs = []
 
     outputs.append("references/references.ckpt")
+    outputs.append("busco/lineage.txt")
 
     return outputs
 
