@@ -3,8 +3,9 @@ rule get_references:
     params: 
         name = config["scientific_name"]
     resources:
-        mem_mb=5000,
-        threads=1
+        mem_mb = 5000,
+        threads = 1,
+        runtime = 20
     shell: """
         find_reference_genomes -n '{params.name}' -l complete --max-rank order | \
             head -n 6 | \
@@ -12,11 +13,12 @@ rule get_references:
     """
 
 rule get_top5_references:
-    input: "references/references.txt"
-    output: "references/references.ckpt"
+    input: rules.get_references.output
+    output: "references/references.list"
     resources:
-        mem_mb=5000,
-        threads=1
+        mem_mb = 5000,
+        threads = 1,
+        runtime = 20
     shell: """
         cd references
 
@@ -27,5 +29,5 @@ rule get_top5_references:
             find_reference_genomes -d $code -o $name
         done < references.txt
         
-        touch references.ckpt
+        ls */*.fna > references.list
     """

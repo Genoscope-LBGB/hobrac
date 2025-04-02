@@ -33,10 +33,10 @@ def create_dir(path: str):
 
 
 def generate_snakemake_command(args) -> str:
-    cmd = f"snakemake --latency-wait 30 --jobs 100 "
+    cmd = "snakemake --latency-wait 30 --jobs 100 "
     
     if args.executor:
-        f"--executor {args.executor} "
+        f"--executor {args.executor} --cores 4000 "
         
     if args.use_apptainer:
         cmd += "--use-apptainer "

@@ -5,8 +5,8 @@ include: "rules/busco.smk"
 def generate_outputs():
     outputs = []
 
-    outputs.append("references/references.ckpt")
-    outputs.append("busco/lineage.txt")
+    outputs.append("references/references.list")
+    outputs.append("busco/chosen_dataset.txt")
 
     return outputs
 
