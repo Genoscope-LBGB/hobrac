@@ -1,6 +1,7 @@
 include: "rules/references.smk"
 include: "rules/mash.smk"
 include: "rules/busco.smk"
+include: "rules/aln.smk"
 
 
 localrules:
@@ -12,4 +13,5 @@ localrules:
 
 rule all:
     input: 
-        "aln/busco"
+        "aln/busco",
+        "aln/get_dgenies_index.done"

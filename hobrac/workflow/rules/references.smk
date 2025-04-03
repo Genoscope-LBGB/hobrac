@@ -13,6 +13,8 @@ rule get_references:
         cat genomes.txt | \
             head -n {params.nblines} | \
             tail -n +2 > {output}
+
+        rm genomes.txt
     """
 
 
@@ -21,7 +23,7 @@ rule get_top_references:
     output: "references/references.list"
     resources:
         mem_mb = 5000,
-        runtime = 20
+        runtime = 2 * 60
     benchmark: "benchmarks/get_top_references.txt"
     shell: """
         cd references
@@ -30,7 +32,7 @@ rule get_top_references:
         do
             name=$(echo $line | cut -f 1 -d ',' | sed 's/ /_/g')
             code=$(echo $line | cut -f 3 -d ',')
-            find_reference_genomes -d $code -o $name
+            find_reference_genomes -d $code -o $name 2> find_reference_genomes.err
             mv $name/*.fna $name.fna
             rm -r $name
         done < references.txt

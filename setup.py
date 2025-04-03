@@ -23,12 +23,14 @@ setuptools.setup(
         "snakemake", 
         "snakemake-executor-plugin-slurm",
         "find_reference_genomes",
+        "xopen"
     ],
     dependency_links=['http://github.com/user/repo/tarball/master#egg=package-1.0'],
     entry_points={
         "console_scripts": [
             "hobrac=hobrac.main:main",
-            "busco_to_paf=hobrac.busco_to_paf:main"
+            "busco_to_paf=hobrac.busco_to_paf:main",
+            "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main"
         ],  
     },
     

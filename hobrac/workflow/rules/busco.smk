@@ -123,14 +123,22 @@ rule busco_to_paf:
         busco_reference = "busco/busco_reference",
         busco_assembly = "busco/busco_assembly"
     output: directory("aln/busco")
+    params:
+        prefix_assembly = config["scientific_name"].replace(" ", "_")
     resources:
         mem_mb = 10000,
         runtime = 20
     benchmark: "benchmarks/busco_to_paf.txt"
     shell: """
+        prefix_ref=$(cat {input.mash_output} | cut -f 1)
         filepath=$(cat {input.mash_output} | cut -f 2)
 
         busco_to_paf --busco_query {input.busco_assembly}/run*/full_table.tsv \
             --busco_ref {input.busco_reference}/run*/full_table.tsv \
             --query {input.assembly} --ref $filepath --out {output}
+
+        mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
+        mv {output}/target_reference.idx {output}/busco_target_${{prefix_ref}}.idx
+
+        dotplot -p {output}/aln_busco.paf -o {output}/busco.png
     """
