@@ -1,15 +1,24 @@
 include: "rules/references.smk"
+include: "rules/mash.smk"
 include: "rules/busco.smk"
+
+
+localrules:
+    all,
+    get_top_references,
+    get_closest_busco_dataset,
+    select_closest_reference
 
 
 def generate_outputs():
     outputs = []
 
-    outputs.append("references/references.list")
-    outputs.append("busco/chosen_dataset.txt")
+    
+    outputs.append("mash/closest_reference.fna")
 
     return outputs
 
 
 rule all:
-    input: generate_outputs()
+    input: 
+        generate_outputs()
