@@ -8,10 +8,13 @@ rule get_references:
         runtime = 20
     benchmark: "benchmarks/get_references.txt"
     shell: """
-        find_reference_genomes -n '{params.name}' -l complete --max-rank order | \
+        find_reference_genomes -n '{params.name}' -l complete --max-rank class > genomes.txt
+
+        cat genomes.txt | \
             head -n {params.nblines} | \
             tail -n +2 > {output}
     """
+
 
 rule get_top_references:
     input: rules.get_references.output
@@ -26,7 +29,7 @@ rule get_top_references:
         while read line
         do
             name=$(echo $line | cut -f 1 -d ',' | sed 's/ /_/g')
-            code=$(echo $line | cut -f 4 -d ',')
+            code=$(echo $line | cut -f 3 -d ',')
             find_reference_genomes -d $code -o $name
             mv $name/*.fna $name.fna
             rm -r $name

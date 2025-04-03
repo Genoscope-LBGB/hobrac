@@ -27,7 +27,7 @@ rule launch_mash:
 
 rule select_closest_reference:
     input: rules.launch_mash.output
-    output: "mash/closest_reference.fna"
+    output: "mash/closest_reference.txt"
     resources:
         mem_mb = 2000,
         runtime = 10
@@ -35,7 +35,7 @@ rule select_closest_reference:
     run:
         import os
 
-        with open(input[0]) as mash:
+        with open(input[0]) as mash, open(output[0], "w") as out:
             minimum_distance = 1.0
             path = ""
 
@@ -46,7 +46,9 @@ rule select_closest_reference:
                     minimum_distace = distance
                     path = line[0]
 
-            os.symlink(os.path.abspath(path), output[0])
+            prefix = os.path.basename(path).replace('.fna', '')
+            abspath = os.path.abspath(path)
+            print(f"{prefix}\t{abspath}", file=out, end="")
             
 
               

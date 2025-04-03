@@ -1,3 +1,6 @@
+import os
+
+
 rule get_lineage:
     output: "busco/lineage.txt"
     params:
@@ -10,6 +13,7 @@ rule get_lineage:
         echo {params.taxid} | taxonkit lineage | cut -f 2 > {output}
     """
 
+
 rule get_busco_datasets:
     input: rules.get_lineage.output
     output: "busco/datasets.txt"
@@ -21,6 +25,7 @@ rule get_busco_datasets:
         busco --list-datasets > {output}
         rm -rf busco_downloads
     """
+
 
 rule get_closest_busco_dataset:
     input: 
@@ -62,41 +67,70 @@ rule get_closest_busco_dataset:
         sys.exit(1)     
 
 
-# checkpoint before_busco:
-#     output: touch("busco/collect_references.done")
+rule busco_reference:
+    input: 
+        mash_output = rules.select_closest_reference.output,
+        dataset = "busco/chosen_dataset.txt"
+    output: directory("busco/busco_reference")
+    threads: 12
+    resources:
+        mem_mb = 60000,
+        runtime = 24 * 60
+    shell: """
+        dataset=$(cat {input.dataset})
+        prefix=$(cat {input.mash_output} | cut -f 1)
+        filepath=$(cat {input.mash_output} | cut -f 2)
+
+        cd busco/
+
+        export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
+
+        busco --metaeuk -i $filepath -c {threads} -m geno \
+            --download_path $buscodbpath  -o busco_reference -l $dataset
+        
+        ln -s busco_reference busco_$prefix
+        rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
+    """
 
 
-# def get_references(wildcards):
-#     """Function to dynamically list files after checkpoint execution"""
-#     files = glob_wildcards("references/{ref_name}.fna").ref_name
-#     files = [f.replace(".fna", "") for f in files] 
-#     return expand("busco/{ref_name}", zip, ref_name=files) 
+rule busco_assembly:
+    input:
+        assembly = config["assembly"],
+        dataset = rules.get_closest_busco_dataset.output
+    output: directory("busco/busco_assembly")
+    threads: 12
+    resources:
+        mem_mb = 60000,
+        runtime = 24 * 60
+    shell: """
+        dataset=$(cat {input.dataset})
 
+        cd busco/
 
-# rule launch_buscos:
-#     input: get_references
+        export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
 
-
-# rule busco:
-#     input: 
-#         rules.before_busco.output,
-#         reference = "references/{ref_name}.fna",
-#         dataset = "busco/chosen_dataset.txt"
-#     output: directory("busco/{ref_name}")
-#     threads: 12
-#     resources:
-#         mem_mb = 60000,
-#         runtime = 24 * 60
-#     shell: """
-#         dataset=$(cat {input.dataset})
-
-#         cd busco/
-
-#         export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
-
-#         busco --metaeuk -i ../{input.reference} -c {threads} -m geno \
-#             --download_path $buscodbpath  -o {wildcards.ref_name} -l $dataset
-
-#         rm -rf {wildcards.ref_name}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
-#     """
+        busco --metaeuk -i {input.assembly} -c {threads} -m geno \
+            --download_path $buscodbpath  -o busco_assembly -l $dataset
+        
+        rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
+    """
                 
+
+rule busco_to_paf:
+    input:
+        mash_output = rules.select_closest_reference.output,
+        assembly = config["assembly"],
+        busco_reference = "busco/busco_reference",
+        busco_assembly = "busco/busco_assembly"
+    output: directory("aln/busco")
+    resources:
+        mem_mb = 10000,
+        runtime = 20
+    benchmark: "benchmarks/busco_to_paf.txt"
+    shell: """
+        filepath=$(cat {input.mash_output} | cut -f 2)
+
+        busco_to_paf --busco_query {input.busco_assembly}/run*/full_table.tsv \
+            --busco_ref {input.busco_reference}/run*/full_table.tsv \
+            --query {input.assembly} --ref $filepath --out {output}
+    """

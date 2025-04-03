@@ -10,15 +10,6 @@ localrules:
     select_closest_reference
 
 
-def generate_outputs():
-    outputs = []
-
-    
-    outputs.append("mash/closest_reference.fna")
-
-    return outputs
-
-
 rule all:
     input: 
-        generate_outputs()
+        "aln/busco"

@@ -28,6 +28,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "hobrac=hobrac.main:main",
+            "busco_to_paf=hobrac.busco_to_paf:main"
         ],  
     },
     
