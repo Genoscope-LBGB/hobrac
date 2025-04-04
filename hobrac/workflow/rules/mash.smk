@@ -41,7 +41,7 @@ rule select_closest_reference:
 
             for line in mash:
                 line = line.rstrip().split("\t")
-                distance = float(line[3])
+                distance = float(line[2])
                 if distance <= minimum_distance:
                     minimum_distace = distance
                     path = line[0]
