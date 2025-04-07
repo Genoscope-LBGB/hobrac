@@ -5,7 +5,6 @@ include: "rules/aln.smk"
 
 
 localrules:
-    all,
     get_closest_busco_dataset,
     select_closest_reference
 

@@ -12,7 +12,8 @@ def get_args():
     )
 
     parser.add_argument(
-        "-a", "--assembly",
+        "-a",
+        "--assembly",
         action="store",
         dest="assembly",
         help="Path to a genome assembly fasta file",
@@ -21,7 +22,8 @@ def get_args():
         type=os.path.abspath,
     )
     parser.add_argument(
-        "-n", "--name",
+        "-n",
+        "--name",
         action="store",
         dest="scientific_name",
         help="Scientific name of the organism given in --assembly",
@@ -29,28 +31,39 @@ def get_args():
         default=None,
     )
     parser.add_argument(
-        "-t", "--taxid",
+        "-t",
+        "--taxid",
         action="store",
         dest="taxid",
         help="Taxid of the organism given in --assembly",
         required=True,
         default=None,
     )
-    
+
     optional_args = parser.add_argument_group("Optional arguments")
     optional_args.add_argument(
-        "-e", "--executor",
+        "-e",
+        "--executor",
         action="store",
         dest="executor",
         help="Name of a snakemake executor plugin to execute the pipeline on a computing cluster",
         default=None,
     )
     optional_args.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         action="store",
         dest="output_directory",
         help="Output directory",
         default="hobrac_analysis",
+    )
+    optional_args.add_argument(
+        "--allow-same-taxid",
+        action="store_true",
+        dest="allow_same_taxid",
+        help="Allow the chosen reference to be of the same taxid as the assembly",
+        default=False,
+        required=False,
     )
     optional_args.add_argument(
         "--use-apptainer",

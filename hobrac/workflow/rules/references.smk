@@ -3,6 +3,7 @@ rule get_references:
     params: 
         name = config["scientific_name"],
         taxid = config["taxid"],
+        allow_same_taxid = config["allow_same_taxid"],
         nblines = 5 + 1
     resources:
         mem_mb = 5000,
@@ -10,9 +11,17 @@ rule get_references:
     benchmark: "benchmarks/get_references.txt"
     shell: """
         find_reference_genomes -n '{params.name}' -l complete --max-rank phylum > genomes.txt
-        cat genomes.txt | \
-            awk -v FS=',' 'BEGIN{{nb=0}} {{ if($2 != {params.taxid} && nb < {params.nblines}) {{ print $0; nb+=1}} }}' | \
-            tail -n +2 > {output}
+
+        if [[ '{params.allow_same_taxid}' == 'False' ]]; then
+            cat genomes.txt | \
+                awk -v FS=',' 'BEGIN{{nb=0}} {{ if($2 != {params.taxid} && nb < {params.nblines}) {{ print $0; nb+=1}} }}' | \
+                tail -n +2 > {output}
+        else
+            cat genomes.txt | \
+                    awk -v FS=',' 'BEGIN{{nb=0}} {{ if(nb < {params.nblines}) {{ print $0; nb+=1}} }}' | \
+                    tail -n +2 > {output}
+        fi
+
         rm genomes.txt
     """
 
