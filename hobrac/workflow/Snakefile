@@ -6,12 +6,12 @@ include: "rules/aln.smk"
 
 localrules:
     all,
-    get_top_references,
     get_closest_busco_dataset,
     select_closest_reference
 
 
 rule all:
     input: 
+        # "references/references.list"
         "aln/busco",
         "aln/get_dgenies_index.done"
