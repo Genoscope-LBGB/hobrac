@@ -61,7 +61,15 @@ def get_args():
         "--allow-same-taxid",
         action="store_true",
         dest="allow_same_taxid",
-        help="Allow the chosen reference to be of the same taxid as the assembly",
+        help="Allows the chosen reference to be of the same taxid as the assembly",
+        default=False,
+        required=False,
+    )
+    optional_args.add_argument(
+        "--allow-zero-distance",
+        action="store_true",
+        dest="allow_zero_distance",
+        help="Allows the choice of the closest reference to pick a genome with a Mash distance of 0",
         default=False,
         required=False,
     )

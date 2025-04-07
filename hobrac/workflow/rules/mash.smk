@@ -28,6 +28,8 @@ rule launch_mash:
 rule select_closest_reference:
     input: rules.launch_mash.output
     output: "mash/closest_reference.txt"
+    params:
+        allow_zero_distance = config["allow_zero_distance"]
     resources:
         mem_mb = 2000,
         runtime = 10
@@ -42,6 +44,10 @@ rule select_closest_reference:
             for line in mash:
                 line = line.rstrip().split("\t")
                 distance = float(line[2])
+
+                if distance == 0.0 and not params.allow_zero_distance:
+                    continue
+                    
                 if distance <= minimum_distance:
                     minimum_distace = distance
                     path = line[0]
