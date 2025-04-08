@@ -1,6 +1,7 @@
 cmd.txt
 tests*
 *.out
+Felimare_picta/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
