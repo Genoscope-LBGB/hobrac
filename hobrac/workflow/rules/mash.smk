@@ -49,7 +49,7 @@ rule select_closest_reference:
                     continue
                     
                 if distance <= minimum_distance:
-                    minimum_distace = distance
+                    minimum_distance = distance
                     path = line[0]
 
             prefix = os.path.basename(path).replace('.fna', '')
