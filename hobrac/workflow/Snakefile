@@ -11,6 +11,5 @@ localrules:
 
 rule all:
     input: 
-        # "references/references.list"
         "aln/busco",
         "aln/get_dgenies_index.done"

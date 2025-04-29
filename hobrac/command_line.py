@@ -42,6 +42,15 @@ def get_args():
 
     optional_args = parser.add_argument_group("Optional arguments")
     optional_args.add_argument(
+        "-r",
+        "--reference",
+        action="store",
+        dest="reference",
+        help="Path to a fasta file to use as a reference (disables the reference searching step)",
+        default=None,
+        type=os.path.abspath,
+    )
+    optional_args.add_argument(
         "-e",
         "--executor",
         action="store",

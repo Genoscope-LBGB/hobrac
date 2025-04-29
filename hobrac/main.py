@@ -73,8 +73,10 @@ def main():
 
     create_dir(args.output_directory)
     os.chdir(args.output_directory)
+    
+    if args.reference:
+        skip_reference_search(args.reference)
 
-    # Data retrieval
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
 
@@ -82,3 +84,15 @@ def main():
     process.wait()
 
     sys.exit(process.returncode)
+
+
+def skip_reference_search(reference: str):
+    create_dir("mash")
+    with open("mash/closest_reference.txt", "w") as out:
+        print(f"user_reference\t{reference}", file=out, end="")
+        
+    if os.exists("aln"):
+        os.rmdir("aln")
+        
+    if os.exists("busco/busco_reference"):
+        os.rmdir("busco/busco_reference")
