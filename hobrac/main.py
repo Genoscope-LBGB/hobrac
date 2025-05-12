@@ -91,8 +91,8 @@ def skip_reference_search(reference: str):
     with open("mash/closest_reference.txt", "w") as out:
         print(f"user_reference\t{reference}", file=out, end="")
         
-    if os.exists("aln"):
+    if os.path.exists("aln"):
         os.rmdir("aln")
         
-    if os.exists("busco/busco_reference"):
+    if os.path.exists("busco/busco_reference"):
         os.rmdir("busco/busco_reference")
