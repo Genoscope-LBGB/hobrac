@@ -5,7 +5,7 @@ rule aln:
     output: touch("aln/aln.done")
     threads: 12
     resources:
-        mem_mb = 60000,
+        mem_mb = 100000,
         runtime = 4 * 60
     benchmark: "benchmarks/aln.txt"
     shell: """
