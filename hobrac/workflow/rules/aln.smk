@@ -41,5 +41,5 @@ rule gen_dgenies_index:
         dgenies_fasta_to_index -i {input.assembly} -n "{params.name}" -o query_{params.assembly_prefix}.idx
         dgenies_fasta_to_index -i ${{ref_filepath}} -n "${{ref_name}}" -o target_${{ref_prefix}}.idx
 
-        dotplot -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{ref_prefix}}.png --line-thickness 2
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{ref_prefix}}.png --line-thickness 2
     """
