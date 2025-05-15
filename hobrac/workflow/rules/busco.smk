@@ -140,5 +140,5 @@ rule busco_to_paf:
         mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
         mv {output}/target_reference.idx {output}/busco_target_${{prefix_ref}}.idx
 
-        dotplotrs -p {output}/aln_busco.paf -o {output}/busco.png --line-thickness 2
+        dotplotrs -p {output}/aln_busco.paf -o {output}/busco.png --line-thickness 4
     """
