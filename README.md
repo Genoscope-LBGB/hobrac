@@ -49,7 +49,7 @@ A typical HoBRAC command looks like this:
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea
 ```
 
-By default, HoBRAC launches computations on the machine it is launched, but being a Snakemake pipeline wrapper it can also launch jobs on a computing grid. HoBRAC is packaged with `snakemake-executor-plugin-slurm` which makes it possible to launch jobs on a SLURM computing grid, it is the responsibility of the user to install the correct plugin for their computing grid. To launch jobs on a computing grid, you can use the `-e` flag with the correct plugit. As an example, this command will launch HoBRAC jobs on a slurm grid:
+By default, HoBRAC runs computations on the machine it is launched, but being a Snakemake pipeline wrapper it can also submit jobs to a computing grid. HoBRAC is packaged with `snakemake-executor-plugin-slurm` which makes it possible to use a SLURM computing grid, it is the responsibility of the user to install the correct plugin for their computing grid. To launch jobs on a computing grid, you can use the `-e` flag with the correct plugin. As an example, this command will launch HoBRAC jobs on a slurm grid:
 ```
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea -e slurm
 ``` 
