@@ -9,6 +9,9 @@ The purpose of HoBRAC is to facilitate structural comparison between two genomes
   - Minimap2 is launched to align the closest reference (based on the MASH distance) and the assembly
   - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, we also provide index files for use in [D-GENIES](https://dgenies.toulouse.inra.fr/)
 
+
+On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyllidia flava (x-axis) and on the right the alignment of busco genes for the same genomes.
+
 |  |  |
 | ------- | ------- |
 | ![](assets/dotplot_Felimare_picta_vs_Phyllidia_flava.png) | ![](assets/busco_Felimare_picta_vs_Phyllidia_flava.png) |
