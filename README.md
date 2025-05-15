@@ -1,6 +1,6 @@
 # HoBRAC - Homology-based reference genome acquisition and comparison
 
-The purpose of HoBRAC is to facilitate structural comparison between two genomes. Direct genome-to-![alt text](dotplot_Felimare_picta_vs_Phyllidia_flava.png) ![alt text](busco_Felimare_picta_vs_Phyllidia_flava.png)genome alignments are sometimes to noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in HoBRAC:
+The purpose of HoBRAC is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes to noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in HoBRAC:
   - the user provides a genome assembly fasta file, a taxid and the organism name
   - the lineage of the organism is retrieved thanks to Taxonkit
   - HoBRAC downloads the five closest genomes (based on taxonomy) from NCBI using ncbi-datasets
