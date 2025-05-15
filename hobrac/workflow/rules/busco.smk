@@ -74,7 +74,7 @@ rule busco_reference:
     output: directory("busco/busco_reference")
     threads: 12
     resources:
-        mem_mb = 100000,
+        mem_mb = config["busco_memory"],
         runtime = 24 * 60
     shell: """
         dataset=$(cat {input.dataset})
@@ -100,7 +100,7 @@ rule busco_assembly:
     output: directory("busco/busco_assembly")
     threads: 12
     resources:
-        mem_mb = 100000,
+        mem_mb = config["busco_memory"],
         runtime = 24 * 60
     shell: """
         dataset=$(cat {input.dataset})

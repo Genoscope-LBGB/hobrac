@@ -5,7 +5,7 @@ rule aln:
     output: touch("aln/aln.done")
     threads: 12
     resources:
-        mem_mb = 100000,
+        mem_mb = config["minimap2_memory"],
         runtime = 4 * 60
     benchmark: "benchmarks/aln.txt"
     shell: """

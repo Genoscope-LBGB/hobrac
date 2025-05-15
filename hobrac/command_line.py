@@ -59,6 +59,20 @@ def get_args():
         default=None,
     )
     optional_args.add_argument(
+        "--busco-memory",
+        action="store",
+        dest="busco_memory",
+        help="Amount of RAM in MB reserved for Busco",
+        default=100_000,
+    )
+    optional_args.add_argument(
+        "--minimap2-memory",
+        action="store",
+        dest="minimap2_memory",
+        help="Amount of RAM in MB reserved for Minimap2",
+        default=100_000,
+    )
+    optional_args.add_argument(
         "-o",
         "--output",
         action="store",
@@ -86,28 +100,28 @@ def get_args():
         "--use-apptainer",
         action="store_true",
         dest="use_apptainer",
-        help="Use apptainer to run the pipeline",
+        help="UNUSED: Use apptainer to run the pipeline",
         default=False,
     )
     optional_args.add_argument(
         "--use-singularity",
         action="store_true",
         dest="use_singularity",
-        help="Use singularity to run the pipeline",
+        help="UNUSED: Use singularity to run the pipeline",
         default=False,
     )
     optional_args.add_argument(
         "--use-docker",
         action="store_true",
         dest="use_docker",
-        help="Use docker to run the pipeline",
+        help="UNUSED: Use docker to run the pipeline",
         default=False,
     )
     optional_args.add_argument(
         "--container-version",
         action="store_true",
         dest="container_version",
-        help="Container version to use",
+        help="UNUSED: Container version to use",
         default="0.1",
     )
 
