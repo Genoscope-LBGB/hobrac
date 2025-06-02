@@ -21,8 +21,6 @@ rule get_references:
                     awk -v FS=',' 'BEGIN{{nb=0}} {{ if(nb < {params.nblines}) {{ print $0; nb+=1}} }}' | \
                     tail -n +2 > {output}
         fi
-
-        rm genomes.txt
     """
 
 
