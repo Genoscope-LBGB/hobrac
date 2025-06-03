@@ -76,6 +76,7 @@ rule busco_reference:
     resources:
         mem_mb = config["busco_memory"],
         runtime = 24 * 60
+    benchmark: "benchmarks/busco_reference.txt"
     shell: """
         dataset=$(cat {input.dataset})
         prefix=$(cat {input.mash_output} | cut -f 1)
@@ -102,6 +103,7 @@ rule busco_assembly:
     resources:
         mem_mb = config["busco_memory"],
         runtime = 24 * 60
+    benchmark: "benchmarks/busco_assembly.txt"
     shell: """
         dataset=$(cat {input.dataset})
 
