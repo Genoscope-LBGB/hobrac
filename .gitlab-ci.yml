@@ -1,18 +1,12 @@
-stages:
+include:
+  - project: rdbioseq/cicd
+    file: cicd.yml
+    inputs:
+      module-name: "hobrac"
+
+stages: 
   - deploy
 
-variables:
-  deploygroup: "lbgb"
-  moduleversion: "0.1"
-  modulesnapshot: "false"
-  
-Deploy:
+deploy:
   stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-  variables:
-    PROJECT_PATH: $CI_PROJECT_PATH
-    modulename: "hobrac"
-  trigger:
-    project: downstream/modules
-    strategy: depend
+  extends: .deploy
