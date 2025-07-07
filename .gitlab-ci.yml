@@ -1,6 +1,6 @@
 include:
   - project: rdbioseq/cicd
-    file: cicd.yml
+    file: cicd_dev.yml
     inputs:
       module-name: "hobrac"
 
