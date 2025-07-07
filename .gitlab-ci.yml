@@ -1,8 +1,10 @@
 include:
   - project: rdbioseq/cicd
-    file: cicd_dev.yml
+    file: cicd.yml
     inputs:
       module-name: "hobrac"
+      other-branches-as-named: true
+
 
 stages: 
   - deploy

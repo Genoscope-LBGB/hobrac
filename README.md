@@ -3,8 +3,8 @@
 The purpose of HoBRAC is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes too noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in HoBRAC:
   - the user provides a genome assembly fasta file, a taxid and the organism name
   - the lineage of the organism is retrieved thanks to Taxonkit
-  - HoBRAC downloads the five closest genomes (based on taxonomy) from NCBI using ncbi-datasets
-  - MASH is ran on all genomes to determine which one is the closest to the provided assembly
+  - HoBRAC downloads the MASH database corresponding to the phylum of the assembly (we pre-computed a database per phylum and are making it available [here](https://www.genoscope.cns.fr/lbgb/mash/))
+  - MASH is ran on all genomes of the selected phylum to determine which one is the closest to the provided assembly
   - HoBRAC chooses the closest Busco dataset to use (based on taxonomy) and Busco is ran on the closest reference genome (based on the MASH distance) and on the assembly. A PAF file containing the positions of the Busco genes on the reference and on the assembly is created
   - Minimap2 is launched to align the closest reference (based on the MASH distance) and the assembly
   - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, we also provide index files for use in [D-GENIES](https://dgenies.toulouse.inra.fr/)

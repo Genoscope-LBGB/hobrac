@@ -1,5 +1,5 @@
-include: "rules/references.smk"
 include: "rules/mash.smk"
+include: "rules/references.smk"
 include: "rules/busco.smk"
 include: "rules/aln.smk"
 

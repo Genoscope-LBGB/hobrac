@@ -59,6 +59,12 @@ def get_args():
         default=None,
     )
     optional_args.add_argument(
+        "--rerun-incomplete",
+        action="store_true",
+        dest="rerun_incomplete",
+        help="Restart incomplete jobs (typically after a crash)",
+    )
+    optional_args.add_argument(
         "--busco-memory",
         action="store",
         dest="busco_memory",

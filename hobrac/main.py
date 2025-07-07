@@ -34,7 +34,10 @@ def create_dir(path: str):
 
 
 def get_base_snakemake_args(args) -> str:
-    cmd = "snakemake --latency-wait 30 --jobs 100 "
+    cmd = "snakemake --latency-wait 30 --jobs 100 -p "
+    
+    if args.rerun_incomplete:
+        cmd += "--rerun-incomplete "
 
     if args.executor:
         cmd += f"--executor {args.executor} --cores 4000 "
@@ -92,10 +95,8 @@ def main():
 def skip_reference_search(reference: str):
     create_dir("mash")
     with open("mash/closest_reference.txt", "w") as out:
-        print(f"user_reference\t{reference}", file=out, end="")
+        print(os.path.basename(reference), file=out, end="")
         
-    if os.path.exists("aln"):
-        os.rmdir("aln")
-        
-    if os.path.exists("busco/busco_reference"):
-        os.rmdir("busco/busco_reference")
+    create_dir("reference")
+    with open("reference/reference.txt", "w") as out:
+        print(reference, file=out, end="")
