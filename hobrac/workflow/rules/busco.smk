@@ -131,7 +131,7 @@ rule busco_to_paf:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
     resources:
         mem_mb = 10000,
-        runtime = 20
+        runtime = 600
     benchmark: "benchmarks/busco_to_paf.txt"
     shell: """
         prefix_ref=$(cat {input.accession})
