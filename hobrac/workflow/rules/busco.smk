@@ -69,7 +69,8 @@ rule get_closest_busco_dataset:
 
 rule busco_reference:
     input: 
-        mash_output = rules.select_closest_reference.output,
+        accession = rules.select_closest_reference.output,
+        reference = rules.get_top_reference.output,
         dataset = "busco/chosen_dataset.txt"
     output: directory("busco/busco_reference")
     threads: 12
@@ -79,8 +80,8 @@ rule busco_reference:
     benchmark: "benchmarks/busco_reference.txt"
     shell: """
         dataset=$(cat {input.dataset})
-        prefix=$(cat {input.mash_output} | cut -f 1)
-        filepath=$(cat {input.mash_output} | cut -f 2)
+        prefix=$(cat {input.accession})
+        filepath=$(cat {input.reference})
 
         cd busco/
 
@@ -120,7 +121,8 @@ rule busco_assembly:
 
 rule busco_to_paf:
     input:
-        mash_output = rules.select_closest_reference.output,
+        accession = rules.select_closest_reference.output,
+        reference = rules.get_top_reference.output,
         assembly = config["assembly"],
         busco_reference = "busco/busco_reference",
         busco_assembly = "busco/busco_assembly"
@@ -129,11 +131,11 @@ rule busco_to_paf:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
     resources:
         mem_mb = 10000,
-        runtime = 20
+        runtime = 600
     benchmark: "benchmarks/busco_to_paf.txt"
     shell: """
-        prefix_ref=$(cat {input.mash_output} | cut -f 1)
-        filepath=$(cat {input.mash_output} | cut -f 2)
+        prefix_ref=$(cat {input.accession})
+        filepath=$(cat {input.reference})
 
         busco_to_paf --busco_query {input.busco_assembly}/run*/full_table.tsv \
             --busco_ref {input.busco_reference}/run*/full_table.tsv \

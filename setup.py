@@ -6,8 +6,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setuptools.setup(
     name="HoBRAC",
     version="0.1.0",
-    author=["Jean-Marc Aury", "Benjamin Istace"],
-    author_email=["jmaury@genoscope.cns.fr", "bistace@genoscope.cns.fr"],
+    author="Benjamin Istace",
+    author_email="bistace@genoscope.cns.fr",
     description="HoBRAC is a rdbioseq tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -22,7 +22,12 @@ setuptools.setup(
     install_requires=["snakemake", "snakemake-executor-plugin-slurm", "find_reference_genomes", "xopen"],
     dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
-        "console_scripts": ["hobrac=hobrac.main:main", "busco_to_paf=hobrac.busco_to_paf:main", "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main"],
+        "console_scripts": [
+            "hobrac=hobrac.main:main", 
+            "busco_to_paf=hobrac.busco_to_paf:main", 
+            "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main",
+            "precompute_mash=hobrac.precompute_mash_refseq:main"
+        ],
     },
     python_requires='>=3.11',
 )

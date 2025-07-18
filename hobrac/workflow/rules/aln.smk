@@ -1,6 +1,7 @@
 rule aln:
     input:
         mash_output = rules.select_closest_reference.output,
+        reference = rules.get_top_reference.output,
         assembly = config["assembly"]
     output: touch("aln/aln.done")
     threads: 12
@@ -9,8 +10,8 @@ rule aln:
         runtime = 4 * 60
     benchmark: "benchmarks/aln.txt"
     shell: """
-        prefix=$(cat {input.mash_output} | cut -f 1)
-        filepath=$(cat {input.mash_output} | cut -f 2)
+        prefix=$(cat {input.mash_output})
+        filepath=$(cat {input.reference})
 
         mkdir -p aln/vs_${{prefix}} && cd aln/vs_${{prefix}}
 
@@ -22,6 +23,7 @@ rule gen_dgenies_index:
     input:
         rules.aln.output,
         mash_output = rules.select_closest_reference.output,
+        reference = rules.get_top_reference.output,
         assembly = config["assembly"]
     output: touch("aln/get_dgenies_index.done")
     params: 
@@ -32,14 +34,13 @@ rule gen_dgenies_index:
         runtime = 60
     benchmark: "benchmarks/aln.txt"
     shell: """
-        ref_prefix=$(cat {input.mash_output} | cut -f 1)
-        ref_name=$(echo $ref_prefix | sed 's/_/ /g')
-        ref_filepath=$(cat {input.mash_output} | cut -f 2)
+        accession=$(cat {input.mash_output})
+        ref_filepath=$(cat {input.reference})
 
-        cd aln/vs_${{ref_prefix}}
+        cd aln/vs_${{accession}}
 
         dgenies_fasta_to_index -i {input.assembly} -n "{params.name}" -o query_{params.assembly_prefix}.idx
-        dgenies_fasta_to_index -i ${{ref_filepath}} -n "${{ref_name}}" -o target_${{ref_prefix}}.idx
+        dgenies_fasta_to_index -i ${{ref_filepath}} -n "${{accession}}" -o target_${{accession}}.idx
 
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{ref_prefix}}.png --line-thickness 2
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}.png --line-thickness 2
     """

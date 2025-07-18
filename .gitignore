@@ -2,6 +2,8 @@ cmd.txt
 tests*
 *.out
 Felimare_picta/
+hobrac_analysis
+hobrac_test_ref
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
