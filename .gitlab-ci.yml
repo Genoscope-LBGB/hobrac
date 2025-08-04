@@ -3,8 +3,8 @@ include:
     file: cicd.yml
     inputs:
       module-name: "hobrac"
+      cd-branch: "master"
       other-branches-as-named: true
-
 
 stages: 
   - deploy
@@ -12,3 +12,7 @@ stages:
 deploy:
   stage: deploy
   extends: .deploy
+
+deploy-futur:
+    stage: deploy
+    extends: .deploy-futur
