@@ -1,6 +1,7 @@
 rule get_top_reference:
     input: rules.select_closest_reference.output
     output: "reference/reference.txt"
+    log: "logs/references/get_top_reference.log"
     resources:
         mem_mb = 5000,
         runtime = 2 * 60
@@ -8,10 +9,10 @@ rule get_top_reference:
     shell: """
         accession=$(cat {input})
         
-        cd reference
-        find_reference_genomes -d $accession -o $accession 2> find_reference_genomes.err
-        mv $accession/*.fna $accession.fna
-        rm -r $accession
+        cd reference 2>> {log}
+        find_reference_genomes -d $accession -o $accession 2>> {log}
+        mv $accession/*.fna $accession.fna 2>> {log}
+        rm -r $accession 2>> {log}
         
         ls $(pwd)/*.fna > reference.txt
     """

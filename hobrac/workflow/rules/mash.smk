@@ -2,12 +2,13 @@ rule download_db:
     output: "mash/mash_db.msh"
     params: taxid = config["taxid"]
     benchmark: "benchmarks/download_db.txt"
+    log: "logs/mash/download_db.log"
     resources:
         mem_mb = 10000,
         runtime = 30
     shell: """
         phylum=$(echo {params.taxid} | taxonkit reformat -I 1 --format '{{p}}' -r 'no_returned_phylum' | cut -f 2)
-        wget https://www.genoscope.cns.fr/lbgb/mash/${{phylum}}.msh -O {output}
+        wget https://www.genoscope.cns.fr/lbgb/mash/${{phylum}}.msh -O {output} 2>> {log}
         echo ${{phylum}} > {output}.phylum
     """
 
@@ -17,13 +18,14 @@ rule launch_mash:
         mashdb = rules.download_db.output,
         assembly = config["assembly"]
     output: "mash/mash.dist"
+    log: "logs/mash/launch_mash.log"
     resources:
         mem_mb = 20000,
         runtime = 120
     benchmark: "benchmarks/mash.txt"
     shell: """
         mash info {input.mashdb} > {input.mashdb}.info
-        mash dist -s 10000 {input.mashdb} {input.assembly} > {output}
+        mash dist -s 10000 {input.mashdb} {input.assembly} > {output} 2>> {log}
     """
 
 
@@ -32,6 +34,7 @@ rule select_closest_reference:
     output: "mash/closest_reference.txt"
     params:
         allow_zero_distance = config["allow_zero_distance"]
+    log: "logs/mash/select_closest_reference.log"
     resources:
         mem_mb = 2000,
         runtime = 10
