@@ -39,6 +39,14 @@ def get_args():
         required=True,
         default=None,
     )
+    parser.add_argument(
+        "--miniprot",
+        action="store_true",
+        dest="miniprot",
+        help="Use miniprot instead of metaeuk",
+        required=False,
+        default=False,
+    )
 
     optional_args = parser.add_argument_group("Optional arguments")
     optional_args.add_argument(

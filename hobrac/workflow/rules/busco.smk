@@ -73,6 +73,7 @@ rule busco_reference:
         reference = rules.get_top_reference.output,
         dataset = "busco/chosen_dataset.txt"
     output: directory("busco/busco_reference")
+    params: method = config["busco_method"]
     threads: 12
     resources:
         mem_mb = config["busco_memory"],
@@ -87,7 +88,7 @@ rule busco_reference:
 
         export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
 
-        busco --metaeuk -i $filepath -c {threads} -m geno \
+        busco --{params.method} -i $filepath -c {threads} -m geno \
             --download_path $buscodbpath  -o busco_reference -l $dataset
         
         ln -s busco_reference busco_$prefix
@@ -100,6 +101,7 @@ rule busco_assembly:
         assembly = config["assembly"],
         dataset = rules.get_closest_busco_dataset.output
     output: directory("busco/busco_assembly")
+    params: method = config["busco_method"]
     threads: 12
     resources:
         mem_mb = config["busco_memory"],
@@ -112,7 +114,7 @@ rule busco_assembly:
 
         export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
 
-        busco --metaeuk -i {input.assembly} -c {threads} -m geno \
+        busco --{params.method} -i {input.assembly} -c {threads} -m geno \
             --download_path $buscodbpath  -o busco_assembly -l $dataset
         
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}

@@ -64,6 +64,11 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     
+    if args.miniprot:
+        cmd += "busco_method=miniprot "
+    else:
+        cmd += "busco_method=metaeuk "
+    
     cmd += f"minimap2_memory={args.minimap2_memory} "
     cmd += f"busco_memory={args.busco_memory} "
 
