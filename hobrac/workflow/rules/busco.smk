@@ -39,7 +39,7 @@ rule get_closest_busco_dataset:
     run:
         import sys
 
-        datasets = set()
+        datasets = {}
         with open(input.datasets[0]) as datasets_file:
             for line in datasets_file:
                 line = line.strip()
@@ -50,7 +50,8 @@ rule get_closest_busco_dataset:
 
                 line = line.replace("-", "")
                 dataset_name = line.split("_odb")[0].lower()
-                datasets.add(dataset_name)
+                dataset_version = line.lower()
+                datasets[dataset_name] = dataset_version.split("[")[0]
 
         with open(input.lineage[0]) as lineage_file, open(output[0], "w") as out:
             lineage = lineage_file.readline()
@@ -60,7 +61,7 @@ rule get_closest_busco_dataset:
             for rank in lineage_tree[::-1]:
                 rank = rank.lower()
                 if rank in datasets:
-                    print(rank, file=out, end="")
+                    print(f"{rank}\t{datasets[rank]}", file=out, end="")
                     return
 
         print("ERROR: no matching dataset found", file=sys.stderr)
@@ -80,14 +81,16 @@ rule busco_reference:
         runtime = 24 * 60
     benchmark: "benchmarks/busco_reference.txt"
     shell: """
-        dataset=$(cat {input.dataset})
+        dataset=$(cat {input.dataset} | cut -f 1)
+        version=$(cat {input.dataset} | cut -f 2)
         prefix=$(cat {input.accession})
         filepath=$(cat {input.reference})
 
         cd busco/
 
         export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
-
+        busco --download_path $buscodbpath --download $version
+        find $buscodbpath -exec touch {{}} \\;
         busco --{params.method} -i $filepath -c {threads} -m geno \
             --download_path $buscodbpath  -o busco_reference -l $dataset
         
@@ -108,12 +111,14 @@ rule busco_assembly:
         runtime = 24 * 60
     benchmark: "benchmarks/busco_assembly.txt"
     shell: """
-        dataset=$(cat {input.dataset})
+        dataset=$(cat {input.dataset} | cut -f 1)
+        version=$(cat {input.dataset} | cut -f 2)
 
         cd busco/
 
         export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
-
+        busco --download_path $buscodbpath --download $version
+        find $buscodbpath -exec touch {{}} \\;
         busco --{params.method} -i {input.assembly} -c {threads} -m geno \
             --download_path $buscodbpath  -o busco_assembly -l $dataset
         
