@@ -9,10 +9,10 @@ rule get_top_reference:
     shell: """
         accession=$(cat {input})
         
-        cd reference 2>> {log}
-        find_reference_genomes -d $accession -o $accession 2>> {log}
-        mv $accession/*.fna $accession.fna 2>> {log}
-        rm -r $accession 2>> {log}
+        cd reference
+        find_reference_genomes -d $accession -o $accession 
+        mv $accession/*.fna $accession.fna
+        rm -r $accession
         
         ls $(pwd)/*.fna > reference.txt
     """
