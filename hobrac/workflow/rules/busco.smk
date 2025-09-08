@@ -136,8 +136,8 @@ rule busco_to_paf:
         accession = rules.select_closest_reference.output,
         reference = rules.get_top_reference.output,
         assembly = config["assembly"],
-        busco_reference = "busco/busco_reference",
-        busco_assembly = "busco/busco_assembly"
+        busco_reference = lambda wildcards: config.get("busco_reference_override", "busco/busco_reference"),
+        busco_assembly = lambda wildcards: config.get("busco_assembly_override", "busco/busco_assembly")
     output: directory("aln/busco")
     params:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
