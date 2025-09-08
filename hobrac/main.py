@@ -117,10 +117,10 @@ def generate_snakemake_command(args) -> str:
     cmd += f"minimap2_memory={args.minimap2_memory} "
     cmd += f"busco_memory={args.busco_memory} "
 
-    if args.busco_assembly:
-        cmd += f"busco_assembly_override='{args.busco_assembly}' "
-    if args.busco_reference:
-        cmd += f"busco_reference_override='{args.busco_reference}' "
+    if getattr(args, "busco_assembly_override_path", None):
+        cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
+    if getattr(args, "busco_reference_override_path", None):
+        cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
 
     cmd += f"container_version='{args.container_version}' "
 
