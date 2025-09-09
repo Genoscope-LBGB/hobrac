@@ -59,6 +59,23 @@ def get_args():
         type=os.path.abspath,
     )
     optional_args.add_argument(
+        "--busco-assembly",
+        action="store",
+        dest="busco_assembly",
+        help="Path to a BUSCO result directory (or run dir or full_table.tsv) to reuse for the assembly",
+        default=None,
+        type=os.path.abspath,
+    )
+    optional_args.add_argument(
+        "--busco-reference",
+        action="store",
+        dest="busco_reference",
+        help="Path to a BUSCO result directory (or run dir or full_table.tsv) to reuse for the reference",
+        default=None,
+        type=os.path.abspath,
+    )
+
+    optional_args.add_argument(
         "-e",
         "--executor",
         action="store",
