@@ -9,7 +9,12 @@ localrules:
     select_closest_reference
 
 
-rule all:
-    input: 
-        "aln/busco",
-        "aln/get_dgenies_index.done"
+if config.get("stop_after_mash", False):
+    rule all:
+        input:
+            "mash/mash.dist"
+else:
+    rule all:
+        input:
+            "aln/busco",
+            "aln/get_dgenies_index.done"
