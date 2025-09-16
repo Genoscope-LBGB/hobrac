@@ -6,6 +6,8 @@ include: "rules/aln.smk"
 
 localrules:
     get_closest_busco_dataset,
+    select_closest_reference,
+    download_db,
     select_closest_reference
 
 
