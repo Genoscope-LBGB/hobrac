@@ -128,6 +128,14 @@ def get_args():
         required=False,
     )
     optional_args.add_argument(
+        "--stop-after-mash",
+        action="store_true",
+        dest="stop_after_mash",
+        help="Stop the pipeline after computing mash distances",
+        default=False,
+        required=False,
+    )
+    optional_args.add_argument(
         "--use-apptainer",
         action="store_true",
         dest="use_apptainer",

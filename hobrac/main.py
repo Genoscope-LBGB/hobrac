@@ -11,8 +11,10 @@ thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
 
 
-def check_dependencies(require_busco: bool = True):
-    deps = ["find_reference_genomes", "datasets", "taxonkit", "mash"]
+def check_dependencies(require_busco: bool = True, require_reference_search: bool = True):
+    deps = ["taxonkit", "mash"]
+    if require_reference_search:
+        deps.extend(["find_reference_genomes", "datasets"])
     if require_busco:
         deps.append("busco")
 
@@ -112,6 +114,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"taxid={args.taxid} "
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
+    cmd += f"stop_after_mash={args.stop_after_mash} "
 
     if args.miniprot:
         cmd += "busco_method=miniprot "
@@ -154,7 +157,10 @@ def main():
 
     # Dependencies: require busco only if at least one side still needs to run
     require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
-    check_dependencies(require_busco=require_busco)
+    check_dependencies(
+        require_busco=require_busco,
+        require_reference_search=not args.stop_after_mash,
+    )
 
     if args.reference:
         skip_reference_search(args.reference)
