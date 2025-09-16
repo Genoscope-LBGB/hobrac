@@ -131,9 +131,6 @@ def generate_snakemake_command(args) -> str:
 
     cmd += f"container_version='{args.container_version}' "
 
-    if args.stop_after_mash:
-        cmd += "mash/mash.dist "
-
     return cmd
 
 
