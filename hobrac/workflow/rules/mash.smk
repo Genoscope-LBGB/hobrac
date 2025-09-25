@@ -33,7 +33,9 @@ rule select_closest_reference:
     input: rules.launch_mash.output
     output: "mash/closest_reference.txt"
     params:
-        allow_zero_distance = config["allow_zero_distance"]
+        allow_zero_distance = config["allow_zero_distance"],
+        allow_same_taxid = config["allow_same_taxid"],
+        taxid = config["taxid"]
     log: "logs/mash/select_closest_reference.log"
     resources:
         mem_mb = 2000,
@@ -50,11 +52,17 @@ rule select_closest_reference:
                 line = line.rstrip().split("\t")
                 distance = float(line[2])
 
+                taxid = "0"
+                if ":" in line[0]:
+                    taxid = line[0].split(":")[1]
+                if not params.allow_same_taxid and params.taxid == taxid:
+                    continue
+
                 if distance == 0.0 and not params.allow_zero_distance:
                     continue
                     
                 if distance <= minimum_distance:
                     minimum_distance = distance
-                    accession = line[0]
+                    accession = line[0].split(":")[0]
 
             print(accession, file=out, end="")
