@@ -30,6 +30,15 @@ def get_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-e", "--eukaryote-list",
+        action="store",
+        dest="euk_list_file",
+        help="File containing the list of chromosome/complete eukaryote genomes at NCBI. TSV format: GCA_accession\\tTaxid",
+        required=True,
+        default=None,
+        type=os.path.abspath,        
+    )
+    parser.add_argument(
         "-o",
         action="store",
         dest="output_dir",
@@ -47,10 +56,8 @@ def get_args() -> argparse.Namespace:
 def main():
     args = get_args()
 
-    get_eukaryote_list(args.output_dir)
-    extract_chromosome_complete(args.output_dir)
     download_taxdump(args.output_dir)
-    extract_phylum(args.output_dir)
+    extract_phylum(args.output_dir, args.euk_list_file)
     phylums = collect_phylums(args.output_dir)
 
     download_dir = os.path.join(args.output_dir, "downloads")
@@ -105,15 +112,15 @@ def download_taxdump(output_dir):
     os.system(f"cd {taxdump} && tar -xzf {taxdump_gz} && rm {taxdump_gz}")
     
 
-def extract_phylum(output_dir):
+def extract_phylum(output_dir, euk_list_file):
     print("Extracting phylums...", flush=True, file=sys.stderr)
     
-    genome_list = os.path.join(output_dir, "eukaryotes_chr_complete.txt")
+    genome_list = euk_list_file
     taxdump = os.path.join(output_dir, "taxdump")
     accession_list = os.path.join(output_dir, "final_list.txt")
     
     os.environ["TAXONKIT_DB"] = taxdump
-    os.system(f"cat {genome_list} | taxonkit reformat -I 1 --format '{{p}}' -r 'no_returned_phylum' " \
+    os.system(f"cat {genome_list} | taxonkit reformat -I 2 --format '{{p}}' -r 'no_returned_phylum' " \
         f"| grep -v 'no_returned_phylum' > {accession_list}")
     
     shutil.rmtree(taxdump)
