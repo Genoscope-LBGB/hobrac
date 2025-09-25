@@ -74,31 +74,6 @@ def main():
         os.makedirs(mash_dir_tmp, exist_ok=True)
     run_mash(download_dir, mash_dir_tmp)
     paste_mash(mash_dir_tmp, mash_dir)
-
-
-def get_eukaryote_list(output_dir):
-    print("Getting genome list...", flush=True, file=sys.stderr)
-    
-    ftp_url = "ftp.ncbi.nih.gov"
-    ftp = ftplib.FTP(ftp_url)
-    ftp.login()
-
-    url = "genomes/GENOME_REPORTS/eukaryotes.txt"
-    print(f"Dowloading ftp://{ftp_url}/{url}", file=sys.stderr)
-
-    with open(f"{output_dir}/eukaryotes.txt", "wb") as f:
-        ftp.retrbinary(f"RETR {url}", f.write)
-    ftp.quit()
-
-
-def extract_chromosome_complete(output_dir):
-    print("Extracting complete genomes...", flush=True, file=sys.stderr)
-    
-    with open(f"{output_dir}/eukaryotes.txt") as inf, open(f"{output_dir}/eukaryotes_chr_complete.txt", "w") as out:
-        for line in inf:
-            if "Chromosome" in line or "Complete Genome" in line:
-                line = line.split("\t")
-                print(f"{line[1]}\t{line[8]}", file=out)
                 
                 
 def download_taxdump(output_dir):
@@ -134,7 +109,7 @@ def collect_phylums(output_dir) -> defaultdict[str, List[Genome]]:
         for line in inf:
             line = line.rstrip("\n").split("\t")
             accession: str = line[0]
-            phylum: str = line[2].replace(" ", "_")
+            phylum: str = line[3].replace(" ", "_")
             phylums[phylum].append(Genome(accession, None))
             
     return phylums
