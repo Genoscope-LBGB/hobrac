@@ -250,7 +250,7 @@ def run_mash(input_dir, output_dir):
         accession = match.group("accession")
         phylum = match.group("phylum")
         taxid = match.group("taxid")
-        identifier = f"{accession}_{taxid}"
+        identifier = f"{accession}:{taxid}"
         output_path = os.path.join(output_dir, phylum, os.path.basename(f))
         os.makedirs(output_path, exist_ok=True)
 
