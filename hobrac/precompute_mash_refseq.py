@@ -33,7 +33,7 @@ def get_args() -> argparse.Namespace:
         "-e", "--eukaryote-list",
         action="store",
         dest="euk_list_file",
-        help="File containing the list of chromosome/complete eukaryote genomes at NCBI. TSV format: GCA_accession\\tTaxid",
+        help="File containing the list of chromosome/complete eukaryote genomes at NCBI. TSV format: GCA_accession\\tAssembly_name\\tTaxid",
         required=True,
         default=None,
         type=os.path.abspath,        
@@ -120,7 +120,7 @@ def extract_phylum(output_dir, euk_list_file):
     accession_list = os.path.join(output_dir, "final_list.txt")
     
     os.environ["TAXONKIT_DB"] = taxdump
-    os.system(f"cat {genome_list} | taxonkit reformat -I 2 --format '{{p}}' -r 'no_returned_phylum' " \
+    os.system(f"cat {genome_list} | taxonkit reformat -I 3 --format '{{p}}' -r 'no_returned_phylum' " \
         f"| grep -v 'no_returned_phylum' > {accession_list}")
     
     shutil.rmtree(taxdump)
@@ -133,7 +133,7 @@ def collect_phylums(output_dir) -> defaultdict[str, List[Genome]]:
     with open(accession_list) as inf:
         for line in inf:
             line = line.rstrip("\n").split("\t")
-            accession: str = line[1]
+            accession: str = line[0]
             phylum: str = line[2].replace(" ", "_")
             phylums[phylum].append(Genome(accession, None))
             
