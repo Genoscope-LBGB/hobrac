@@ -18,6 +18,7 @@ from typing import Dict, List
 @dataclass
 class Genome:
     accession: str
+    taxid: str
     url: str | None = None
 
 
@@ -109,8 +110,9 @@ def collect_phylums(output_dir) -> defaultdict[str, List[Genome]]:
         for line in inf:
             line = line.rstrip("\n").split("\t")
             accession: str = line[0]
+            taxid: str = line[2]
             phylum: str = line[3].replace(" ", "_")
-            phylums[phylum].append(Genome(accession, None))
+            phylums[phylum].append(Genome(accession, taxid, None))
             
     return phylums
 
@@ -197,8 +199,9 @@ def download_genomes(phylums: defaultdict[str, List[Genome]], output_dir):
                 continue
             
             accession = genome.accession
+            taxid = genome.taxid
             url = genome.url
-            compressed_name = os.path.join(phylums_download_dir, f"{accession}.fna.gz")
+            compressed_name = os.path.join(phylums_download_dir, f"{accession}_{taxid}.fna.gz")
 
             try:
                 response = requests.get(url, stream=True)
@@ -236,7 +239,7 @@ def decompress(output_dir):
 
 
 def run_mash(input_dir, output_dir):
-    pattern = r"(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)"
+    pattern = r"^(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna$"
     
     for f in glob.glob(f"{input_dir}/*/*.fna"):
         match = re.search(pattern, f)
@@ -244,8 +247,10 @@ def run_mash(input_dir, output_dir):
             print(f"Could not find a GC[AF] match for {f}", flush=True, file=sys.stderr)
             continue
         
+        accession = match.group("accession")
         phylum = match.group("phylum")
-        identifier = match.group("accession")
+        taxid = match.group("taxid")
+        identifier = f"{accession}_{taxid}"
         output_path = os.path.join(output_dir, phylum, os.path.basename(f))
         os.makedirs(output_path, exist_ok=True)
 
