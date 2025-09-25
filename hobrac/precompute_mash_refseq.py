@@ -121,7 +121,7 @@ def extract_phylum(output_dir, euk_list_file):
     
     os.environ["TAXONKIT_DB"] = taxdump
     os.system(f"cat {genome_list} | taxonkit reformat -I 3 --format '{{p}}' -r 'no_returned_phylum' " \
-        f"| grep -v 'no_returned_phylum' > {accession_list}")
+        f" > {accession_list}")
     
     shutil.rmtree(taxdump)
     
