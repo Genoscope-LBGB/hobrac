@@ -157,5 +157,8 @@ rule busco_to_paf:
         mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
         mv {output}/target_reference.idx {output}/busco_target_${{prefix_ref}}.idx
 
-        dotplotrs -p {output}/aln_busco.paf -o {output}/busco.png --line-thickness 4
+        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_significance.png --line-thickness 8
+        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_gravity.png --line-thickness 8 --gravity-only-ordering
+        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_bw.png --line-thickness 8 --no-color
+        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_bw_gravity.png --line-thickness 8 --no-color --gravity-only-ordering
     """
