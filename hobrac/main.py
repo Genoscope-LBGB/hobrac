@@ -121,8 +121,8 @@ def generate_snakemake_command(args) -> str:
     else:
         cmd += "busco_method=metaeuk "
 
-    cmd += f"minimap2_memory={args.minimap2_memory} "
-    cmd += f"busco_memory={args.busco_memory} "
+    cmd += f"minimap2_memory={args.minimap2_memory * 1000} "
+    cmd += f"busco_memory={args.busco_memory * 1000} "
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "

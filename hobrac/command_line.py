@@ -93,15 +93,17 @@ def get_args():
         "--busco-memory",
         action="store",
         dest="busco_memory",
-        help="Amount of RAM in MB reserved for Busco",
-        default=100_000,
+        help="Amount of RAM in GB reserved for Busco",
+        default=100,
+        type=int,
     )
     optional_args.add_argument(
         "--minimap2-memory",
         action="store",
         dest="minimap2_memory",
-        help="Amount of RAM in MB reserved for Minimap2",
-        default=100_000,
+        help="Amount of RAM in GB reserved for Minimap2",
+        default=100,
+        type=int,
     )
     optional_args.add_argument(
         "-o",
