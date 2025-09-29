@@ -8,7 +8,7 @@ def get_args():
         prog="HoBRAC",
         description="\n\nHomology-based reference genome acquisition and comparison",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        add_help=False,
+        add_help=True,
     )
 
     parser.add_argument(
