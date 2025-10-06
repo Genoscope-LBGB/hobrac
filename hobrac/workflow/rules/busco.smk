@@ -92,11 +92,8 @@ rule busco_reference:
 
         cd busco/
 
-        export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
-        busco --download_path $buscodbpath --download $version
-        find $buscodbpath -exec touch {{}} \\;
         busco --skip_bbtools --{params.method} -i $filepath -c {threads} -m geno \
-            --download_path $buscodbpath  -o busco_reference -l $dataset
+            -o busco_reference -l $dataset
         
         ln -s busco_reference busco_$prefix
         rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
@@ -121,11 +118,8 @@ rule busco_assembly:
 
         cd busco/
 
-        export buscodbpath="$(pwd)/$(whoami)_buscodb_$$"
-        busco --download_path $buscodbpath --download $version
-        find $buscodbpath -exec touch {{}} \\;
         busco --skip_bbtools --{params.method} -i {input.assembly} -c {threads} -m geno \
-            --download_path $buscodbpath  -o busco_assembly -l $dataset
+            -o busco_assembly -l $dataset
         
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
     """
