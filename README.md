@@ -7,7 +7,7 @@ The purpose of HoBRAC is to facilitate structural comparison between two genomes
   - MASH is ran on all genomes of the selected phylum to determine which one is the closest to the provided assembly
   - HoBRAC chooses the closest Busco dataset to use (based on taxonomy) and Busco is ran on the closest reference genome (based on the MASH distance) and on the assembly. A PAF file containing the positions of the Busco genes on the reference and on the assembly is created
   - Minimap2 is launched to align the closest reference (based on the MASH distance) and the assembly
-  - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, we also provide index files for use in [D-GENIES](https://dgenies.toulouse.inra.fr/)
+  - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, an alignment viewer is available [here](https://www.genoscope.cns.fr/lbgb/hobrac/)
 
 
 On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyllidia flava (x-axis) and on the right the alignment of busco genes for the same genomes.
@@ -55,3 +55,7 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogast
 ``` 
 
 The list of available plugins is available [here](https://snakemake.github.io/snakemake-plugin-catalog/).
+
+## Visualization
+
+To enable manual inspection of the alignments, a viewer is available online on our [website](https://www.genoscope.cns.fr/lbgb/hobrac/). This viewer makes it possible to explore alignments interactively using either the classical dotplot view or various ribbon plots.
