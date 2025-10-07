@@ -96,7 +96,7 @@ rule busco_reference:
             -o busco_reference -l $dataset
         
         ln -s busco_reference busco_$prefix
-        rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
+        rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
 
 
@@ -121,7 +121,7 @@ rule busco_assembly:
         busco --skip_bbtools --{params.method} -i {input.assembly} -c {threads} -m geno \
             -o busco_assembly -l $dataset
         
-        rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}} ${{buscodbpath}}
+        rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
                 
 
