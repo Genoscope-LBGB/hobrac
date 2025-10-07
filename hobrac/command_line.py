@@ -40,10 +40,10 @@ def get_args():
         default=None,
     )
     parser.add_argument(
-        "--miniprot",
+        "--metaeuk",
         action="store_true",
-        dest="miniprot",
-        help="Use miniprot instead of metaeuk",
+        dest="metaeuk",
+        help="Use metaeuk instead of miniprot",
         required=False,
         default=False,
     )

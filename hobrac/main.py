@@ -116,10 +116,10 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     cmd += f"stop_after_mash={args.stop_after_mash} "
 
-    if args.miniprot:
-        cmd += "busco_method=miniprot "
-    else:
+    if args.metaeuk:
         cmd += "busco_method=metaeuk "
+    else:
+        cmd += "busco_method=miniprot "
 
     cmd += f"minimap2_memory={args.minimap2_memory * 1000} "
     cmd += f"busco_memory={args.busco_memory * 1000} "
