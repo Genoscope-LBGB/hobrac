@@ -44,5 +44,8 @@ rule gen_dgenies_index:
         dgenies_fasta_to_index -i {input.assembly} -n "{params.name}" -o query_{params.assembly_prefix}.idx
         dgenies_fasta_to_index -i ${{ref_filepath}} -n "${{accession}}" -o target_${{accession}}.idx
 
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}.png --line-thickness 2
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}_significance.png --line-thickness 8
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}_gravity.png --line-thickness 8 --gravity-only-ordering
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}_bw.png --line-thickness 8 --no-color
+        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_${{accession}}_bw_gravity.png --line-thickness 8 --no-color --gravity-only-ordering
     """
