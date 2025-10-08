@@ -116,13 +116,13 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     cmd += f"stop_after_mash={args.stop_after_mash} "
 
-    if args.miniprot:
-        cmd += "busco_method=miniprot "
-    else:
+    if args.metaeuk:
         cmd += "busco_method=metaeuk "
+    else:
+        cmd += "busco_method=miniprot "
 
-    cmd += f"minimap2_memory={args.minimap2_memory} "
-    cmd += f"busco_memory={args.busco_memory} "
+    cmd += f"minimap2_memory={args.minimap2_memory * 1000} "
+    cmd += f"busco_memory={args.busco_memory * 1000} "
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
