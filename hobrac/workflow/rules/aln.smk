@@ -32,7 +32,7 @@ rule gen_dgenies_index:
         assembly_prefix = config["scientific_name"].replace(" ", "_")
     log: "logs/aln/gen_dgenies_index.log"
     resources:
-        mem_mb = 10000,
+        mem_mb = 50000,
         runtime = 60
     benchmark: "benchmarks/aln.txt"
     shell: """
