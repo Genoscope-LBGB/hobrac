@@ -67,8 +67,9 @@ rule get_closest_busco_dataset:
                     print(f"{rank}\t{datasets[rank]}", file=out, end="")
                     return
 
-        print("ERROR: no matching dataset found", file=sys.stderr)
-        sys.exit(1)     
+        print("WARNING: no matching dataset found, using eukaryota", file=sys.stderr)
+        with open(input.lineage[0]) as lineage_file, open(output[0], "w") as out:
+            print(f"eukaryota\teukaryota_odb12", file=out, end="")
 
 
 rule busco_reference:
