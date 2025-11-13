@@ -1,3 +1,6 @@
+variables:
+  VERBOSITY=10
+  
 include:
   - project: rdbioseq/cicd
     file: cicd.yml
