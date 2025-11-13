@@ -4,7 +4,6 @@ rule aln:
         reference = rules.get_top_reference.output,
         assembly = config["assembly"]
     output: touch("aln/aln.done")
-    log: "logs/aln/aln.log"
     threads: 12
     resources:
         mem_mb = config["minimap2_memory"],

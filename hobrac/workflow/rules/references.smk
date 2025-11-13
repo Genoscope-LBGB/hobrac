@@ -1,7 +1,6 @@
 rule get_top_reference:
     input: rules.select_closest_reference.output
     output: "reference/reference.txt"
-    log: "logs/references/get_top_reference.log"
     resources:
         mem_mb = 5000,
         runtime = 2 * 60

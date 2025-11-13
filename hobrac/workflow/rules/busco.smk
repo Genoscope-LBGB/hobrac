@@ -5,7 +5,6 @@ rule get_lineage:
     output: "busco/lineage.txt"
     params:
         taxid = config["taxid"]
-    log: "logs/busco/get_lineage.log"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -18,7 +17,6 @@ rule get_lineage:
 rule get_busco_datasets:
     input: rules.get_lineage.output
     output: "busco/datasets.txt"
-    log: "logs/busco/get_busco_datasets.log"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -34,7 +32,6 @@ rule get_closest_busco_dataset:
         lineage = rules.get_lineage.output, 
         datasets = rules.get_busco_datasets.output
     output: "busco/chosen_dataset.txt"
-    log: "logs/busco/get_closest_busco_dataset.log"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -79,7 +76,6 @@ rule busco_reference:
         dataset = "busco/chosen_dataset.txt"
     output: directory("busco/busco_reference")
     params: method = config["busco_method"]
-    log: "logs/busco/busco_reference.log"
     threads: 12
     resources:
         mem_mb = config["busco_memory"],
@@ -106,8 +102,7 @@ rule busco_assembly:
         assembly = config["assembly"],
         dataset = rules.get_closest_busco_dataset.output
     output: directory("busco/busco_assembly")
-    params: method = config["busco_method"]
-    log: "logs/busco/busco_assembly.log"
+    params: method = config["busco_method"
     threads: 12
     resources:
         mem_mb = config["busco_memory"],
@@ -136,7 +131,6 @@ rule busco_to_paf:
     output: directory("aln/busco")
     params:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
-    log: "logs/busco/busco_to_paf.log"
     resources:
         mem_mb = 50000,
         runtime = 600
