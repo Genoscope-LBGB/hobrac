@@ -1,5 +1,5 @@
 variables:
-  VERBOSITY=10
+  VERBOSITY: 10
   
 include:
   - project: rdbioseq/cicd
