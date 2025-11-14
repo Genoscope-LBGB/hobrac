@@ -28,8 +28,8 @@ rule get_busco_datasets:
 
 
 rule get_closest_busco_dataset:
-    input: 
-        lineage = rules.get_lineage.output, 
+    input:
+        lineage = rules.get_lineage.output,
         datasets = rules.get_busco_datasets.output
     output: "busco/chosen_dataset.txt"
     resources:
@@ -70,7 +70,7 @@ rule get_closest_busco_dataset:
 
 
 rule busco_reference:
-    input: 
+    input:
         accession = rules.select_closest_reference.output,
         reference = rules.get_top_reference.output,
         dataset = "busco/chosen_dataset.txt"
@@ -91,7 +91,7 @@ rule busco_reference:
 
         busco --skip_bbtools --{params.method} -i $filepath -c {threads} -m geno \
             -o busco_reference -l $dataset
-        
+
         ln -s busco_reference busco_$prefix
         rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
@@ -102,7 +102,7 @@ rule busco_assembly:
         assembly = config["assembly"],
         dataset = rules.get_closest_busco_dataset.output
     output: directory("busco/busco_assembly")
-    params: method = config["busco_method"
+    params: method = config["busco_method"]
     threads: 12
     resources:
         mem_mb = config["busco_memory"],
@@ -116,10 +116,10 @@ rule busco_assembly:
 
         busco --skip_bbtools --{params.method} -i {input.assembly} -c {threads} -m geno \
             -o busco_assembly -l $dataset
-        
+
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
-                
+
 
 rule busco_to_paf:
     input:
