@@ -81,7 +81,7 @@ def link_busco_dir(src_dir: str, dest_dir: str):
 
 
 def get_base_snakemake_args(args) -> str:
-    cmd = "snakemake --latency-wait 30 --jobs 100 -p --skip-script-cleanup "
+    cmd = "snakemake --latency-wait 70 --jobs 100 -p --skip-script-cleanup "
 
     # Fallback to greedy scheduler if CBC solver is not available to avoid PuLP errors
     if shutil.which("cbc") is None:
