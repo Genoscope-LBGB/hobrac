@@ -81,7 +81,7 @@ def get_args():
         action="store",
         dest="executor",
         help="Name of a snakemake executor plugin to execute the pipeline on a computing cluster",
-        default=None,
+        default="slurm",
     )
     optional_args.add_argument(
         "--rerun-incomplete",
