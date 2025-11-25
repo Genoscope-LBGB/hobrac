@@ -5,6 +5,7 @@ rule get_lineage:
     output: "busco/lineage.txt"
     params:
         taxid = config["taxid"]
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -17,6 +18,7 @@ rule get_lineage:
 rule get_busco_datasets:
     input: rules.get_lineage.output
     output: "busco/datasets.txt"
+    container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -32,6 +34,7 @@ rule get_closest_busco_dataset:
         lineage = rules.get_lineage.output,
         datasets = rules.get_busco_datasets.output
     output: "busco/chosen_dataset.txt"
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -77,6 +80,7 @@ rule busco_reference:
     output: directory("busco/busco_reference")
     params: method = config["busco_method"]
     threads: 12
+    container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = config["busco_memory"],
         runtime = 24 * 60
@@ -104,6 +108,7 @@ rule busco_assembly:
     output: directory("busco/busco_assembly")
     params: method = config["busco_method"]
     threads: 12
+    container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = config["busco_memory"],
         runtime = 24 * 60
@@ -131,6 +136,7 @@ rule busco_to_paf:
     output: directory("aln/busco")
     params:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 50000,
         runtime = 600

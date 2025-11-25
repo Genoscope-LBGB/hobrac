@@ -5,6 +5,7 @@ rule aln:
         assembly = config["assembly"]
     output: touch("aln/aln.done")
     threads: 12
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = config["minimap2_memory"],
         runtime = 12 * 60
@@ -30,6 +31,7 @@ rule gen_dgenies_index:
         name = config["scientific_name"],
         assembly_prefix = config["scientific_name"].replace(" ", "_")
     log: "logs/aln/gen_dgenies_index.log"
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 50000,
         runtime = 60

@@ -1,6 +1,7 @@
 rule download_db:
     output: "mash/mash_db.msh"
     params: taxid = config["taxid"]
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     benchmark: "benchmarks/download_db.txt"
     resources:
         mem_mb = 10000,
@@ -17,6 +18,7 @@ rule launch_mash:
         mashdb = rules.download_db.output,
         assembly = config["assembly"]
     output: "mash/mash.dist"
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 20000,
         runtime = 120
@@ -34,6 +36,7 @@ rule select_closest_reference:
         allow_zero_distance = config["allow_zero_distance"],
         allow_same_taxid = config["allow_same_taxid"],
         taxid = config["taxid"]
+    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 2000,
         runtime = 10
