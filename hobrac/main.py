@@ -132,8 +132,6 @@ def generate_snakemake_command(args) -> str:
     if getattr(args, "busco_reference_override_path", None):
         cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
 
-    cmd += f"container_version='{args.container_version}' "
-
     return cmd
 
 
