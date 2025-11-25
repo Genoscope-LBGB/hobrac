@@ -157,11 +157,12 @@ def main():
         args.busco_reference_override_path = None
 
     # Dependencies: require busco only if at least one side still needs to run
-    require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
-    check_dependencies(
-        require_busco=require_busco,
-        require_reference_search=not args.stop_after_mash,
-    )
+    if not args.use_docker and not args.use_singularity and not args.use_apptainer:
+        require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
+        check_dependencies(
+            require_busco=require_busco,
+            require_reference_search=not args.stop_after_mash,
+        )
 
     if args.reference:
         skip_reference_search(args.reference)
