@@ -34,7 +34,6 @@ rule get_closest_busco_dataset:
         lineage = rules.get_lineage.output,
         datasets = rules.get_busco_datasets.output
     output: "busco/chosen_dataset.txt"
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 5000,
         runtime = 20

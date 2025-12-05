@@ -36,7 +36,6 @@ rule select_closest_reference:
         allow_zero_distance = config["allow_zero_distance"],
         allow_same_taxid = config["allow_same_taxid"],
         taxid = config["taxid"]
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 2000,
         runtime = 10
