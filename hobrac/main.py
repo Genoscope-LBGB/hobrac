@@ -96,12 +96,24 @@ def get_base_snakemake_args(args) -> str:
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "
 
-    if args.use_apptainer:
-        cmd += "--use-apptainer "
-    elif args.use_singularity:
-        cmd += "--use-singularity "
-    elif args.use_docker:
-        cmd += "--use_docker "
+    if args.use_apptainer or args.use_singularity or args.use_docker:
+        taxonkit_db = os.environ.get("TAXONKIT_DB")
+        if not taxonkit_db:
+            print(
+                "Error: TAXONKIT_DB environment variable is not set.\n"
+                "When using containers, you must provide the path to your taxonkit database.\n"
+                "Download it from https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz and run:\n"
+                "  export TAXONKIT_DB=/path/to/extracted/taxdump",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if args.use_apptainer:
+            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit' "
+        elif args.use_singularity:
+            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit' "
+        elif args.use_docker:
+            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit' "
 
     return cmd
 
