@@ -108,12 +108,14 @@ def get_base_snakemake_args(args) -> str:
             )
             sys.exit(1)
 
+        assembly_dir = os.path.dirname(args.assembly)
+
         if args.use_apptainer:
-            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit' "
+            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
         elif args.use_singularity:
-            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit' "
+            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
         elif args.use_docker:
-            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit' "
+            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit -v {assembly_dir}:{assembly_dir}' "
 
     return cmd
 
