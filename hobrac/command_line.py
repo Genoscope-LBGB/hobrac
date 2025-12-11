@@ -141,29 +141,22 @@ def get_args():
         "--use-apptainer",
         action="store_true",
         dest="use_apptainer",
-        help="UNUSED: Use apptainer to run the pipeline",
+        help="Use apptainer to run the pipeline",
         default=False,
     )
     optional_args.add_argument(
         "--use-singularity",
         action="store_true",
         dest="use_singularity",
-        help="UNUSED: Use singularity to run the pipeline",
+        help="Use singularity to run the pipeline",
         default=False,
     )
     optional_args.add_argument(
         "--use-docker",
         action="store_true",
         dest="use_docker",
-        help="UNUSED: Use docker to run the pipeline",
+        help="Use docker to run the pipeline",
         default=False,
-    )
-    optional_args.add_argument(
-        "--container-version",
-        action="store_true",
-        dest="container_version",
-        help="UNUSED: Container version to use",
-        default="0.1",
     )
 
     args = parser.parse_args()

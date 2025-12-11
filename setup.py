@@ -19,7 +19,12 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     package_data={"hobrac": ["workflow/*", "workflow/rules/*"]},
-    install_requires=["snakemake", "snakemake-executor-plugin-slurm", "find_reference_genomes", "xopen"],
+    install_requires=[
+        "snakemake>=9.13.4,<9.14",
+        "snakemake-executor-plugin-slurm>=1.9.2,<2",
+        "find_reference_genomes",
+        "xopen",
+    ],
     dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
         "console_scripts": [

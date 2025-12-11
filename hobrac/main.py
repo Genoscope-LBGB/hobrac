@@ -96,12 +96,26 @@ def get_base_snakemake_args(args) -> str:
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "
 
-    if args.use_apptainer:
-        cmd += "--use-apptainer "
-    elif args.use_singularity:
-        cmd += "--use-singularity "
-    elif args.use_docker:
-        cmd += "--use_docker "
+    if args.use_apptainer or args.use_singularity or args.use_docker:
+        taxonkit_db = os.environ.get("TAXONKIT_DB")
+        if not taxonkit_db:
+            print(
+                "Error: TAXONKIT_DB environment variable is not set.\n"
+                "When using containers, you must provide the path to your taxonkit database.\n"
+                "Download it from https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz and run:\n"
+                "  export TAXONKIT_DB=/path/to/extracted/taxdump",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        assembly_dir = os.path.dirname(args.assembly)
+
+        if args.use_apptainer:
+            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+        elif args.use_singularity:
+            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+        elif args.use_docker:
+            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit -v {assembly_dir}:{assembly_dir}' "
 
     return cmd
 
@@ -132,8 +146,6 @@ def generate_snakemake_command(args) -> str:
     if getattr(args, "busco_reference_override_path", None):
         cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
 
-    cmd += f"container_version='{args.container_version}' "
-
     return cmd
 
 
@@ -159,11 +171,12 @@ def main():
         args.busco_reference_override_path = None
 
     # Dependencies: require busco only if at least one side still needs to run
-    require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
-    check_dependencies(
-        require_busco=require_busco,
-        require_reference_search=not args.stop_after_mash,
-    )
+    if not args.use_docker and not args.use_singularity and not args.use_apptainer:
+        require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
+        check_dependencies(
+            require_busco=require_busco,
+            require_reference_search=not args.stop_after_mash,
+        )
 
     if args.reference:
         skip_reference_search(args.reference)
