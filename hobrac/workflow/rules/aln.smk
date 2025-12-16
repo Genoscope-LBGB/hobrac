@@ -9,7 +9,7 @@ rule aln:
     resources:
         mem_mb = config["minimap2_memory"],
         runtime = config["minimap2_runtime"],
-        slurm_extra = f"--qos={config['minimap2_qos']}" if config.get("minimap2_qos") else ""
+        slurm_qos = config.get("minimap2_qos", "")
     benchmark: "benchmarks/aln.txt"
     shell: """
         prefix=$(cat {input.mash_output})

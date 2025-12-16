@@ -83,7 +83,7 @@ rule busco_reference:
     resources:
         mem_mb = config["busco_memory"],
         runtime = config["busco_runtime"],
-        slurm_extra = f"--qos={config['busco_qos']}" if config.get("busco_qos") else ""
+        slurm_qos = config.get("busco_qos", "")
     benchmark: "benchmarks/busco_reference.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
@@ -112,7 +112,7 @@ rule busco_assembly:
     resources:
         mem_mb = config["busco_memory"],
         runtime = config["busco_runtime"],
-        slurm_extra = f"--qos={config['busco_qos']}" if config.get("busco_qos") else ""
+        slurm_qos = config.get("busco_qos", "")
     benchmark: "benchmarks/busco_assembly.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
