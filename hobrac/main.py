@@ -125,6 +125,13 @@ def generate_snakemake_command(args) -> str:
 
     cmd += f"--snakefile {snakefile_path} "
 
+    # Set per-rule QoS via --set-resources (for SLURM executor)
+    if args.busco_qos:
+        cmd += f"--set-resources busco_reference:slurm_qos={args.busco_qos} "
+        cmd += f"--set-resources busco_assembly:slurm_qos={args.busco_qos} "
+    if args.minimap2_qos:
+        cmd += f"--set-resources aln:slurm_qos={args.minimap2_qos} "
+
     cmd += "--config "
     cmd += f"assembly={args.assembly} "
     cmd += f"scientific_name='{args.scientific_name}' "
@@ -143,11 +150,6 @@ def generate_snakemake_command(args) -> str:
 
     cmd += f"minimap2_runtime={args.minimap2_runtime * 60} "
     cmd += f"busco_runtime={args.busco_runtime * 60} "
-
-    if args.busco_qos:
-        cmd += f"busco_qos={args.busco_qos} "
-    if args.minimap2_qos:
-        cmd += f"minimap2_qos={args.minimap2_qos} "
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
