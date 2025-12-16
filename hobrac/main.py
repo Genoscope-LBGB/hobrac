@@ -125,12 +125,9 @@ def generate_snakemake_command(args) -> str:
 
     cmd += f"--snakefile {snakefile_path} "
 
-    # Set per-rule QoS via --set-resources slurm_extra (for SLURM executor)
-    if args.busco_qos:
-        cmd += f"--set-resources 'busco_reference:slurm_extra=\"--qos={args.busco_qos}\"' "
-        cmd += f"--set-resources 'busco_assembly:slurm_extra=\"--qos={args.busco_qos}\"' "
-    if args.minimap2_qos:
-        cmd += f"--set-resources 'aln:slurm_extra=\"--qos={args.minimap2_qos}\"' "
+    # Set global QoS via --slurm-qos (for SLURM executor)
+    if args.qos:
+        cmd += f"--slurm-qos={args.qos} "
 
     cmd += "--config "
     cmd += f"assembly={args.assembly} "

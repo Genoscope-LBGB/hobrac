@@ -122,17 +122,10 @@ def get_args():
         type=int,
     )
     optional_args.add_argument(
-        "--busco-qos",
+        "--qos",
         action="store",
-        dest="busco_qos",
-        help="SLURM QoS for Busco jobs",
-        default=None,
-    )
-    optional_args.add_argument(
-        "--minimap2-qos",
-        action="store",
-        dest="minimap2_qos",
-        help="SLURM QoS for Minimap2 jobs",
+        dest="qos",
+        help="SLURM QoS for all jobs",
         default=None,
     )
     optional_args.add_argument(
