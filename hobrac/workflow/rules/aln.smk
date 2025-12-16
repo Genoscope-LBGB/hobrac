@@ -8,7 +8,8 @@ rule aln:
     container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = config["minimap2_memory"],
-        runtime = 12 * 60
+        runtime = config["minimap2_runtime"],
+        slurm_extra = f"--qos={config['minimap2_qos']}" if config.get("minimap2_qos") else ""
     benchmark: "benchmarks/aln.txt"
     shell: """
         prefix=$(cat {input.mash_output})

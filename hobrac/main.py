@@ -141,6 +141,14 @@ def generate_snakemake_command(args) -> str:
     cmd += f"minimap2_memory={args.minimap2_memory * 1000} "
     cmd += f"busco_memory={args.busco_memory * 1000} "
 
+    cmd += f"minimap2_runtime={args.minimap2_runtime * 60} "
+    cmd += f"busco_runtime={args.busco_runtime * 60} "
+
+    if args.busco_qos:
+        cmd += f"busco_qos={args.busco_qos} "
+    if args.minimap2_qos:
+        cmd += f"minimap2_qos={args.minimap2_qos} "
+
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
     if getattr(args, "busco_reference_override_path", None):

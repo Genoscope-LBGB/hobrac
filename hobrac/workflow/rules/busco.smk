@@ -82,7 +82,8 @@ rule busco_reference:
     container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = config["busco_memory"],
-        runtime = 24 * 60
+        runtime = config["busco_runtime"],
+        slurm_extra = f"--qos={config['busco_qos']}" if config.get("busco_qos") else ""
     benchmark: "benchmarks/busco_reference.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
@@ -110,7 +111,8 @@ rule busco_assembly:
     container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = config["busco_memory"],
-        runtime = 24 * 60
+        runtime = config["busco_runtime"],
+        slurm_extra = f"--qos={config['busco_qos']}" if config.get("busco_qos") else ""
     benchmark: "benchmarks/busco_assembly.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)

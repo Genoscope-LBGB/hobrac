@@ -106,6 +106,36 @@ def get_args():
         type=int,
     )
     optional_args.add_argument(
+        "--busco-runtime",
+        action="store",
+        dest="busco_runtime",
+        help="Maximum runtime in hours for Busco jobs",
+        default=24,
+        type=int,
+    )
+    optional_args.add_argument(
+        "--minimap2-runtime",
+        action="store",
+        dest="minimap2_runtime",
+        help="Maximum runtime in hours for Minimap2 jobs",
+        default=12,
+        type=int,
+    )
+    optional_args.add_argument(
+        "--busco-qos",
+        action="store",
+        dest="busco_qos",
+        help="SLURM QoS for Busco jobs",
+        default=None,
+    )
+    optional_args.add_argument(
+        "--minimap2-qos",
+        action="store",
+        dest="minimap2_qos",
+        help="SLURM QoS for Minimap2 jobs",
+        default=None,
+    )
+    optional_args.add_argument(
         "-o",
         "--output",
         action="store",
