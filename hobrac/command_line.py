@@ -84,6 +84,14 @@ def get_args():
         default="slurm",
     )
     optional_args.add_argument(
+        "--profile",
+        action="store",
+        dest="profile",
+        help="Path to a snakemake profile directory",
+        default=None,
+        type=os.path.abspath,
+    )
+    optional_args.add_argument(
         "--rerun-incomplete",
         action="store_true",
         dest="rerun_incomplete",

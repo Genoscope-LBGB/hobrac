@@ -90,6 +90,9 @@ def get_base_snakemake_args(args) -> str:
     if args.rerun_incomplete:
         cmd += "--rerun-incomplete "
 
+    if args.profile:
+        cmd += f"--profile {args.profile} "
+
     if args.executor:
         cmd += f"--executor {args.executor} --cores 4000 "
 
@@ -158,6 +161,10 @@ def generate_snakemake_command(args) -> str:
 
 def main():
     args = get_args()
+
+    if getattr(args, "profile", None) and not os.path.exists(args.profile):
+        print(f"Snakemake profile path does not exist: {args.profile}", file=sys.stderr)
+        sys.exit(1)
 
     create_dir(args.output_directory)
     os.chdir(args.output_directory)
