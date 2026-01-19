@@ -1,3 +1,5 @@
+import os
+
 rule aln:
     input:
         reference = "reference/{accession}.fna",
@@ -22,7 +24,9 @@ rule gen_dgenies_index:
     output: touch("aln/vs_{accession}/dgenies.done")
     params: 
         name = config["scientific_name"],
-        assembly_prefix = config["scientific_name"].replace(" ", "_")
+        assembly_prefix = config["scientific_name"].replace(" ", "_"),
+        assembly_path = lambda wildcards, input: input.assembly if os.path.isabs(input.assembly) else f"../../{input.assembly}",
+        reference_path = lambda wildcards, input: input.reference if os.path.isabs(input.reference) else f"../../{input.reference}"
     log: "logs/aln/gen_dgenies_index_{accession}.log"
     container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
@@ -32,8 +36,8 @@ rule gen_dgenies_index:
     shell: """
         cd aln/vs_{wildcards.accession}
 
-        dgenies_fasta_to_index -i ../../{input.assembly} -n "{params.name}" -o query_{params.assembly_prefix}.idx
-        dgenies_fasta_to_index -i ../../{input.reference} -n "{wildcards.accession}" -o target_{wildcards.accession}.idx
+        dgenies_fasta_to_index -i {params.assembly_path} -n "{params.name}" -o query_{params.assembly_prefix}.idx
+        dgenies_fasta_to_index -i {params.reference_path} -n "{wildcards.accession}" -o target_{wildcards.accession}.idx
 
         dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_significance.png --line-thickness 8
         dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_gravity.png --line-thickness 8 --gravity-ordering-only
