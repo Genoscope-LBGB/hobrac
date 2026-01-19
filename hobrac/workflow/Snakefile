@@ -16,10 +16,15 @@ def get_targets(wildcards):
             if line.strip():
                 accessions.append(line.strip())
     
-    return expand([
+    targets = expand([
         "aln/busco_{accession}", 
         "aln/vs_{accession}/dgenies.done"
     ], accession=accessions)
+
+    if not config.get("manual_references"):
+        targets.append("aln/ranking_symlinks.done")
+
+    return targets
 
 rule all:
     input:
