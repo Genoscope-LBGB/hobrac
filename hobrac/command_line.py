@@ -169,6 +169,14 @@ def get_args():
         required=False,
     )
     optional_args.add_argument(
+        "--ref-count",
+        action="store",
+        dest="ref_count",
+        help="Number of reference genomes to select automatically",
+        default=1,
+        type=int,
+    )
+    optional_args.add_argument(
         "--use-apptainer",
         action="store_true",
         dest="use_apptainer",

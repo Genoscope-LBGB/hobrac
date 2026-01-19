@@ -73,33 +73,28 @@ rule get_closest_busco_dataset:
 
 rule busco_reference:
     input:
-        accession = rules.select_closest_reference.output,
-        reference = rules.get_top_reference.output,
+        fna = "reference/{accession}.fna",
         dataset = "busco/chosen_dataset.txt"
-    output: directory("busco/busco_reference")
+    output: directory("busco/busco_reference_{accession}")
     params: method = config["busco_method"]
     threads: 12
     container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
         mem_mb = config["busco_memory"],
         runtime = config["busco_runtime"]
-    benchmark: "benchmarks/busco_reference.txt"
+    benchmark: "benchmarks/busco_reference_{accession}.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
-        version=$(cat {input.dataset} | cut -f 2)
-        prefix=$(cat {input.accession})
-        filepath=$(cat {input.reference})
-
+        
         cd busco/
 
-        busco --skip_bbtools --{params.method} -i $filepath -c {threads} -m geno \
-            -o busco_reference -l $dataset
+        busco --skip_bbtools --{params.method} -i ../{input.fna} -c {threads} -m geno \
+            -o busco_reference_{wildcards.accession} -l $dataset
 
-        ln -s busco_reference busco_$prefix
-        rm -rf busco_reference/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
+        rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
-
-
+    
+    
 rule busco_assembly:
     input:
         assembly = config["assembly"],
@@ -127,29 +122,25 @@ rule busco_assembly:
 
 rule busco_to_paf:
     input:
-        accession = rules.select_closest_reference.output,
-        reference = rules.get_top_reference.output,
+        reference = "reference/{accession}.fna",
         assembly = config["assembly"],
-        busco_reference = lambda wildcards: config.get("busco_reference_override", "busco/busco_reference"),
+        busco_reference = lambda wildcards: config.get("busco_reference_override", f"busco/busco_reference_{wildcards.accession}"),
         busco_assembly = lambda wildcards: config.get("busco_assembly_override", "busco/busco_assembly")
-    output: directory("aln/busco")
+    output: directory("aln/busco_{accession}")
     params:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
     container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 50000,
         runtime = 600
-    benchmark: "benchmarks/busco_to_paf.txt"
+    benchmark: "benchmarks/busco_to_paf_{accession}.txt"
     shell: """
-        prefix_ref=$(cat {input.accession})
-        filepath=$(cat {input.reference})
-
         busco_to_paf --busco_query {input.busco_assembly}/run*/full_table.tsv \
             --busco_ref {input.busco_reference}/run*/full_table.tsv \
-            --query {input.assembly} --ref $filepath --out {output}
+            --query {input.assembly} --ref {input.reference} --out {output}
 
         mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
-        mv {output}/target_reference.idx {output}/busco_target_${{prefix_ref}}.idx
+        mv {output}/target_reference.idx {output}/busco_target_{wildcards.accession}.idx
 
         dotplotrs -p {output}/aln_busco.paf -o {output}/busco_significance.png --line-thickness 8
         dotplotrs -p {output}/aln_busco.paf -o {output}/busco_gravity.png --line-thickness 8 --gravity-ordering-only

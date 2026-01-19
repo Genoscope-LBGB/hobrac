@@ -4,12 +4,23 @@ include: "rules/busco.smk"
 include: "rules/aln.smk"
 
 
-if config.get("stop_after_mash", False):
-    rule all:
-        input:
-            "mash/mash.dist"
-else:
-    rule all:
-        input:
-            "aln/busco",
-            "aln/get_dgenies_index.done"
+def get_targets(wildcards):
+    if config.get("stop_after_mash", False):
+        return ["mash/mash.dist"]
+    
+    checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
+    
+    accessions = []
+    with open(checkpoint_output) as f:
+        for line in f:
+            if line.strip():
+                accessions.append(line.strip())
+    
+    return expand([
+        "aln/busco_{accession}", 
+        "aln/vs_{accession}/dgenies.done"
+    ], accession=accessions)
+
+rule all:
+    input:
+        get_targets
