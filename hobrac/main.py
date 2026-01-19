@@ -41,6 +41,27 @@ def _busco_dir_contains_full_table(dir_path: str) -> bool:
     return len(glob.glob(pattern)) > 0
 
 
+def validate_manual_references(paths):
+    """Validate that manual reference paths don't have filename collisions."""
+    if not paths:
+        return
+
+    seen = {}
+    for path in paths:
+        name = os.path.splitext(os.path.basename(path))[0]
+        if name in seen:
+            print(
+                f"Error: Duplicate reference name '{name}' detected.\n"
+                f"  File 1: {seen[name]}\n"
+                f"  File 2: {path}\n"
+                "Please rename one of the files or provide checking references with distinct filenames.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        seen[name] = path
+
+
+
 def normalize_busco_dir(path: str) -> str:
     """Normalize a user-provided BUSCO path to the directory that contains run*/full_table.tsv.
     Accepts:
@@ -157,6 +178,12 @@ def generate_snakemake_command(args) -> str:
     if getattr(args, "busco_reference_override_path", None):
         cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
 
+    if args.reference:
+        # Pass manual references as a semicolon-separated string of paths
+        # Snakemake will parse this to map IDs to paths
+        manual_refs_str = ";".join(args.reference)
+        cmd += f"manual_references='{manual_refs_str}' "
+
     return cmd
 
 
@@ -190,11 +217,22 @@ def main():
         require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
         check_dependencies(
             require_busco=require_busco,
-            require_reference_search=not args.stop_after_mash,
+            # REQUIRE reference search tools ONLY if NO manual references are provided
+            require_reference_search=(not args.reference) and (not args.stop_after_mash),
         )
 
     if args.reference:
-        skip_reference_search(args.reference)
+        validate_manual_references(args.reference)
+        # Copy manual references to reference directory
+        create_dir("reference")
+        for ref_path in args.reference:
+            # ID is basename without extension
+            base_name = os.path.splitext(os.path.basename(ref_path))[0]
+            dest_path = os.path.join("reference", f"{base_name}.fna")
+            
+            # Simple copy to ensure container visibility
+            # Logic: If it's a manual ref, we put it where the pipeline expects it
+            shutil.copy(ref_path, dest_path)
 
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
@@ -204,12 +242,3 @@ def main():
 
     sys.exit(process.returncode)
 
-
-def skip_reference_search(reference: str):
-    create_dir("mash")
-    with open("mash/closest_reference.txt", "w") as out:
-        print(os.path.basename(reference), file=out, end="")
-
-    create_dir("reference")
-    with open("reference/reference.txt", "w") as out:
-        print(reference, file=out, end="")

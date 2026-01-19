@@ -42,6 +42,19 @@ checkpoint select_references:
         runtime = 10
     benchmark: "benchmarks/select_references.txt"
     run:
+        manual_refs_str = config.get("manual_references")
+        if manual_refs_str:
+            import os
+            # Manual mode: skip mash filtering, use provided files
+            paths = manual_refs_str.split(";")
+            with open(output[0], "w") as out:
+                for path in paths:
+                    # IDs are basenames without extension
+                    # (Collision check already done in main.py)
+                    accession = os.path.splitext(os.path.basename(path))[0]
+                    print(accession, file=out)
+            return
+
         candidates = []
         with open(input[0]) as mash:
             for line in mash:

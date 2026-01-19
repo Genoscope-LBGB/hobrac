@@ -52,9 +52,9 @@ def get_args():
     optional_args.add_argument(
         "-r",
         "--reference",
-        action="store",
+        action="append",
         dest="reference",
-        help="Path to a fasta file to use as a reference (disables the reference searching step)",
+        help="Path to a fasta file to use as a reference (disables the reference searching step). Can be specified multiple times.",
         default=None,
         type=os.path.abspath,
     )
