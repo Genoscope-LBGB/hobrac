@@ -76,7 +76,9 @@ rule busco_reference:
         fna = "reference/{accession}.fna",
         dataset = "busco/chosen_dataset.txt"
     output: directory("busco/busco_reference_{accession}")
-    params: method = config["busco_method"]
+    params: 
+        method = config["busco_method"],
+        fna_path = lambda wildcards, input: input.fna if os.path.isabs(input.fna) else f"../{input.fna}"
     threads: 12
     container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
@@ -88,7 +90,7 @@ rule busco_reference:
         
         cd busco/
 
-        busco --skip_bbtools --{params.method} -i ../{input.fna} -c {threads} -m geno \
+        busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
             -o busco_reference_{wildcards.accession} -l $dataset
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
@@ -100,7 +102,9 @@ rule busco_assembly:
         assembly = config["assembly"],
         dataset = rules.get_closest_busco_dataset.output
     output: directory("busco/busco_assembly")
-    params: method = config["busco_method"]
+    params: 
+        method = config["busco_method"],
+        assembly_path = lambda wildcards, input: input.assembly if os.path.isabs(input.assembly) else f"../{input.assembly}"
     threads: 12
     container: "docker://ezlabgva/busco:v6.0.0_cv1"
     resources:
@@ -113,7 +117,7 @@ rule busco_assembly:
 
         cd busco/
 
-        busco --skip_bbtools --{params.method} -i {input.assembly} -c {threads} -m geno \
+        busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
             -o busco_assembly -l $dataset
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
