@@ -66,19 +66,19 @@ rule rank_symlinks:
         "aln/ranking_symlinks.done"
     shell: """
         # Clean existing symlinks to avoid duplicates or stale links
-        find aln/ -maxdepth 1 -type l -name "top*_busco" -delete
-        find aln/ -maxdepth 1 -type l -name "top*_geno" -delete
+        find aln/ -maxdepth 1 -type l -name "rank*_busco" -delete
+        find aln/ -maxdepth 1 -type l -name "rank*_geno" -delete
 
         i=1
         while read -r accession; do
             # Create symlink for BUSCO
             if [ -d "aln/busco_${accession}" ]; then
-                ln -s "busco_${accession}" "aln/top${i}_busco"
+                ln -s "busco_${accession}" "aln/rank${i}_busco"
             fi
             
-            # Create symlink for VS (Minimap2/D-Genies)
+            # Create symlink for genome-to-genome alignments
             if [ -d "aln/vs_${accession}" ]; then
-                ln -s "vs_${accession}" "aln/top${i}_geno"
+                ln -s "vs_${accession}" "aln/rank${i}_geno"
             fi
             
             i=$((i+1))
