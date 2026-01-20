@@ -72,13 +72,13 @@ rule rank_symlinks:
         i=1
         while read -r accession; do
             # Create symlink for BUSCO
-            if [ -d "aln/busco_${accession}" ]; then
-                ln -s "busco_${accession}" "aln/rank${i}_busco"
+            if [ -d "aln/busco_${{accession}}" ]; then
+                ln -s "busco_${{accession}}" "aln/rank${{i}}_busco"
             fi
             
             # Create symlink for genome-to-genome alignments
-            if [ -d "aln/vs_${accession}" ]; then
-                ln -s "vs_${accession}" "aln/rank${i}_geno"
+            if [ -d "aln/vs_${{accession}}" ]; then
+                ln -s "vs_${{accession}}" "aln/rank${{i}}_geno"
             fi
             
             i=$((i+1))
