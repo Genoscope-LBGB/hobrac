@@ -25,7 +25,6 @@ rule get_busco_datasets:
     benchmark: "benchmarks/get_busco_dataset.txt"
     shell: """
         busco --list-datasets > {output}
-        rm -rf busco_downloads
     """
 
 
@@ -71,12 +70,27 @@ rule get_closest_busco_dataset:
             print(f"eukaryota\teukaryota_odb12", file=out, end="")
 
 
+rule download_busco_dataset:
+    input: "busco/chosen_dataset.txt"
+    output: directory("busco/busco_downloads")
+    container: "docker://ezlabgva/busco:v6.0.0_cv1"
+    resources:
+        mem_mb = 5000,
+        runtime = 60
+    benchmark: "benchmarks/download_busco_dataset.txt"
+    shell: """
+        version=$(cat {input} | cut -f 2)
+        busco --download_path {output} --download $version
+    """
+
+
 rule busco_reference:
     input:
         fna = "reference/{accession}.fna",
-        dataset = "busco/chosen_dataset.txt"
+        dataset = "busco/chosen_dataset.txt",
+        busco_db = "busco/busco_downloads"
     output: directory("busco/busco_reference_{accession}")
-    params: 
+    params:
         method = config["busco_method"],
         fna_path = lambda wildcards, input: input.fna if os.path.isabs(input.fna) else f"../{input.fna}"
     threads: 12
@@ -87,11 +101,12 @@ rule busco_reference:
     benchmark: "benchmarks/busco_reference_{accession}.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
-        
+
         cd busco/
 
         busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
-            -o busco_reference_{wildcards.accession} -l $dataset
+            -o busco_reference_{wildcards.accession} -l $dataset \
+            --offline --download_path busco_downloads
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
@@ -100,9 +115,10 @@ rule busco_reference:
 rule busco_assembly:
     input:
         assembly = config["assembly"],
-        dataset = rules.get_closest_busco_dataset.output
+        dataset = rules.get_closest_busco_dataset.output,
+        busco_db = "busco/busco_downloads"
     output: directory("busco/busco_assembly")
-    params: 
+    params:
         method = config["busco_method"],
         assembly_path = lambda wildcards, input: input.assembly if os.path.isabs(input.assembly) else f"../{input.assembly}"
     threads: 12
@@ -113,12 +129,12 @@ rule busco_assembly:
     benchmark: "benchmarks/busco_assembly.txt"
     shell: """
         dataset=$(cat {input.dataset} | cut -f 1)
-        version=$(cat {input.dataset} | cut -f 2)
 
         cd busco/
 
         busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
-            -o busco_assembly -l $dataset
+            -o busco_assembly -l $dataset \
+            --offline --download_path busco_downloads
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
