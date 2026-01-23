@@ -19,7 +19,6 @@ rule jcvi_synteny:
     params:
         manual_refs = config.get("manual_references", ""),
         assembly_name = config["scientific_name"].replace(" ", "_")
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
     resources:
         mem_mb = 8000,
         runtime = 30
