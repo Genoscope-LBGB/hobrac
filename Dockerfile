@@ -40,6 +40,8 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     minimap2 \
     ncbi-datasets-cli \
     busco \
+    scipy \
+    jcvi \
     && micromamba clean --all --yes
 
 # Install Python packages not available on conda

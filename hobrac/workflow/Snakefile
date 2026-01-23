@@ -2,6 +2,7 @@ include: "rules/mash.smk"
 include: "rules/references.smk"
 include: "rules/busco.smk"
 include: "rules/aln.smk"
+include: "rules/jcvi.smk"
 
 
 def get_targets(wildcards):
@@ -17,12 +18,14 @@ def get_targets(wildcards):
                 accessions.append(line.strip())
     
     targets = expand([
-        "aln/busco_{accession}", 
+        "aln/busco_{accession}",
         "aln/vs_{accession}/dgenies.done"
     ], accession=accessions)
 
     if not config.get("manual_references"):
         targets.append("aln/ranking_symlinks.done")
+
+    targets.append("aln/jcvi_karyotype/karyotype.png")
 
     return targets
 
