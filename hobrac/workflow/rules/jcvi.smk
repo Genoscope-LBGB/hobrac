@@ -15,10 +15,12 @@ rule jcvi_synteny:
         busco_references = get_busco_reference_dirs,
         accession_order = "mash/selected_accessions.txt"
     output:
-        directory("aln/jcvi_karyotype")
+        seqids = "aln/jcvi_karyotype/seqids",
+        layouts = "aln/jcvi_karyotype/layouts"
     params:
         manual_refs = config.get("manual_references", ""),
-        assembly_name = config["scientific_name"].replace(" ", "_")
+        assembly_name = config["scientific_name"].replace(" ", "_"),
+        outdir = "aln/jcvi_karyotype"
     resources:
         mem_mb = 8000,
         runtime = 30
@@ -31,13 +33,14 @@ rule jcvi_synteny:
             --accession_order {input.accession_order} \
             --manual_refs "{params.manual_refs}" \
             --assembly_name "{params.assembly_name}" \
-            --output_dir {output}
+            --output_dir {params.outdir}
         """
 
 
 rule jcvi_karyotype:
     input:
-        "aln/jcvi_karyotype"
+        seqids = "aln/jcvi_karyotype/seqids",
+        layouts = "aln/jcvi_karyotype/layouts"
     output:
         "aln/jcvi_karyotype/karyotype.png"
     container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
@@ -47,7 +50,7 @@ rule jcvi_karyotype:
     benchmark: "benchmarks/jcvi_karyotype.txt"
     shell:
         """
-        cd {input}
+        cd aln/jcvi_karyotype
         python -m jcvi.graphics.karyotype seqids layouts \
             --dpi 100 --figsize 12x10 --basepair -o karyotype.png
         """
