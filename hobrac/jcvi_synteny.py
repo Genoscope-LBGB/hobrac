@@ -175,17 +175,23 @@ def generate_bed_file(
         species_name: Species name prefix for gene IDs
         output_path: Output BED file path
     """
-    # Sort by chromosome and position
+    # Sort by chromosome and position (use min of start/end for sorting)
     genes = sorted(
         busco_data.values(),
-        key=lambda g: (g.chromosome, g.start)
+        key=lambda g: (g.chromosome, min(g.start, g.end))
     )
 
     with open(output_path, 'w') as f:
         for gene in genes:
             # BED format: chr, start, end, gene_id, score, strand
+            # BED requires start <= end, so swap if necessary
+            # Also determine strand based on original coordinate order
+            if gene.start <= gene.end:
+                start, end, strand = gene.start, gene.end, "+"
+            else:
+                start, end, strand = gene.end, gene.start, "-"
             gene_id = f"{species_name}_{gene.busco_id}"
-            f.write(f"{gene.chromosome}\t{gene.start}\t{gene.end}\t{gene_id}\t0\t+\n")
+            f.write(f"{gene.chromosome}\t{start}\t{end}\t{gene_id}\t0\t{strand}\n")
 
 
 def generate_links_file(
