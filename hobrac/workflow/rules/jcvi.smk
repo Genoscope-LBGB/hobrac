@@ -43,7 +43,7 @@ rule jcvi_karyotype:
         layouts = "aln/jcvi_karyotype/layouts"
     output:
         "aln/jcvi_karyotype/karyotype.png"
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 4000,
         runtime = 10

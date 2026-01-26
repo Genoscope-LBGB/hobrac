@@ -6,7 +6,7 @@ rule aln:
         assembly = config["assembly"]
     output: "aln/vs_{accession}/aln.paf"
     threads: 12
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = config["minimap2_memory"],
         runtime = config["minimap2_runtime"]
@@ -28,7 +28,7 @@ rule gen_dgenies_index:
         assembly_path = lambda wildcards, input: input.assembly if os.path.isabs(input.assembly) else f"../../{input.assembly}",
         reference_path = lambda wildcards, input: input.reference if os.path.isabs(input.reference) else f"../../{input.reference}"
     log: "logs/aln/gen_dgenies_index_{accession}.log"
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 50000,
         runtime = 60

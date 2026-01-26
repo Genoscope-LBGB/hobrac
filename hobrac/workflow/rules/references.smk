@@ -1,6 +1,6 @@
 rule get_reference:
     output: "reference/{accession}.fna"
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 5000,
         runtime = 2 * 60

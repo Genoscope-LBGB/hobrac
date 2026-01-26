@@ -5,7 +5,7 @@ rule get_lineage:
     output: "busco/lineage.txt"
     params:
         taxid = config["taxid"]
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 5000,
         runtime = 20
@@ -149,7 +149,7 @@ rule busco_to_paf:
     output: directory("aln/busco_{accession}")
     params:
         prefix_assembly = config["scientific_name"].replace(" ", "_")
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 50000,
         runtime = 600
