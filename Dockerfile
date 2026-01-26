@@ -61,3 +61,4 @@ RUN pip install --no-cache-dir .
 
 # Set environment variables
 ENV TAXONKIT_DB=/taxonkit
+ENV PATH="/opt/conda/bin:$PATH"
