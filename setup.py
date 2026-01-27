@@ -25,6 +25,7 @@ setuptools.setup(
         "find_reference_genomes",
         "xopen",
         "scipy",
+        "jcvi",
     ],
     dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
