@@ -295,9 +295,13 @@ def generate_links_file(
             blocks.append(_make_block(current_block, gene_colors))
 
     # Write .simple file in JCVI format
+    # Color prefix format: "color*gene_name" (e.g., "#ff0000*gene1")
     with open(output_path, 'w') as f:
         for block in blocks:
-            gene1_start = f"{sp1}_{block['start1']}"
+            color = block.get('color', 'lightgrey')
+            # Add color prefix if not default grey
+            color_prefix = f"{color}*" if color != 'lightgrey' else ""
+            gene1_start = f"{color_prefix}{sp1}_{block['start1']}"
             gene1_end = f"{sp1}_{block['end1']}"
             gene2_start = f"{sp2}_{block['start2']}"
             gene2_end = f"{sp2}_{block['end2']}"
@@ -424,9 +428,9 @@ def generate_layouts_file(
             f.write(f"{y:.2f}, 0.1, 0.9, 0, black, {species_name}, {va}, {bed_basename}\n")
 
         f.write("\n# edges\n")
-        for links_file in links_files:
+        for i, links_file in enumerate(links_files):
             links_basename = os.path.basename(links_file)
-            f.write(f"e, 0, 1, {links_basename}\n")
+            f.write(f"e, {i}, {i+1}, {links_basename}\n")
 
 
 def save_alg_associations(
