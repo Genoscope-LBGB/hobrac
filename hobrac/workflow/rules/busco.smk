@@ -87,8 +87,7 @@ rule download_busco_dataset:
 rule busco_reference:
     input:
         fna = "reference/{accession}.fna",
-        dataset = "busco/chosen_dataset.txt",
-        busco_db = "busco/busco_downloads"
+        dataset = "busco/chosen_dataset.txt"
     output: directory("busco/busco_reference_{accession}")
     params:
         method = config["busco_method"],
@@ -106,7 +105,7 @@ rule busco_reference:
 
         busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
             -o busco_reference_{wildcards.accession} -l $dataset \
-            --offline --download_path busco_downloads
+            --offline --download_path ../busco_downloads
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
@@ -115,8 +114,7 @@ rule busco_reference:
 rule busco_assembly:
     input:
         assembly = config["assembly"],
-        dataset = rules.get_closest_busco_dataset.output,
-        busco_db = "busco/busco_downloads"
+        dataset = rules.get_closest_busco_dataset.output
     output: directory("busco/busco_assembly")
     params:
         method = config["busco_method"],
@@ -134,7 +132,7 @@ rule busco_assembly:
 
         busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
             -o busco_assembly -l $dataset \
-            --offline --download_path busco_downloads
+            --offline --download_path ../busco_downloads
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
