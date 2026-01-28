@@ -29,8 +29,14 @@ rule launch_mash:
     """
 
 
+def select_references_input(wildcards):
+    if config.get("manual_references"):
+        return []
+    return rules.launch_mash.output
+
+
 checkpoint select_references:
-    input: rules.launch_mash.output
+    input: select_references_input
     output: "mash/selected_accessions.txt"
     params:
         allow_zero_distance = config["allow_zero_distance"],
