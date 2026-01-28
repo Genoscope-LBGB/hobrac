@@ -44,12 +44,17 @@ ALG_PALETTE = [
 ]
 
 
-def read_busco_tsv(file_path: str) -> Dict[str, BuscoGene]:
+def read_busco_tsv(
+    file_path: str,
+    min_busco_genes: int = 0
+) -> Dict[str, BuscoGene]:
     """
     Parse BUSCO full_table.tsv and return only Complete single-copy genes.
 
     Args:
         file_path: Path to BUSCO full_table.tsv file
+        min_busco_genes: Minimum complete BUSCO genes required per sequence.
+                         Sequences with fewer genes are excluded.
 
     Returns:
         Dictionary mapping BUSCO ID to BuscoGene
@@ -68,7 +73,38 @@ def read_busco_tsv(file_path: str) -> Dict[str, BuscoGene]:
                     start=int(parts[3]),
                     end=int(parts[4])
                 )
+
+    if min_busco_genes > 0:
+        busco_data = filter_by_min_genes(busco_data, min_busco_genes)
+
     return busco_data
+
+
+def filter_by_min_genes(
+    busco_data: Dict[str, BuscoGene],
+    min_genes: int
+) -> Dict[str, BuscoGene]:
+    """
+    Filter BUSCO data to keep only sequences with at least min_genes.
+
+    Args:
+        busco_data: Dictionary mapping BUSCO ID to BuscoGene
+        min_genes: Minimum number of genes required per sequence
+
+    Returns:
+        Filtered dictionary with only genes from qualifying sequences
+    """
+    seq_counts: Dict[str, int] = defaultdict(int)
+    for gene in busco_data.values():
+        seq_counts[gene.chromosome] += 1
+
+    valid_seqs = {seq for seq, count in seq_counts.items() if count >= min_genes}
+
+    return {
+        busco_id: gene
+        for busco_id, gene in busco_data.items()
+        if gene.chromosome in valid_seqs
+    }
 
 
 def detect_algs_pairwise(
@@ -677,7 +713,8 @@ def run(
     manual_refs: str,
     output_dir: str,
     assembly_name: str = "assembly",
-    use_gravity_ordering: bool = True
+    use_gravity_ordering: bool = True,
+    min_busco_genes: int = 0
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -691,6 +728,7 @@ def run(
         assembly_name: Name for the assembly in plots
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
+        min_busco_genes: Minimum complete BUSCO genes required per sequence
 
     Returns:
         Dictionary with paths to generated files
@@ -733,7 +771,7 @@ def run(
     # Load all BUSCO data
     species_busco = []
     for name, path in species_order:
-        busco_data = read_busco_tsv(path)
+        busco_data = read_busco_tsv(path, min_busco_genes)
         species_busco.append((name, busco_data))
 
     # Generate BED files
@@ -817,6 +855,12 @@ def main():
         default="assembly",
         help="Name for assembly in plots"
     )
+    parser.add_argument(
+        '--min-busco-genes',
+        type=int,
+        default=0,
+        help="Minimum complete BUSCO genes required per sequence (default: 0)"
+    )
 
     args = parser.parse_args()
 
@@ -827,6 +871,7 @@ def main():
         manual_refs=args.manual_refs,
         output_dir=args.output_dir,
         assembly_name=args.assembly_name,
+        min_busco_genes=args.min_busco_genes,
     )
 
 

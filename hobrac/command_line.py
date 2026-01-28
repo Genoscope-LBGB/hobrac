@@ -197,6 +197,14 @@ def get_args():
         help="Use docker to run the pipeline",
         default=False,
     )
+    optional_args.add_argument(
+        "--min-busco-genes",
+        action="store",
+        dest="min_busco_genes",
+        help="Minimum complete BUSCO genes required per sequence for JCVI plot",
+        default=30,
+        type=int,
+    )
 
     args = parser.parse_args()
 
