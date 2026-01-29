@@ -58,5 +58,5 @@ rule jcvi_karyotype:
         """
         cd aln/jcvi_karyotype
         python -m jcvi.graphics.karyotype seqids layouts \
-            --dpi 100 --figsize 12x10 --basepair -o karyotype.png
+            --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
         """
