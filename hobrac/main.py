@@ -61,6 +61,27 @@ def validate_manual_references(paths):
         seen[name] = path
 
 
+def validate_jcvi_names(jcvi_names: str, ref_count: int):
+    """Validate that the number of custom JCVI names matches expected species count."""
+    if not jcvi_names:
+        return
+
+    names_list = [n.strip() for n in jcvi_names.split(",")]
+    if len(names_list) == 1:
+        # Single name applies only to assembly, always valid
+        return
+
+    expected_count = 1 + ref_count  # assembly + references
+    if len(names_list) != expected_count:
+        print(
+            f"Error: Number of custom names ({len(names_list)}) must equal "
+            f"number of species ({expected_count}): 1 assembly + {ref_count} references.\n"
+            f"  Provided names: {', '.join(names_list)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 
 def normalize_busco_dir(path: str) -> str:
     """Normalize a user-provided BUSCO path to the directory that contains run*/full_table.tsv.
@@ -236,10 +257,14 @@ def main():
             # ID is basename without extension
             base_name = os.path.splitext(os.path.basename(ref_path))[0]
             dest_path = os.path.join("reference", f"{base_name}.fna")
-            
+
             # Simple copy to ensure container visibility
             # Logic: If it's a manual ref, we put it where the pipeline expects it
             shutil.copy(ref_path, dest_path)
+
+    # Validate JCVI names count if provided
+    ref_count = len(args.reference) if args.reference else args.ref_count
+    validate_jcvi_names(args.jcvi_names, ref_count)
 
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
