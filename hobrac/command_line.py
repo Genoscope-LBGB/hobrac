@@ -215,6 +215,15 @@ def get_args():
         default=None,
         type=os.path.abspath,
     )
+    optional_args.add_argument(
+        "--jcvi-names",
+        action="store",
+        dest="jcvi_names",
+        help="Comma-separated custom names for JCVI tracks. If one name is provided, "
+             "it applies only to the assembly. If multiple names are provided, the count "
+             "must equal 1 (assembly) + number of references, in order.",
+        default="",
+    )
 
     args = parser.parse_args()
 

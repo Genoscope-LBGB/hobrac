@@ -773,7 +773,8 @@ def run(
     assembly_name: str = "assembly",
     use_gravity_ordering: bool = True,
     min_busco_genes: int = 0,
-    custom_color_file: str = ""
+    custom_color_file: str = "",
+    custom_names: str = ""
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -791,6 +792,9 @@ def run(
         custom_color_file: Path to custom color file. When provided, ALG
                            statistical test is skipped and colors are applied
                            directly from the file.
+        custom_names: Comma-separated custom names for JCVI tracks. If one name
+                      is provided, it applies only to the assembly. If multiple
+                      names are provided, the count must match species count.
 
     Returns:
         Dictionary with paths to generated files
@@ -834,6 +838,26 @@ def run(
                 accession = line.strip()
                 if accession and accession in ref_busco_paths:
                     species_order.append((accession, ref_busco_paths[accession]))
+
+    # Apply custom names if provided
+    if custom_names:
+        names_list = [n.strip() for n in custom_names.split(",")]
+        if len(names_list) == 1:
+            # Single name: apply only to assembly
+            if species_order:
+                species_order[0] = (names_list[0], species_order[0][1])
+        else:
+            # Multiple names: must match species count
+            if len(names_list) != len(species_order):
+                raise ValueError(
+                    f"Number of custom names ({len(names_list)}) must equal "
+                    f"number of species ({len(species_order)}): 1 assembly + "
+                    f"{len(species_order) - 1} references"
+                )
+            species_order = [
+                (names_list[i], species_order[i][1])
+                for i in range(len(species_order))
+            ]
 
     # Load all BUSCO data
     species_busco = []
@@ -941,6 +965,13 @@ def main():
              "applied directly from the file. Genes not in the file will be shown "
              "in grey."
     )
+    parser.add_argument(
+        '--jcvi-names',
+        default="",
+        help="Comma-separated custom names for JCVI tracks. If one name is provided, "
+             "it applies only to the assembly. If multiple names are provided, the count "
+             "must equal 1 (assembly) + number of references, in order."
+    )
 
     args = parser.parse_args()
 
@@ -953,6 +984,7 @@ def main():
         assembly_name=args.assembly_name,
         min_busco_genes=args.min_busco_genes,
         custom_color_file=args.jcvi_custom_colors,
+        custom_names=args.jcvi_names,
     )
 
 
