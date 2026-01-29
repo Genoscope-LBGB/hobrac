@@ -88,7 +88,7 @@ rule busco_reference:
     input:
         fna = "reference/{accession}.fna",
         dataset = "busco/chosen_dataset.txt",
-        "busco/busco_downloads"
+        busco_db = "busco/busco_downloads"
     output: directory("busco/busco_reference_{accession}")
     params:
         method = config["busco_method"],
@@ -116,7 +116,7 @@ rule busco_assembly:
     input:
         assembly = config["assembly"],
         dataset = rules.get_closest_busco_dataset.output,
-        "busco/busco_downloads"
+        busco_db = "busco/busco_downloads"
     output: directory("busco/busco_assembly")
     params:
         method = config["busco_method"],
