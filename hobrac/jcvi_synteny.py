@@ -44,6 +44,64 @@ ALG_PALETTE = [
 ]
 
 
+def parse_custom_colors(color_file: str) -> Dict[str, str]:
+    """
+    Parse custom color file and convert RGB values to hex colors.
+
+    Color file format (tab or space separated):
+    BUSCO_ID     R,G,B        ALG_NAME
+    10000at6447  141,78,106   A2
+
+    Args:
+        color_file: Path to the custom color file
+
+    Returns:
+        Dictionary mapping BUSCO ID to hex color string
+    """
+    custom_colors = {}
+    with open(color_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            busco_id = parts[0]
+            rgb_str = parts[1]
+            try:
+                r, g, b = map(int, rgb_str.split(','))
+                hex_color = f"#{r:02x}{g:02x}{b:02x}"
+                custom_colors[busco_id] = hex_color
+            except (ValueError, IndexError):
+                # Skip malformed lines
+                continue
+    return custom_colors
+
+
+def apply_custom_colors(
+    busco1: Dict[str, BuscoGene],
+    busco2: Dict[str, BuscoGene],
+    custom_colors: Dict[str, str]
+) -> Dict[str, str]:
+    """
+    Apply custom colors to genes common between two species.
+
+    Args:
+        busco1: BUSCO data for species 1
+        busco2: BUSCO data for species 2
+        custom_colors: Dictionary mapping BUSCO ID to hex color
+
+    Returns:
+        Dictionary mapping BUSCO ID to color (custom or lightgrey)
+    """
+    common_ids = set(busco1.keys()) & set(busco2.keys())
+    gene_colors = {}
+    for busco_id in common_ids:
+        gene_colors[busco_id] = custom_colors.get(busco_id, "lightgrey")
+    return gene_colors
+
+
 def read_busco_tsv(
     file_path: str,
     min_busco_genes: int = 0
@@ -714,7 +772,8 @@ def run(
     output_dir: str,
     assembly_name: str = "assembly",
     use_gravity_ordering: bool = True,
-    min_busco_genes: int = 0
+    min_busco_genes: int = 0,
+    custom_color_file: str = ""
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -729,11 +788,19 @@ def run(
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
         min_busco_genes: Minimum complete BUSCO genes required per sequence
+        custom_color_file: Path to custom color file. When provided, ALG
+                           statistical test is skipped and colors are applied
+                           directly from the file.
 
     Returns:
         Dictionary with paths to generated files
     """
     os.makedirs(output_dir, exist_ok=True)
+
+    # Load custom colors if provided
+    custom_colors = {}
+    if custom_color_file:
+        custom_colors = parse_custom_colors(custom_color_file)
 
     # Build mapping from accession to BUSCO path
     ref_busco_paths = {}
@@ -790,8 +857,13 @@ def run(
         sp1_name, sp1_busco = species_busco[i]
         sp2_name, sp2_busco = species_busco[i + 1]
 
-        # Detect ALGs
-        algs, gene_colors = detect_algs_pairwise(sp1_busco, sp2_busco)
+        if custom_colors:
+            # Use custom colors directly, skip statistical analysis
+            gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
+            algs = []
+        else:
+            # Detect ALGs using Fisher's exact test with Bonferroni correction
+            algs, gene_colors = detect_algs_pairwise(sp1_busco, sp2_busco)
 
         # Save ALG associations
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
@@ -861,6 +933,14 @@ def main():
         default=0,
         help="Minimum complete BUSCO genes required per sequence (default: 0)"
     )
+    parser.add_argument(
+        '--jcvi-custom-colors',
+        default="",
+        help="Path to custom color file (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
+             "When provided, the ALG statistical test is disabled and colors are "
+             "applied directly from the file. Genes not in the file will be shown "
+             "in grey."
+    )
 
     args = parser.parse_args()
 
@@ -872,6 +952,7 @@ def main():
         output_dir=args.output_dir,
         assembly_name=args.assembly_name,
         min_busco_genes=args.min_busco_genes,
+        custom_color_file=args.jcvi_custom_colors,
     )
 
 

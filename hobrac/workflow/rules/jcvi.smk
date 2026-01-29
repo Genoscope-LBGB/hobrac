@@ -21,7 +21,8 @@ rule jcvi_synteny:
         manual_refs = config.get("manual_references", ""),
         assembly_name = config["scientific_name"].replace(" ", "_"),
         outdir = "aln/jcvi_karyotype",
-        min_busco_genes = config.get("min_busco_genes", 0)
+        min_busco_genes = config.get("min_busco_genes", 0),
+        jcvi_custom_colors = config.get("jcvi_custom_colors", "")
     resources:
         mem_mb = 8000,
         runtime = 30
@@ -35,7 +36,8 @@ rule jcvi_synteny:
             --manual_refs "{params.manual_refs}" \
             --assembly_name "{params.assembly_name}" \
             --output_dir {params.outdir} \
-            --min-busco-genes {params.min_busco_genes}
+            --min-busco-genes {params.min_busco_genes} \
+            $([ -n "{params.jcvi_custom_colors}" ] && echo "--jcvi-custom-colors {params.jcvi_custom_colors}")
         """
 
 

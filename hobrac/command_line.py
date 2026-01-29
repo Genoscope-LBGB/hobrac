@@ -205,6 +205,16 @@ def get_args():
         default=30,
         type=int,
     )
+    optional_args.add_argument(
+        "--jcvi-custom-colors",
+        action="store",
+        dest="jcvi_custom_colors",
+        help="Path to custom color file for JCVI synteny plot (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
+             "When provided, the ALG statistical test is disabled and colors are applied directly from the file. "
+             "Genes not in the file will be shown in grey.",
+        default=None,
+        type=os.path.abspath,
+    )
 
     args = parser.parse_args()
 
