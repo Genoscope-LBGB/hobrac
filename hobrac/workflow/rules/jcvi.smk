@@ -13,7 +13,8 @@ rule jcvi_synteny:
     input:
         busco_assembly = "busco/busco_assembly",
         busco_references = get_busco_reference_dirs,
-        accession_order = "mash/selected_accessions.txt"
+        accession_order = "mash/selected_accessions.txt",
+        assembly = config["assembly"]
     output:
         seqids = "aln/jcvi_karyotype/seqids",
         layouts = "aln/jcvi_karyotype/layouts"
@@ -32,6 +33,7 @@ rule jcvi_synteny:
         """
         jcvi_synteny \
             --busco_assembly {input.busco_assembly}/run*/full_table.tsv \
+            --assembly-fasta {input.assembly} \
             --busco_references {input.busco_references} \
             --accession_order {input.accession_order} \
             --manual_refs "{params.manual_refs}" \

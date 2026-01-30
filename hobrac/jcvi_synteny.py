@@ -44,6 +44,37 @@ ALG_PALETTE = [
 ]
 
 
+def read_fasta_sizes(fasta_path: str) -> Dict[str, int]:
+    """
+    Read sequence sizes from a fasta file.
+
+    Args:
+        fasta_path: Path to the fasta file
+
+    Returns:
+        Dictionary mapping sequence names to their lengths
+    """
+    sizes = {}
+    current_name = None
+    current_length = 0
+
+    with open(fasta_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('>'):
+                if current_name is not None:
+                    sizes[current_name] = current_length
+                current_name = line[1:].split()[0]
+                current_length = 0
+            else:
+                current_length += len(line)
+
+        if current_name is not None:
+            sizes[current_name] = current_length
+
+    return sizes
+
+
 def parse_custom_colors(color_file: str) -> Dict[str, str]:
     """
     Parse custom color file and convert RGB values to hex colors.
@@ -450,6 +481,32 @@ def _make_block(
 
 
 def get_chromosome_order(
+    fasta_sizes: Dict[str, int],
+    busco_data: Dict[str, BuscoGene]
+) -> List[str]:
+    """
+    Get chromosomes sorted by fasta sequence size (largest first).
+
+    Only chromosomes that have BUSCO genes are included in the output.
+
+    Args:
+        fasta_sizes: Dictionary mapping sequence names to their lengths
+        busco_data: BUSCO gene data (used to filter to BUSCO-containing sequences)
+
+    Returns:
+        List of chromosome names sorted by fasta size (largest first)
+    """
+    busco_chromosomes = {gene.chromosome for gene in busco_data.values()}
+
+    sorted_chrs = sorted(
+        busco_chromosomes,
+        key=lambda c: fasta_sizes.get(c, 0),
+        reverse=True
+    )
+    return sorted_chrs
+
+
+def get_chromosome_order_by_span(
     busco_data: Dict[str, BuscoGene]
 ) -> List[str]:
     """
@@ -459,14 +516,13 @@ def get_chromosome_order(
         busco_data: BUSCO gene data
 
     Returns:
-        List of chromosome names sorted by size
+        List of chromosome names sorted by gene span
     """
     chr_spans = defaultdict(lambda: [float('inf'), 0])
     for gene in busco_data.values():
         chr_spans[gene.chromosome][0] = min(chr_spans[gene.chromosome][0], gene.start)
         chr_spans[gene.chromosome][1] = max(chr_spans[gene.chromosome][1], gene.end)
 
-    # Sort by span (largest first)
     sorted_chrs = sorted(
         chr_spans.keys(),
         key=lambda c: chr_spans[c][1] - chr_spans[c][0],
@@ -542,7 +598,7 @@ def get_chromosome_order_by_gravity(
 
     if not gravity_scores:
         # Fall back to span ordering if no shared genes
-        return get_chromosome_order(query_busco)
+        return get_chromosome_order_by_span(query_busco)
 
     # Find best matching target for each query chromosome
     query_to_best_target: Dict[str, str] = {}
@@ -614,7 +670,8 @@ def get_chromosome_order_by_gravity(
 def generate_seqids_file(
     species_data: List[Tuple[str, Dict[str, BuscoGene]]],
     output_path: str,
-    use_gravity_ordering: bool = False
+    use_gravity_ordering: bool = False,
+    assembly_fasta_sizes: Dict[str, int] = None
 ) -> None:
     """
     Generate JCVI seqids file with chromosome order for each species.
@@ -624,20 +681,25 @@ def generate_seqids_file(
         output_path: Output seqids file path
         use_gravity_ordering: If True, order subsequent species by gravity
                               with the species above them
+        assembly_fasta_sizes: Dictionary mapping assembly sequence names to sizes.
+                              Used for ordering the first species (assembly).
     """
     with open(output_path, 'w') as f:
         previous_order: List[str] = []
         previous_busco: Dict[str, BuscoGene] = {}
 
         for i, (species_name, busco_data) in enumerate(species_data):
-            if i == 0 or not use_gravity_ordering:
-                # First species or gravity disabled: use span ordering
-                chromosomes = get_chromosome_order(busco_data)
-            else:
+            if i == 0:
+                # First species (assembly): use fasta size ordering
+                chromosomes = get_chromosome_order(assembly_fasta_sizes, busco_data)
+            elif use_gravity_ordering:
                 # Use gravity ordering with the species above
                 chromosomes = get_chromosome_order_by_gravity(
                     previous_order, busco_data, previous_busco
                 )
+            else:
+                # Gravity disabled: use span ordering for references
+                chromosomes = get_chromosome_order_by_span(busco_data)
 
             f.write(",".join(chromosomes) + "\n")
 
@@ -766,6 +828,7 @@ def find_busco_table(pattern: str, accession: str) -> str:
 
 def run(
     assembly_busco: str,
+    assembly_fasta: str,
     busco_refs: List[str],
     accession_order: str,
     manual_refs: str,
@@ -781,6 +844,7 @@ def run(
 
     Args:
         assembly_busco: Path to assembly BUSCO full_table.tsv
+        assembly_fasta: Path to the assembly fasta file
         busco_refs: List of reference BUSCO directory paths
         accession_order: Path to MASH-ordered accessions file
         manual_refs: Semicolon-separated manual reference paths
@@ -800,6 +864,9 @@ def run(
         Dictionary with paths to generated files
     """
     os.makedirs(output_dir, exist_ok=True)
+
+    # Read assembly fasta sizes for chromosome ordering
+    assembly_fasta_sizes = read_fasta_sizes(assembly_fasta)
 
     # Load custom colors if provided
     custom_colors = {}
@@ -886,23 +953,20 @@ def run(
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
             algs = []
         else:
-            # Detect ALGs using Fisher's exact test with Bonferroni correction
             algs, gene_colors = detect_algs_pairwise(sp1_busco, sp2_busco)
 
-        # Save ALG associations
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 
-        # Generate links file
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")
         generate_links_file(sp1_busco, sp2_busco, gene_colors,
                             sp1_name, sp2_name, links_path)
         links_files.append(links_path)
 
-    # Generate seqids file
     seqids_path = os.path.join(output_dir, "seqids")
-    generate_seqids_file(species_busco, seqids_path, use_gravity_ordering)
+    generate_seqids_file(
+        species_busco, seqids_path, use_gravity_ordering, assembly_fasta_sizes
+    )
 
-    # Generate layouts file
     layouts_path = os.path.join(output_dir, "layouts")
     generate_layouts_file(bed_files, links_files, layouts_path)
 
@@ -924,6 +988,11 @@ def main():
         '--busco_assembly',
         required=True,
         help="Path to assembly BUSCO full_table.tsv"
+    )
+    parser.add_argument(
+        '--assembly-fasta',
+        required=True,
+        help="Path to the assembly fasta file"
     )
     parser.add_argument(
         '--busco_references',
@@ -977,6 +1046,7 @@ def main():
 
     run(
         assembly_busco=args.busco_assembly,
+        assembly_fasta=args.assembly_fasta,
         busco_refs=args.busco_references,
         accession_order=args.accession_order,
         manual_refs=args.manual_refs,
