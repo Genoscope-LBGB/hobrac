@@ -7,9 +7,9 @@ Group) detection using Fisher's exact test with Bonferroni correction.
 import argparse
 import glob
 import os
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from scipy.stats import fisher_exact
 
@@ -23,12 +23,24 @@ class BuscoGene:
 
 
 @dataclass
+class PairwiseAssociation:
+    """Raw pairwise significant association before ALG grouping."""
+    species1: str
+    species2: str
+    chr1: str
+    chr2: str
+    p_value: float
+    gene_count: int
+
+
+@dataclass
 class ALGAssociation:
     chr1: str
     chr2: str
     p_value: float
     color: str
     gene_count: int
+    alg_id: int = -1
 
 
 # 37-color palette for ALG visualization
@@ -133,6 +145,68 @@ def apply_custom_colors(
     return gene_colors
 
 
+def build_alg_graph(
+    pairwise_associations: List[PairwiseAssociation]
+) -> Dict[Tuple[str, str], Set[Tuple[str, str]]]:
+    """
+    Build adjacency list from significant associations.
+
+    Args:
+        pairwise_associations: List of PairwiseAssociation objects
+
+    Returns:
+        Graph where nodes are (species, chromosome) tuples
+    """
+    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]] = defaultdict(set)
+    for assoc in pairwise_associations:
+        node1 = (assoc.species1, assoc.chr1)
+        node2 = (assoc.species2, assoc.chr2)
+        graph[node1].add(node2)
+        graph[node2].add(node1)
+    return dict(graph)
+
+
+def find_connected_components(
+    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]]
+) -> List[Set[Tuple[str, str]]]:
+    """
+    Find connected components
+
+    Args:
+        graph: Adjacency list representation of the graph
+
+    Returns:
+        List of component sets, where each set contains (species, chr) tuples
+    """
+    if not graph:
+        return []
+
+    visited: Set[Tuple[str, str]] = set()
+    components: List[Set[Tuple[str, str]]] = []
+
+    for start_node in graph:
+        if start_node in visited:
+            continue
+
+        component: Set[Tuple[str, str]] = set()
+        queue = deque([start_node])
+
+        while queue:
+            node = queue.popleft()
+            if node in visited:
+                continue
+            visited.add(node)
+            component.add(node)
+
+            for neighbor in graph.get(node, set()):
+                if neighbor not in visited:
+                    queue.append(neighbor)
+
+        components.append(component)
+
+    return components
+
+
 def read_busco_tsv(
     file_path: str,
     min_busco_genes: int = 0
@@ -196,30 +270,32 @@ def filter_by_min_genes(
     }
 
 
-def detect_algs_pairwise(
+def detect_algs_pairwise_raw(
     busco1: Dict[str, BuscoGene],
     busco2: Dict[str, BuscoGene],
+    species1: str,
+    species2: str,
     alpha: float = 0.01,
     min_genes: int = 5
-) -> Tuple[List[ALGAssociation], Dict[str, str]]:
+) -> List[PairwiseAssociation]:
     """
-    Detect ALG associations using Fisher's exact test with Bonferroni correction.
+    Run Fisher's exact test, return raw associations without colors.
 
     Args:
         busco1: BUSCO data for species 1
         busco2: BUSCO data for species 2
+        species1: Name of species 1
+        species2: Name of species 2
         alpha: Significance level before correction
         min_genes: Minimum genes in a chr pair to test
 
     Returns:
-        Tuple of (list of significant ALG associations, dict mapping gene to color)
+        List of significant PairwiseAssociation objects
     """
-    # Find common BUSCO IDs
     common_ids = set(busco1.keys()) & set(busco2.keys())
     if not common_ids:
-        return [], {}
+        return []
 
-    # Count genes per chromosome pair
     chr_pair_counts = defaultdict(int)
     chr1_counts = defaultdict(int)
     chr2_counts = defaultdict(int)
@@ -233,7 +309,6 @@ def detect_algs_pairwise(
 
     total_genes = len(common_ids)
 
-    # Collect all chromosome pairs that meet minimum gene threshold
     testable_pairs = [
         (chr1, chr2, count)
         for (chr1, chr2), count in chr_pair_counts.items()
@@ -241,13 +316,10 @@ def detect_algs_pairwise(
     ]
 
     if not testable_pairs:
-        return [], {}
+        return []
 
-    # Perform Fisher's exact test for each pair
     results = []
     for chr1, chr2, observed in testable_pairs:
-        # Build 2x2 contingency table
-        # [observed, chr1_other], [chr2_other, neither]
         chr1_other = chr1_counts[chr1] - observed
         chr2_other = chr2_counts[chr2] - observed
         neither = total_genes - chr1_counts[chr1] - chr2_counts[chr2] + observed
@@ -256,23 +328,145 @@ def detect_algs_pairwise(
         _, p_value = fisher_exact(table, alternative='greater')
         results.append((chr1, chr2, p_value, observed))
 
-    # Apply Bonferroni correction
     num_tests = len(results)
     p_threshold = alpha / num_tests
 
-    # Filter significant associations and assign colors
     significant = []
-    color_idx = 0
     for chr1, chr2, p_value, gene_count in results:
         if p_value < p_threshold:
-            color = ALG_PALETTE[color_idx % len(ALG_PALETTE)]
-            significant.append(ALGAssociation(
-                chr1=chr1, chr2=chr2, p_value=p_value,
-                color=color, gene_count=gene_count
+            significant.append(PairwiseAssociation(
+                species1=species1,
+                species2=species2,
+                chr1=chr1,
+                chr2=chr2,
+                p_value=p_value,
+                gene_count=gene_count
             ))
-            color_idx += 1
 
-    # Build gene-to-color mapping
+    return significant
+
+
+def detect_algs_transitive(
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+    alpha: float = 0.01,
+    min_genes: int = 5
+) -> Tuple[List[PairwiseAssociation], Dict[Tuple[str, str], int], Dict[int, str]]:
+    """
+    Detect ALGs with consistent colors across all species.
+
+    Args:
+        species_busco: List of (species_name, busco_data) tuples
+        alpha: Significance level before correction
+        min_genes: Minimum genes in a chr pair to test
+
+    Returns:
+        Tuple of:
+        - all_associations: List of PairwiseAssociation objects
+        - chr_to_alg: Dict mapping (species, chr) to alg_id
+        - alg_colors: Dict mapping alg_id to color
+    """
+    all_associations: List[PairwiseAssociation] = []
+    for i in range(len(species_busco) - 1):
+        sp1_name, sp1_busco = species_busco[i]
+        sp2_name, sp2_busco = species_busco[i + 1]
+        associations = detect_algs_pairwise_raw(
+            sp1_busco, sp2_busco, sp1_name, sp2_name, alpha, min_genes
+        )
+        all_associations.extend(associations)
+
+    graph = build_alg_graph(all_associations)
+    components = find_connected_components(graph)
+
+    chr_to_alg: Dict[Tuple[str, str], int] = {}
+    alg_colors: Dict[int, str] = {}
+
+    for alg_id, component in enumerate(components):
+        color = ALG_PALETTE[alg_id % len(ALG_PALETTE)]
+        alg_colors[alg_id] = color
+        for node in component:
+            chr_to_alg[node] = alg_id
+
+    return all_associations, chr_to_alg, alg_colors
+
+
+def build_gene_colors_from_algs(
+    species1_busco: Dict[str, BuscoGene],
+    species2_busco: Dict[str, BuscoGene],
+    species1: str,
+    species2: str,
+    chr_to_alg: Dict[Tuple[str, str], int],
+    alg_colors: Dict[int, str]
+) -> Dict[str, str]:
+    """
+    Build gene-to-color mapping for a species pair using ALG membership.
+
+    Args:
+        species1_busco: BUSCO data for species 1
+        species2_busco: BUSCO data for species 2
+        species1: Name of species 1
+        species2: Name of species 2
+        chr_to_alg: Dict mapping (species, chr) to alg_id
+        alg_colors: Dict mapping alg_id to color
+
+    Returns:
+        Dictionary mapping BUSCO ID to color
+    """
+    common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
+    gene_colors = {}
+
+    for busco_id in common_ids:
+        chr1 = species1_busco[busco_id].chromosome
+        chr2 = species2_busco[busco_id].chromosome
+
+        node1 = (species1, chr1)
+        node2 = (species2, chr2)
+
+        alg_id = chr_to_alg.get(node1) or chr_to_alg.get(node2)
+        if alg_id is not None:
+            gene_colors[busco_id] = alg_colors[alg_id]
+        else:
+            gene_colors[busco_id] = "lightgrey"
+
+    return gene_colors
+
+
+def detect_algs_pairwise(
+    busco1: Dict[str, BuscoGene],
+    busco2: Dict[str, BuscoGene],
+    alpha: float = 0.01,
+    min_genes: int = 5
+) -> Tuple[List[ALGAssociation], Dict[str, str]]:
+    """
+    Detect ALG associations using Fisher's exact test with Bonferroni correction.
+
+    This is a wrapper for backward compatibility (single pair use case).
+
+    Args:
+        busco1: BUSCO data for species 1
+        busco2: BUSCO data for species 2
+        alpha: Significance level before correction
+        min_genes: Minimum genes in a chr pair to test
+
+    Returns:
+        Tuple of (list of significant ALG associations, dict mapping gene to color)
+    """
+    raw_associations = detect_algs_pairwise_raw(
+        busco1, busco2, "sp1", "sp2", alpha, min_genes
+    )
+
+    significant = []
+    for i, assoc in enumerate(raw_associations):
+        color = ALG_PALETTE[i % len(ALG_PALETTE)]
+        significant.append(ALGAssociation(
+            chr1=assoc.chr1,
+            chr2=assoc.chr2,
+            p_value=assoc.p_value,
+            color=color,
+            gene_count=assoc.gene_count,
+            alg_id=i
+        ))
+
+    common_ids = set(busco1.keys()) & set(busco2.keys())
     gene_colors = {}
     for busco_id in common_ids:
         chr1 = busco1[busco_id].chromosome
@@ -760,10 +954,10 @@ def save_alg_associations(
     """
     with open(output_path, 'a') as f:
         if os.path.getsize(output_path) == 0:
-            f.write("species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\n")
+            f.write("species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n")
         for alg in algs:
             f.write(f"{sp1}\t{sp2}\t{alg.chr1}\t{alg.chr2}\t"
-                    f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\n")
+                    f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\t{alg.alg_id}\n")
 
 
 def get_species_order(
@@ -943,6 +1137,14 @@ def run(
     alg_output = os.path.join(output_dir, "alg_associations.tsv")
     open(alg_output, 'w').close()  # Create empty file
 
+    # Phase 1: Transitive ALG detection across all species (if not using custom colors)
+    all_associations: List[PairwiseAssociation] = []
+    chr_to_alg: Dict[Tuple[str, str], int] = {}
+    alg_colors: Dict[int, str] = {}
+    if not custom_colors:
+        all_associations, chr_to_alg, alg_colors = detect_algs_transitive(species_busco)
+
+    # Phase 2: Generate outputs for each pair
     links_files = []
     for i in range(len(species_busco) - 1):
         sp1_name, sp1_busco = species_busco[i]
@@ -951,9 +1153,29 @@ def run(
         if custom_colors:
             # Use custom colors directly, skip statistical analysis
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
-            algs = []
+            algs: List[ALGAssociation] = []
         else:
-            algs, gene_colors = detect_algs_pairwise(sp1_busco, sp2_busco)
+            # Filter associations for this pair
+            pair_associations = [
+                a for a in all_associations
+                if a.species1 == sp1_name and a.species2 == sp2_name
+            ]
+            # Build gene colors from ALG membership
+            gene_colors = build_gene_colors_from_algs(
+                sp1_busco, sp2_busco, sp1_name, sp2_name, chr_to_alg, alg_colors
+            )
+            # Convert to ALGAssociation with alg_id
+            algs = [
+                ALGAssociation(
+                    chr1=a.chr1,
+                    chr2=a.chr2,
+                    p_value=a.p_value,
+                    color=alg_colors.get(chr_to_alg.get((a.species1, a.chr1), -1), "lightgrey"),
+                    gene_count=a.gene_count,
+                    alg_id=chr_to_alg.get((a.species1, a.chr1), -1)
+                )
+                for a in pair_associations
+            ]
 
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 
