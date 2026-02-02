@@ -145,6 +145,8 @@ def get_base_snakemake_args(args) -> str:
 
     if args.use_apptainer or args.use_singularity or args.use_docker:
         taxonkit_db = os.environ.get("TAXONKIT_DB")
+        if taxonkit_db:
+            taxonkit_db = os.path.realpath(taxonkit_db)
         if not taxonkit_db:
             print(
                 "Error: TAXONKIT_DB environment variable is not set.\n"
@@ -155,7 +157,7 @@ def get_base_snakemake_args(args) -> str:
             )
             sys.exit(1)
 
-        assembly_dir = os.path.dirname(args.assembly)
+        assembly_dir = os.path.dirname(os.path.realpath(args.assembly))
 
         if args.use_apptainer:
             cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
