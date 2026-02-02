@@ -279,5 +279,8 @@ def main():
     process = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr)
     process.wait()
 
+    if process.returncode != 0:
+        print(f"\nSnakemake failed with exit code {process.returncode}. Check .snakemake/log/ for details.", file=sys.stderr)
+
     sys.exit(process.returncode)
 
