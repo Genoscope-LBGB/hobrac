@@ -395,10 +395,14 @@ def build_gene_colors_from_algs(
     species1: str,
     species2: str,
     chr_to_alg: Dict[Tuple[str, str], int],
-    alg_colors: Dict[int, str]
+    alg_colors: Dict[int, str],
+    significant_associations: List[PairwiseAssociation]
 ) -> Dict[str, str]:
     """
     Build gene-to-color mapping for a species pair using ALG membership.
+
+    Only genes on chromosome pairs with significant associations are colored.
+    Genes on non-significant chromosome pairs are colored grey.
 
     Args:
         species1_busco: BUSCO data for species 1
@@ -407,10 +411,16 @@ def build_gene_colors_from_algs(
         species2: Name of species 2
         chr_to_alg: Dict mapping (species, chr) to alg_id
         alg_colors: Dict mapping alg_id to color
+        significant_associations: List of significant associations for this pair
 
     Returns:
         Dictionary mapping BUSCO ID to color
     """
+    # Build set of significant chromosome pairs
+    significant_pairs = {
+        (assoc.chr1, assoc.chr2) for assoc in significant_associations
+    }
+
     common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
     gene_colors = {}
 
@@ -418,12 +428,14 @@ def build_gene_colors_from_algs(
         chr1 = species1_busco[busco_id].chromosome
         chr2 = species2_busco[busco_id].chromosome
 
-        node1 = (species1, chr1)
-        node2 = (species2, chr2)
-
-        alg_id = chr_to_alg.get(node1) or chr_to_alg.get(node2)
-        if alg_id is not None:
-            gene_colors[busco_id] = alg_colors[alg_id]
+        # Only color if this specific chromosome pair has a significant association
+        if (chr1, chr2) in significant_pairs:
+            node1 = (species1, chr1)
+            alg_id = chr_to_alg.get(node1)
+            if alg_id is not None:
+                gene_colors[busco_id] = alg_colors[alg_id]
+            else:
+                gene_colors[busco_id] = "lightgrey"
         else:
             gene_colors[busco_id] = "lightgrey"
 
@@ -1162,7 +1174,8 @@ def run(
             ]
             # Build gene colors from ALG membership
             gene_colors = build_gene_colors_from_algs(
-                sp1_busco, sp2_busco, sp1_name, sp2_name, chr_to_alg, alg_colors
+                sp1_busco, sp2_busco, sp1_name, sp2_name, chr_to_alg, alg_colors,
+                pair_associations
             )
             # Convert to ALGAssociation with alg_id
             algs = [
