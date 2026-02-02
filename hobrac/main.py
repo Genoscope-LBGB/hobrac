@@ -136,7 +136,9 @@ def get_base_snakemake_args(args) -> str:
         cmd += f"--profile {args.profile} "
 
     if args.executor:
-        cmd += f"--executor {args.executor} --cores 4000 "
+        cmd += f"--executor {args.executor} "
+        if args.executor != "local":
+            cmd += "--cores 4000 "
 
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "
