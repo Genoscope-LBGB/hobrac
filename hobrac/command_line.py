@@ -224,6 +224,15 @@ def get_args():
              "must equal 1 (assembly) + number of references, in order.",
         default="",
     )
+    optional_args.add_argument(
+        "--jcvi-hide-non-significant",
+        action="store_true",
+        dest="hide_non_significant",
+        help="Hide links between chromosome pairs without significant associations "
+             "in the JCVI karyotype plot. This produces a cleaner plot showing only "
+             "ALG-related synteny.",
+        default=False,
+    )
 
     args = parser.parse_args()
 

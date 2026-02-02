@@ -532,7 +532,8 @@ def generate_links_file(
     sp1: str,
     sp2: str,
     output_path: str,
-    max_gap: int = 10
+    max_gap: int = 10,
+    hide_non_significant: bool = False
 ) -> None:
     """
     Generate JCVI .simple file with synteny blocks between two species.
@@ -548,6 +549,7 @@ def generate_links_file(
         sp2: Species 2 name
         output_path: Output .simple file path
         max_gap: Maximum rank gap to consider genes as part of same block
+        hide_non_significant: If True, skip blocks with no significant association
     """
     common_ids = set(busco1.keys()) & set(busco2.keys())
     if not common_ids:
@@ -630,6 +632,9 @@ def generate_links_file(
     with open(output_path, 'w') as f:
         for block in blocks:
             color = block.get('color', 'lightgrey')
+            # Skip non-significant blocks if requested
+            if hide_non_significant and color == 'lightgrey':
+                continue
             # Add color prefix if not default grey
             color_prefix = f"{color}*" if color != 'lightgrey' else ""
             gene1_start = f"{color_prefix}{sp1}_{block['start1']}"
@@ -1043,7 +1048,8 @@ def run(
     use_gravity_ordering: bool = True,
     min_busco_genes: int = 0,
     custom_color_file: str = "",
-    custom_names: str = ""
+    custom_names: str = "",
+    hide_non_significant: bool = False
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -1065,6 +1071,8 @@ def run(
         custom_names: Comma-separated custom names for JCVI tracks. If one name
                       is provided, it applies only to the assembly. If multiple
                       names are provided, the count must match species count.
+        hide_non_significant: If True, hide links between chromosome pairs
+                              without significant associations.
 
     Returns:
         Dictionary with paths to generated files
@@ -1194,7 +1202,8 @@ def run(
 
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")
         generate_links_file(sp1_busco, sp2_busco, gene_colors,
-                            sp1_name, sp2_name, links_path)
+                            sp1_name, sp2_name, links_path,
+                            hide_non_significant=hide_non_significant)
         links_files.append(links_path)
 
     seqids_path = os.path.join(output_dir, "seqids")
@@ -1276,6 +1285,12 @@ def main():
              "it applies only to the assembly. If multiple names are provided, the count "
              "must equal 1 (assembly) + number of references, in order."
     )
+    parser.add_argument(
+        '--hide-non-significant',
+        action='store_true',
+        help="Hide links between chromosome pairs without significant associations. "
+             "This produces a cleaner plot showing only ALG-related synteny."
+    )
 
     args = parser.parse_args()
 
@@ -1290,6 +1305,7 @@ def main():
         min_busco_genes=args.min_busco_genes,
         custom_color_file=args.jcvi_custom_colors,
         custom_names=args.jcvi_names,
+        hide_non_significant=args.hide_non_significant,
     )
 
 

@@ -24,7 +24,8 @@ rule jcvi_synteny:
         outdir = "aln/jcvi_karyotype",
         min_busco_genes = config.get("min_busco_genes", 0),
         jcvi_custom_colors = config.get("jcvi_custom_colors", ""),
-        jcvi_names = config.get("jcvi_names", "")
+        jcvi_names = config.get("jcvi_names", ""),
+        hide_non_significant = config.get("hide_non_significant", False)
     resources:
         mem_mb = 8000,
         runtime = 30
@@ -41,7 +42,8 @@ rule jcvi_synteny:
             --output_dir {params.outdir} \
             --min-busco-genes {params.min_busco_genes} \
             $([ -n "{params.jcvi_custom_colors}" ] && echo "--jcvi-custom-colors {params.jcvi_custom_colors}") \
-            $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}")
+            $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}") \
+            $([ "{params.hide_non_significant}" = "True" ] && echo "--hide-non-significant")
         """
 
 

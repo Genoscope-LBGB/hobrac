@@ -201,6 +201,9 @@ def generate_snakemake_command(args) -> str:
     if args.jcvi_names:
         cmd += f"jcvi_names='{args.jcvi_names}' "
 
+    if args.hide_non_significant:
+        cmd += "hide_non_significant=True "
+
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
     if getattr(args, "busco_reference_override_path", None):
