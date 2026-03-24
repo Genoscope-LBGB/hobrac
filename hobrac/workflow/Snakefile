@@ -1,5 +1,5 @@
 # Container versions
-HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.3"
+HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.4"
 
 include: "rules/mash.smk"
 include: "rules/references.smk"
