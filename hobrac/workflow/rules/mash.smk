@@ -62,6 +62,7 @@ checkpoint select_references:
             return
 
         candidates = []
+        seen_accessions = set()
         with open(input[0]) as mash:
             for line in mash:
                 line = line.rstrip().split("\t")
@@ -75,10 +76,13 @@ checkpoint select_references:
 
                 if distance == 0.0 and not params.allow_zero_distance:
                     continue
-                    
+
                 accession = line[0].split(":")[0]
+                if accession in seen_accessions:
+                    continue
+                seen_accessions.add(accession)
                 candidates.append((distance, accession))
-        
+
         candidates.sort(key=lambda x: x[0])
         selected = candidates[:int(params.ref_count)]
 
