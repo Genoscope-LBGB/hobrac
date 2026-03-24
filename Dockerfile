@@ -57,7 +57,7 @@ COPY . /app
 RUN chown -R $MAMBA_USER:$MAMBA_USER /app
 
 USER $MAMBA_USER
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Set environment variables
 ENV TAXONKIT_DB=/taxonkit
