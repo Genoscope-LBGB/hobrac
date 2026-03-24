@@ -10,11 +10,7 @@ include:
       other-branches-as-named: true
 
 stages: 
-  - deploy
-
-deploy:
-  stage: deploy
-  extends: .deploy
+  - deploy-futur
 
 deploy-futur:
     stage: deploy
