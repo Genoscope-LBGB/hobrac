@@ -946,7 +946,7 @@ def generate_layouts_file(
             bed_basename = os.path.basename(bed_path)
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
-            f.write(f"{y:.2f}, 0.1, 0.9, 0, black, {species_name}, {va}, {bed_basename}\n")
+            f.write(f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{species_name},\t{va},\t{bed_basename}\n")
 
         f.write("\n# edges\n")
         for i, links_file in enumerate(links_files):
