@@ -13,6 +13,6 @@ stages:
   - deploy-futur
 
 deploy-futur:
-    stage: deploy
+    stage: deploy-futur
     extends: .deploy-futur
     interruptible: true
