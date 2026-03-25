@@ -71,7 +71,7 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --ref-count 3
 
 ## Using Containers
 
-HoBRAC supports running all workflow steps inside containers, which eliminates the need to manually install dependencies. A Docker image containing all required tools is available at `ghcr.io/cea-lbgb/hobrac-tools:latest`.
+HoBRAC supports running all workflow steps inside containers, which eliminates the need to manually install dependencies. A Docker image containing all required tools is available at `ghcr.io/cea-lbgb/hobrac-tools`.
 
 ### With Singularity/Apptainer (recommended for HPC)
 
