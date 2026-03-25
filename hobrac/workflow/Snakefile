@@ -1,15 +1,37 @@
+# Container versions
+HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.5"
+
 include: "rules/mash.smk"
 include: "rules/references.smk"
 include: "rules/busco.smk"
 include: "rules/aln.smk"
+include: "rules/jcvi.smk"
 
 
-if config.get("stop_after_mash", False):
-    rule all:
-        input:
-            "mash/mash.dist"
-else:
-    rule all:
-        input:
-            "aln/busco",
-            "aln/get_dgenies_index.done"
+def get_targets(wildcards):
+    if config.get("stop_after_mash", False):
+        return ["mash/mash.dist"]
+    
+    checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
+    
+    accessions = []
+    with open(checkpoint_output) as f:
+        for line in f:
+            if line.strip():
+                accessions.append(line.strip())
+    
+    targets = expand([
+        "aln/busco_{accession}",
+        "aln/vs_{accession}/dgenies.done"
+    ], accession=accessions)
+
+    if not config.get("manual_references"):
+        targets.append("aln/ranking_symlinks.done")
+
+    targets.append("aln/jcvi_karyotype/karyotype.png")
+
+    return targets
+
+rule all:
+    input:
+        get_targets

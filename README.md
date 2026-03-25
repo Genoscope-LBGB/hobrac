@@ -56,7 +56,18 @@ By default, HoBRAC runs computations on the machine it is launched, but being a 
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea -e slurm
 ``` 
 
+
 The list of available plugins is available [here](https://snakemake.github.io/snakemake-plugin-catalog/).
+
+## Multi-Reference Selection
+
+By default, HoBRAC compares your assembly to the single closest reference genome found via MASH. You can choose to compare against multiple reference genomes using the `--ref-count` flag. This will identify the top N closest genomes and run the full analysis pipeline (Alignments, BUSCO) against each of them in parallel.
+
+```
+# Compare against the top 3 closest reference genomes
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --ref-count 3
+```
+
 
 ## Using Containers
 

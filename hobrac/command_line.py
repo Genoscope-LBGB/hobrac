@@ -52,9 +52,9 @@ def get_args():
     optional_args.add_argument(
         "-r",
         "--reference",
-        action="store",
+        action="append",
         dest="reference",
-        help="Path to a fasta file to use as a reference (disables the reference searching step)",
+        help="Path to a fasta file to use as a reference (disables the reference searching step). Can be specified multiple times.",
         default=None,
         type=os.path.abspath,
     )
@@ -169,6 +169,14 @@ def get_args():
         required=False,
     )
     optional_args.add_argument(
+        "--ref-count",
+        action="store",
+        dest="ref_count",
+        help="Number of reference genomes to select automatically",
+        default=1,
+        type=int,
+    )
+    optional_args.add_argument(
         "--use-apptainer",
         action="store_true",
         dest="use_apptainer",
@@ -187,6 +195,42 @@ def get_args():
         action="store_true",
         dest="use_docker",
         help="Use docker to run the pipeline",
+        default=False,
+    )
+    optional_args.add_argument(
+        "--min-busco-genes",
+        action="store",
+        dest="min_busco_genes",
+        help="Minimum complete BUSCO genes required per sequence for JCVI plot",
+        default=30,
+        type=int,
+    )
+    optional_args.add_argument(
+        "--jcvi-custom-colors",
+        action="store",
+        dest="jcvi_custom_colors",
+        help="Path to custom color file for JCVI synteny plot (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
+             "When provided, the ALG statistical test is disabled and colors are applied directly from the file. "
+             "Genes not in the file will be shown in grey.",
+        default=None,
+        type=os.path.abspath,
+    )
+    optional_args.add_argument(
+        "--jcvi-names",
+        action="store",
+        dest="jcvi_names",
+        help="Comma-separated custom names for JCVI tracks. If one name is provided, "
+             "it applies only to the assembly. If multiple names are provided, the count "
+             "must equal 1 (assembly) + number of references, in order.",
+        default="",
+    )
+    optional_args.add_argument(
+        "--jcvi-hide-non-significant",
+        action="store_true",
+        dest="hide_non_significant",
+        help="Hide links between chromosome pairs without significant associations "
+             "in the JCVI karyotype plot. This produces a cleaner plot showing only "
+             "ALG-related synteny.",
         default=False,
     )
 

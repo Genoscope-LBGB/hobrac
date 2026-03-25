@@ -41,6 +41,48 @@ def _busco_dir_contains_full_table(dir_path: str) -> bool:
     return len(glob.glob(pattern)) > 0
 
 
+def validate_manual_references(paths):
+    """Validate that manual reference paths don't have filename collisions."""
+    if not paths:
+        return
+
+    seen = {}
+    for path in paths:
+        name = os.path.splitext(os.path.basename(path))[0]
+        if name in seen:
+            print(
+                f"Error: Duplicate reference name '{name}' detected.\n"
+                f"  File 1: {seen[name]}\n"
+                f"  File 2: {path}\n"
+                "Please rename one of the files or provide checking references with distinct filenames.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        seen[name] = path
+
+
+def validate_jcvi_names(jcvi_names: str, ref_count: int):
+    """Validate that the number of custom JCVI names matches expected species count."""
+    if not jcvi_names:
+        return
+
+    names_list = [n.strip() for n in jcvi_names.split(",")]
+    if len(names_list) == 1:
+        # Single name applies only to assembly, always valid
+        return
+
+    expected_count = 1 + ref_count  # assembly + references
+    if len(names_list) != expected_count:
+        print(
+            f"Error: Number of custom names ({len(names_list)}) must equal "
+            f"number of species ({expected_count}): 1 assembly + {ref_count} references.\n"
+            f"  Provided names: {', '.join(names_list)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+
 def normalize_busco_dir(path: str) -> str:
     """Normalize a user-provided BUSCO path to the directory that contains run*/full_table.tsv.
     Accepts:
@@ -94,13 +136,17 @@ def get_base_snakemake_args(args) -> str:
         cmd += f"--profile {args.profile} "
 
     if args.executor:
-        cmd += f"--executor {args.executor} --cores 4000 "
+        cmd += f"--executor {args.executor} "
+        if args.executor != "local":
+            cmd += "--cores 4000 "
 
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "
 
     if args.use_apptainer or args.use_singularity or args.use_docker:
         taxonkit_db = os.environ.get("TAXONKIT_DB")
+        if taxonkit_db:
+            taxonkit_db = os.path.realpath(taxonkit_db)
         if not taxonkit_db:
             print(
                 "Error: TAXONKIT_DB environment variable is not set.\n"
@@ -111,7 +157,7 @@ def get_base_snakemake_args(args) -> str:
             )
             sys.exit(1)
 
-        assembly_dir = os.path.dirname(args.assembly)
+        assembly_dir = os.path.dirname(os.path.realpath(args.assembly))
 
         if args.use_apptainer:
             cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
@@ -139,6 +185,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     cmd += f"stop_after_mash={args.stop_after_mash} "
+    cmd += f"ref_count={args.ref_count} "
 
     if args.metaeuk:
         cmd += "busco_method=metaeuk "
@@ -150,11 +197,27 @@ def generate_snakemake_command(args) -> str:
 
     cmd += f"minimap2_runtime={args.minimap2_runtime * 60} "
     cmd += f"busco_runtime={args.busco_runtime * 60} "
+    cmd += f"min_busco_genes={args.min_busco_genes} "
+
+    if args.jcvi_custom_colors:
+        cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
+
+    if args.jcvi_names:
+        cmd += f"jcvi_names='{args.jcvi_names}' "
+
+    if args.hide_non_significant:
+        cmd += "hide_non_significant=True "
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
     if getattr(args, "busco_reference_override_path", None):
         cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
+
+    if args.reference:
+        # Pass manual references as a semicolon-separated string of paths
+        # Snakemake will parse this to map IDs to paths
+        manual_refs_str = ";".join(args.reference)
+        cmd += f"manual_references='{manual_refs_str}' "
 
     return cmd
 
@@ -189,11 +252,26 @@ def main():
         require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
         check_dependencies(
             require_busco=require_busco,
-            require_reference_search=not args.stop_after_mash,
+            # REQUIRE reference search tools ONLY if NO manual references are provided
+            require_reference_search=(not args.reference) and (not args.stop_after_mash),
         )
 
     if args.reference:
-        skip_reference_search(args.reference)
+        validate_manual_references(args.reference)
+        # Copy manual references to reference directory
+        create_dir("reference")
+        for ref_path in args.reference:
+            # ID is basename without extension
+            base_name = os.path.splitext(os.path.basename(ref_path))[0]
+            dest_path = os.path.join("reference", f"{base_name}.fna")
+
+            # Simple copy to ensure container visibility
+            # Logic: If it's a manual ref, we put it where the pipeline expects it
+            shutil.copy(ref_path, dest_path)
+
+    # Validate JCVI names count if provided
+    ref_count = len(args.reference) if args.reference else args.ref_count
+    validate_jcvi_names(args.jcvi_names, ref_count)
 
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
@@ -201,14 +279,8 @@ def main():
     process = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr)
     process.wait()
 
+    if process.returncode != 0:
+        print(f"\nSnakemake failed with exit code {process.returncode}. Check .snakemake/log/ for details.", file=sys.stderr)
+
     sys.exit(process.returncode)
 
-
-def skip_reference_search(reference: str):
-    create_dir("mash")
-    with open("mash/closest_reference.txt", "w") as out:
-        print(os.path.basename(reference), file=out, end="")
-
-    create_dir("reference")
-    with open("reference/reference.txt", "w") as out:
-        print(reference, file=out, end="")

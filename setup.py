@@ -20,18 +20,21 @@ setuptools.setup(
     include_package_data=True,
     package_data={"hobrac": ["workflow/*", "workflow/rules/*"]},
     install_requires=[
-        "snakemake>=9.13.4,<9.14",
-        "snakemake-executor-plugin-slurm>=1.9.2,<2",
+        "snakemake",
+        "snakemake-executor-plugin-slurm",
         "find_reference_genomes",
         "xopen",
+        "scipy",
+        "jcvi",
     ],
     dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
         "console_scripts": [
-            "hobrac=hobrac.main:main", 
-            "busco_to_paf=hobrac.busco_to_paf:main", 
+            "hobrac=hobrac.main:main",
+            "busco_to_paf=hobrac.busco_to_paf:main",
             "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main",
-            "precompute_mash=hobrac.precompute_mash_refseq:main"
+            "precompute_mash=hobrac.precompute_mash_refseq:main",
+            "jcvi_synteny=hobrac.jcvi_synteny:main"
         ],
     },
     python_requires='>=3.11',

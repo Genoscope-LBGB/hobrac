@@ -1,7 +1,7 @@
 rule download_db:
     output: "mash/mash_db.msh"
     params: taxid = config["taxid"]
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     benchmark: "benchmarks/download_db.txt"
     resources:
         mem_mb = 10000,
@@ -18,7 +18,7 @@ rule launch_mash:
         mashdb = rules.download_db.output,
         assembly = config["assembly"]
     output: "mash/mash.dist"
-    container: "docker://ghcr.io/cea-lbgb/hobrac-tools:latest"
+    container: HOBRAC_TOOLS
     resources:
         mem_mb = 20000,
         runtime = 120
@@ -29,24 +29,41 @@ rule launch_mash:
     """
 
 
-rule select_closest_reference:
-    input: rules.launch_mash.output
-    output: "mash/closest_reference.txt"
+def select_references_input(wildcards):
+    if config.get("manual_references"):
+        return []
+    return rules.launch_mash.output
+
+
+checkpoint select_references:
+    input: select_references_input
+    output: "mash/selected_accessions.txt"
     params:
         allow_zero_distance = config["allow_zero_distance"],
         allow_same_taxid = config["allow_same_taxid"],
-        taxid = config["taxid"]
+        taxid = config["taxid"],
+        ref_count = config.get("ref_count", 1)
     resources:
         mem_mb = 2000,
         runtime = 10
-    benchmark: "benchmarks/select_closest_reference.txt"
+    benchmark: "benchmarks/select_references.txt"
     run:
-        import os
+        manual_refs_str = config.get("manual_references")
+        if manual_refs_str:
+            import os
+            # Manual mode: skip mash filtering, use provided files
+            paths = manual_refs_str.split(";")
+            with open(output[0], "w") as out:
+                for path in paths:
+                    # IDs are basenames without extension
+                    # (Collision check already done in main.py)
+                    accession = os.path.splitext(os.path.basename(path))[0]
+                    print(accession, file=out)
+            return
 
-        with open(input[0]) as mash, open(output[0], "w") as out:
-            minimum_distance = 1.0
-            accession = ""
-
+        candidates = []
+        seen_accessions = set()
+        with open(input[0]) as mash:
             for line in mash:
                 line = line.rstrip().split("\t")
                 distance = float(line[2])
@@ -54,14 +71,21 @@ rule select_closest_reference:
                 taxid = "0"
                 if ":" in line[0]:
                     taxid = line[0].split(":")[1]
-                if not params.allow_same_taxid and params.taxid == taxid:
+                if not params.allow_same_taxid and str(params.taxid) == str(taxid):
                     continue
 
                 if distance == 0.0 and not params.allow_zero_distance:
                     continue
-                    
-                if distance <= minimum_distance:
-                    minimum_distance = distance
-                    accession = line[0].split(":")[0]
 
-            print(accession, file=out, end="")
+                accession = line[0].split(":")[0]
+                if accession in seen_accessions:
+                    continue
+                seen_accessions.add(accession)
+                candidates.append((distance, accession))
+
+        candidates.sort(key=lambda x: x[0])
+        selected = candidates[:int(params.ref_count)]
+
+        with open(output[0], "w") as out:
+            for _, accession in selected:
+                print(accession, file=out)

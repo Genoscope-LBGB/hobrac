@@ -40,6 +40,9 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     minimap2 \
     ncbi-datasets-cli \
     busco \
+    scipy \
+    jcvi \
+    ete4 \
     && micromamba clean --all --yes
 
 # Install Python packages not available on conda
@@ -55,7 +58,8 @@ COPY . /app
 RUN chown -R $MAMBA_USER:$MAMBA_USER /app
 
 USER $MAMBA_USER
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Set environment variables
 ENV TAXONKIT_DB=/taxonkit
+ENV PATH="/opt/conda/bin:$PATH"
