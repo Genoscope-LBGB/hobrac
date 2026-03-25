@@ -42,6 +42,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     busco \
     scipy \
     jcvi \
+    ete4 \
     && micromamba clean --all --yes
 
 # Install Python packages not available on conda
