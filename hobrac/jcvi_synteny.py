@@ -636,7 +636,7 @@ def generate_links_file(
             if hide_non_significant and color == 'lightgrey':
                 continue
             # Add color prefix if not default grey
-            color_prefix = f"{color}*" if color != 'lightgrey' else ""
+            color_prefix = f"{color}*"
             gene1_start = f"{color_prefix}{sp1}_{block['start1']}"
             gene1_end = f"{sp1}_{block['end1']}"
             gene2_start = f"{sp2}_{block['start2']}"
