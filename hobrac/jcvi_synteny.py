@@ -629,6 +629,8 @@ def generate_links_file(
 
     # Write .simple file in JCVI format
     # Color prefix format: "color*gene_name" (e.g., "#ff0000*gene1")
+    # Write lightgrey (non-significant) blocks first so significant ones render on top
+    blocks.sort(key=lambda b: b.get('color', 'lightgrey') != 'lightgrey')
     with open(output_path, 'w') as f:
         for block in blocks:
             color = block.get('color', 'lightgrey')
