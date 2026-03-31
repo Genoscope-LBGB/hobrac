@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 
 def get_args():
@@ -210,8 +209,8 @@ def get_args():
         action="store",
         dest="jcvi_custom_colors",
         help="Path to custom color file for JCVI synteny plot (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
-             "When provided, the ALG statistical test is disabled and colors are applied directly from the file. "
-             "Genes not in the file will be shown in grey.",
+        "By default, ALG statistical testing still runs to determine significance; "
+        "use --jcvi-skip-alg to disable it. Genes not in the file will be shown in grey.",
         default=None,
         type=os.path.abspath,
     )
@@ -220,8 +219,8 @@ def get_args():
         action="store",
         dest="jcvi_names",
         help="Comma-separated custom names for JCVI tracks. If one name is provided, "
-             "it applies only to the assembly. If multiple names are provided, the count "
-             "must equal 1 (assembly) + number of references, in order.",
+        "it applies only to the assembly. If multiple names are provided, the count "
+        "must equal 1 (assembly) + number of references, in order.",
         default="",
     )
     optional_args.add_argument(
@@ -229,8 +228,17 @@ def get_args():
         action="store_true",
         dest="hide_non_significant",
         help="Hide links between chromosome pairs without significant associations "
-             "in the JCVI karyotype plot. This produces a cleaner plot showing only "
-             "ALG-related synteny.",
+        "in the JCVI karyotype plot. This produces a cleaner plot showing only "
+        "ALG-related synteny.",
+        default=False,
+    )
+    optional_args.add_argument(
+        "--jcvi-skip-alg",
+        action="store_true",
+        dest="skip_alg",
+        help="Skip ALG statistical testing when using custom colors. All genes in the "
+        "color file get their custom color; unlisted genes are grey. Only effective "
+        "with --jcvi-custom-colors.",
         default=False,
     )
 

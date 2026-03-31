@@ -25,6 +25,7 @@ class BuscoGene:
 @dataclass
 class PairwiseAssociation:
     """Raw pairwise significant association before ALG grouping."""
+
     species1: str
     species2: str
     chr1: str
@@ -45,14 +46,43 @@ class ALGAssociation:
 
 # 37-color palette for ALG visualization
 ALG_PALETTE = [
-    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-    "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
-    "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
-    "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080",
-    "#ff6f61", "#6b5b95", "#88b04b", "#f7cac9", "#92a8d1",
-    "#955251", "#b565a7", "#009b77", "#dd4124", "#d65076",
-    "#45b8ac", "#efc050", "#5b5ea6", "#9b2335", "#dfcfbe",
-    "#55b4b0", "#e15d44"
+    "#e6194b",
+    "#3cb44b",
+    "#ffe119",
+    "#4363d8",
+    "#f58231",
+    "#911eb4",
+    "#46f0f0",
+    "#f032e6",
+    "#bcf60c",
+    "#fabebe",
+    "#008080",
+    "#e6beff",
+    "#9a6324",
+    "#fffac8",
+    "#800000",
+    "#aaffc3",
+    "#808000",
+    "#ffd8b1",
+    "#000075",
+    "#808080",
+    "#ff6f61",
+    "#6b5b95",
+    "#88b04b",
+    "#f7cac9",
+    "#92a8d1",
+    "#955251",
+    "#b565a7",
+    "#009b77",
+    "#dd4124",
+    "#d65076",
+    "#45b8ac",
+    "#efc050",
+    "#5b5ea6",
+    "#9b2335",
+    "#dfcfbe",
+    "#55b4b0",
+    "#e15d44",
 ]
 
 
@@ -70,10 +100,10 @@ def read_fasta_sizes(fasta_path: str) -> Dict[str, int]:
     current_name = None
     current_length = 0
 
-    with open(fasta_path, 'r') as f:
+    with open(fasta_path, "r") as f:
         for line in f:
             line = line.strip()
-            if line.startswith('>'):
+            if line.startswith(">"):
                 if current_name is not None:
                     sizes[current_name] = current_length
                 current_name = line[1:].split()[0]
@@ -102,10 +132,10 @@ def parse_custom_colors(color_file: str) -> Dict[str, str]:
         Dictionary mapping BUSCO ID to hex color string
     """
     custom_colors = {}
-    with open(color_file, 'r') as f:
+    with open(color_file, "r") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
             parts = line.split()
             if len(parts) < 2:
@@ -113,7 +143,7 @@ def parse_custom_colors(color_file: str) -> Dict[str, str]:
             busco_id = parts[0]
             rgb_str = parts[1]
             try:
-                r, g, b = map(int, rgb_str.split(','))
+                r, g, b = map(int, rgb_str.split(","))
                 hex_color = f"#{r:02x}{g:02x}{b:02x}"
                 custom_colors[busco_id] = hex_color
             except (ValueError, IndexError):
@@ -125,7 +155,7 @@ def parse_custom_colors(color_file: str) -> Dict[str, str]:
 def apply_custom_colors(
     busco1: Dict[str, BuscoGene],
     busco2: Dict[str, BuscoGene],
-    custom_colors: Dict[str, str]
+    custom_colors: Dict[str, str],
 ) -> Dict[str, str]:
     """
     Apply custom colors to genes common between two species.
@@ -146,7 +176,7 @@ def apply_custom_colors(
 
 
 def build_alg_graph(
-    pairwise_associations: List[PairwiseAssociation]
+    pairwise_associations: List[PairwiseAssociation],
 ) -> Dict[Tuple[str, str], Set[Tuple[str, str]]]:
     """
     Build adjacency list from significant associations.
@@ -167,7 +197,7 @@ def build_alg_graph(
 
 
 def find_connected_components(
-    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]]
+    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]],
 ) -> List[Set[Tuple[str, str]]]:
     """
     Find connected components
@@ -207,10 +237,7 @@ def find_connected_components(
     return components
 
 
-def read_busco_tsv(
-    file_path: str,
-    min_busco_genes: int = 0
-) -> Dict[str, BuscoGene]:
+def read_busco_tsv(file_path: str, min_busco_genes: int = 0) -> Dict[str, BuscoGene]:
     """
     Parse BUSCO full_table.tsv and return only Complete single-copy genes.
 
@@ -223,18 +250,18 @@ def read_busco_tsv(
         Dictionary mapping BUSCO ID to BuscoGene
     """
     busco_data = {}
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         for line in f:
             if line.startswith("#"):
                 continue
-            parts = line.strip().split('\t')
+            parts = line.strip().split("\t")
             if len(parts) >= 5 and parts[1] == "Complete":
                 busco_id = parts[0]
                 busco_data[busco_id] = BuscoGene(
                     busco_id=busco_id,
                     chromosome=parts[2],
                     start=int(parts[3]),
-                    end=int(parts[4])
+                    end=int(parts[4]),
                 )
 
     if min_busco_genes > 0:
@@ -244,8 +271,7 @@ def read_busco_tsv(
 
 
 def filter_by_min_genes(
-    busco_data: Dict[str, BuscoGene],
-    min_genes: int
+    busco_data: Dict[str, BuscoGene], min_genes: int
 ) -> Dict[str, BuscoGene]:
     """
     Filter BUSCO data to keep only sequences with at least min_genes.
@@ -276,7 +302,7 @@ def detect_algs_pairwise_raw(
     species1: str,
     species2: str,
     alpha: float = 0.01,
-    min_genes: int = 5
+    min_genes: int = 5,
 ) -> List[PairwiseAssociation]:
     """
     Run Fisher's exact test, return raw associations without colors.
@@ -325,7 +351,7 @@ def detect_algs_pairwise_raw(
         neither = total_genes - chr1_counts[chr1] - chr2_counts[chr2] + observed
 
         table = [[observed, chr1_other], [chr2_other, neither]]
-        _, p_value = fisher_exact(table, alternative='greater')
+        _, p_value = fisher_exact(table, alternative="greater")
         results.append((chr1, chr2, p_value, observed))
 
     num_tests = len(results)
@@ -334,14 +360,16 @@ def detect_algs_pairwise_raw(
     significant = []
     for chr1, chr2, p_value, gene_count in results:
         if p_value < p_threshold:
-            significant.append(PairwiseAssociation(
-                species1=species1,
-                species2=species2,
-                chr1=chr1,
-                chr2=chr2,
-                p_value=p_value,
-                gene_count=gene_count
-            ))
+            significant.append(
+                PairwiseAssociation(
+                    species1=species1,
+                    species2=species2,
+                    chr1=chr1,
+                    chr2=chr2,
+                    p_value=p_value,
+                    gene_count=gene_count,
+                )
+            )
 
     return significant
 
@@ -349,7 +377,7 @@ def detect_algs_pairwise_raw(
 def detect_algs_transitive(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
     alpha: float = 0.01,
-    min_genes: int = 5
+    min_genes: int = 5,
 ) -> Tuple[List[PairwiseAssociation], Dict[Tuple[str, str], int], Dict[int, str]]:
     """
     Detect ALGs with consistent colors across all species.
@@ -396,7 +424,7 @@ def build_gene_colors_from_algs(
     species2: str,
     chr_to_alg: Dict[Tuple[str, str], int],
     alg_colors: Dict[int, str],
-    significant_associations: List[PairwiseAssociation]
+    significant_associations: List[PairwiseAssociation],
 ) -> Dict[str, str]:
     """
     Build gene-to-color mapping for a species pair using ALG membership.
@@ -417,9 +445,7 @@ def build_gene_colors_from_algs(
         Dictionary mapping BUSCO ID to color
     """
     # Build set of significant chromosome pairs
-    significant_pairs = {
-        (assoc.chr1, assoc.chr2) for assoc in significant_associations
-    }
+    significant_pairs = {(assoc.chr1, assoc.chr2) for assoc in significant_associations}
 
     common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
     gene_colors = {}
@@ -446,7 +472,7 @@ def detect_algs_pairwise(
     busco1: Dict[str, BuscoGene],
     busco2: Dict[str, BuscoGene],
     alpha: float = 0.01,
-    min_genes: int = 5
+    min_genes: int = 5,
 ) -> Tuple[List[ALGAssociation], Dict[str, str]]:
     """
     Detect ALG associations using Fisher's exact test with Bonferroni correction.
@@ -469,14 +495,16 @@ def detect_algs_pairwise(
     significant = []
     for i, assoc in enumerate(raw_associations):
         color = ALG_PALETTE[i % len(ALG_PALETTE)]
-        significant.append(ALGAssociation(
-            chr1=assoc.chr1,
-            chr2=assoc.chr2,
-            p_value=assoc.p_value,
-            color=color,
-            gene_count=assoc.gene_count,
-            alg_id=i
-        ))
+        significant.append(
+            ALGAssociation(
+                chr1=assoc.chr1,
+                chr2=assoc.chr2,
+                p_value=assoc.p_value,
+                color=color,
+                gene_count=assoc.gene_count,
+                alg_id=i,
+            )
+        )
 
     common_ids = set(busco1.keys()) & set(busco2.keys())
     gene_colors = {}
@@ -494,9 +522,7 @@ def detect_algs_pairwise(
 
 
 def generate_bed_file(
-    busco_data: Dict[str, BuscoGene],
-    species_name: str,
-    output_path: str
+    busco_data: Dict[str, BuscoGene], species_name: str, output_path: str
 ) -> None:
     """
     Generate a BED file for JCVI from BUSCO data.
@@ -508,11 +534,10 @@ def generate_bed_file(
     """
     # Sort by chromosome and position (use min of start/end for sorting)
     genes = sorted(
-        busco_data.values(),
-        key=lambda g: (g.chromosome, min(g.start, g.end))
+        busco_data.values(), key=lambda g: (g.chromosome, min(g.start, g.end))
     )
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         for gene in genes:
             # BED format: chr, start, end, gene_id, score, strand
             # BED requires start <= end, so swap if necessary
@@ -533,7 +558,7 @@ def generate_links_file(
     sp2: str,
     output_path: str,
     max_gap: int = 10,
-    hide_non_significant: bool = False
+    hide_non_significant: bool = False,
 ) -> None:
     """
     Generate JCVI .simple file with synteny blocks between two species.
@@ -554,7 +579,7 @@ def generate_links_file(
     common_ids = set(busco1.keys()) & set(busco2.keys())
     if not common_ids:
         # Write empty file
-        open(output_path, 'w').close()
+        open(output_path, "w").close()
         return
 
     # Build chromosome-sorted gene lists for each species
@@ -593,12 +618,17 @@ def generate_links_file(
             # Single gene - still output as a block
             if orthologs:
                 busco_id, rank1, rank2 = orthologs[0]
-                blocks.append({
-                    'start1': busco_id, 'end1': busco_id,
-                    'start2': busco_id, 'end2': busco_id,
-                    'score': 1, 'orientation': '+',
-                    'color': gene_colors.get(busco_id, 'lightgrey')
-                })
+                blocks.append(
+                    {
+                        "start1": busco_id,
+                        "end1": busco_id,
+                        "start2": busco_id,
+                        "end2": busco_id,
+                        "score": 1,
+                        "orientation": "+",
+                        "color": gene_colors.get(busco_id, "lightgrey"),
+                    }
+                )
             continue
 
         # Sort by position in species 1
@@ -630,12 +660,12 @@ def generate_links_file(
     # Write .simple file in JCVI format
     # Color prefix format: "color*gene_name" (e.g., "#ff0000*gene1")
     # Write lightgrey (non-significant) blocks first so significant ones render on top
-    blocks.sort(key=lambda b: b.get('color', 'lightgrey') != 'lightgrey')
-    with open(output_path, 'w') as f:
+    blocks.sort(key=lambda b: b.get("color", "lightgrey") != "lightgrey")
+    with open(output_path, "w") as f:
         for block in blocks:
-            color = block.get('color', 'lightgrey')
+            color = block.get("color", "lightgrey")
             # Skip non-significant blocks if requested
-            if hide_non_significant and color == 'lightgrey':
+            if hide_non_significant and color == "lightgrey":
                 continue
             # Add color prefix if not default grey
             color_prefix = f"{color}*"
@@ -643,13 +673,14 @@ def generate_links_file(
             gene1_end = f"{sp1}_{block['end1']}"
             gene2_start = f"{sp2}_{block['start2']}"
             gene2_end = f"{sp2}_{block['end2']}"
-            f.write(f"{gene1_start}\t{gene1_end}\t{gene2_start}\t{gene2_end}\t"
-                    f"{block['score']}\t{block['orientation']}\n")
+            f.write(
+                f"{gene1_start}\t{gene1_end}\t{gene2_start}\t{gene2_end}\t"
+                f"{block['score']}\t{block['orientation']}\n"
+            )
 
 
 def _make_block(
-    orthologs: List[Tuple[str, int, int]],
-    gene_colors: Dict[str, str]
+    orthologs: List[Tuple[str, int, int]], gene_colors: Dict[str, str]
 ) -> Dict:
     """
     Create a synteny block from a list of orthologs.
@@ -667,10 +698,10 @@ def _make_block(
     # Determine orientation based on rank2 direction
     rank2_first = first[2]
     rank2_last = last[2]
-    orientation = '+' if rank2_last >= rank2_first else '-'
+    orientation = "+" if rank2_last >= rank2_first else "-"
 
     # For inverted blocks, swap start2/end2 so they're in correct order
-    if orientation == '+':
+    if orientation == "+":
         start2, end2 = first[0], last[0]
     else:
         start2, end2 = last[0], first[0]
@@ -678,24 +709,23 @@ def _make_block(
     # Get most common color in block (for ALG coloring)
     color_counts = defaultdict(int)
     for busco_id, _, _ in orthologs:
-        color = gene_colors.get(busco_id, 'lightgrey')
+        color = gene_colors.get(busco_id, "lightgrey")
         color_counts[color] += 1
     dominant_color = max(color_counts.keys(), key=lambda c: color_counts[c])
 
     return {
-        'start1': first[0],
-        'end1': last[0],
-        'start2': start2,
-        'end2': end2,
-        'score': len(orthologs),
-        'orientation': orientation,
-        'color': dominant_color
+        "start1": first[0],
+        "end1": last[0],
+        "start2": start2,
+        "end2": end2,
+        "score": len(orthologs),
+        "orientation": orientation,
+        "color": dominant_color,
     }
 
 
 def get_chromosome_order(
-    fasta_sizes: Dict[str, int],
-    busco_data: Dict[str, BuscoGene]
+    fasta_sizes: Dict[str, int], busco_data: Dict[str, BuscoGene]
 ) -> List[str]:
     """
     Get chromosomes sorted by fasta sequence size (largest first).
@@ -712,16 +742,12 @@ def get_chromosome_order(
     busco_chromosomes = {gene.chromosome for gene in busco_data.values()}
 
     sorted_chrs = sorted(
-        busco_chromosomes,
-        key=lambda c: fasta_sizes.get(c, 0),
-        reverse=True
+        busco_chromosomes, key=lambda c: fasta_sizes.get(c, 0), reverse=True
     )
     return sorted_chrs
 
 
-def get_chromosome_order_by_span(
-    busco_data: Dict[str, BuscoGene]
-) -> List[str]:
+def get_chromosome_order_by_span(busco_data: Dict[str, BuscoGene]) -> List[str]:
     """
     Get chromosomes sorted by total gene span (largest first).
 
@@ -731,22 +757,19 @@ def get_chromosome_order_by_span(
     Returns:
         List of chromosome names sorted by gene span
     """
-    chr_spans = defaultdict(lambda: [float('inf'), 0])
+    chr_spans = defaultdict(lambda: [float("inf"), 0])
     for gene in busco_data.values():
         chr_spans[gene.chromosome][0] = min(chr_spans[gene.chromosome][0], gene.start)
         chr_spans[gene.chromosome][1] = max(chr_spans[gene.chromosome][1], gene.end)
 
     sorted_chrs = sorted(
-        chr_spans.keys(),
-        key=lambda c: chr_spans[c][1] - chr_spans[c][0],
-        reverse=True
+        chr_spans.keys(), key=lambda c: chr_spans[c][1] - chr_spans[c][0], reverse=True
     )
     return sorted_chrs
 
 
 def calculate_gravity_scores(
-    target_busco: Dict[str, BuscoGene],
-    query_busco: Dict[str, BuscoGene]
+    target_busco: Dict[str, BuscoGene], query_busco: Dict[str, BuscoGene]
 ) -> Dict[Tuple[str, str], float]:
     """
     Calculate gravity scores between chromosome pairs using shared BUSCO genes.
@@ -776,7 +799,7 @@ def calculate_gravity_scores(
         # Calculate distance using gene spans
         target_span = abs(target_gene.end - target_gene.start)
         query_span = abs(query_gene.end - query_gene.start)
-        distance = math.sqrt(target_span ** 2 + query_span ** 2)
+        distance = math.sqrt(target_span**2 + query_span**2)
 
         # Gravity formula: (1 + distance)^2
         gravity = (1 + distance) ** 2
@@ -790,7 +813,7 @@ def calculate_gravity_scores(
 def get_chromosome_order_by_gravity(
     target_order: List[str],
     query_busco: Dict[str, BuscoGene],
-    target_busco: Dict[str, BuscoGene]
+    target_busco: Dict[str, BuscoGene],
 ) -> List[str]:
     """
     Order query chromosomes by gravity with target chromosomes.
@@ -856,14 +879,12 @@ def get_chromosome_order_by_gravity(
         if target_chr in target_to_queries:
             # Sort queries in this group by position on target
             group = target_to_queries[target_chr]
-            group.sort(key=lambda q: query_positions.get(q, float('inf')))
+            group.sort(key=lambda q: query_positions.get(q, float("inf")))
             ordered_queries.extend(group)
             matched_queries.update(group)
 
     # Add unmatched chromosomes at the end, sorted by span
-    all_query_chrs = set(
-        gene.chromosome for gene in query_busco.values()
-    )
+    all_query_chrs = set(gene.chromosome for gene in query_busco.values())
     unmatched = all_query_chrs - matched_queries
 
     if unmatched:
@@ -884,7 +905,7 @@ def generate_seqids_file(
     species_data: List[Tuple[str, Dict[str, BuscoGene]]],
     output_path: str,
     use_gravity_ordering: bool = False,
-    assembly_fasta_sizes: Dict[str, int] = None
+    assembly_fasta_sizes: Dict[str, int] = None,
 ) -> None:
     """
     Generate JCVI seqids file with chromosome order for each species.
@@ -897,7 +918,7 @@ def generate_seqids_file(
         assembly_fasta_sizes: Dictionary mapping assembly sequence names to sizes.
                               Used for ordering the first species (assembly).
     """
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         previous_order: List[str] = []
         previous_busco: Dict[str, BuscoGene] = {}
 
@@ -922,9 +943,7 @@ def generate_seqids_file(
 
 
 def generate_layouts_file(
-    species_beds: List[Tuple[str, str]],
-    links_files: List[str],
-    output_path: str
+    species_beds: List[Tuple[str, str]], links_files: List[str], output_path: str
 ) -> None:
     """
     Generate JCVI layouts file.
@@ -936,19 +955,22 @@ def generate_layouts_file(
     """
     num_species = len(species_beds)
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write("# y, xstart, xend, rotation, color, label, va, bed\n")
         f.write(f"#{'-' * 60}\n")
 
         # Calculate y positions (evenly spaced from 0.9 to 0.1)
-        y_positions = [0.9 - (i * 0.8 / max(num_species - 1, 1))
-                       for i in range(num_species)]
+        y_positions = [
+            0.9 - (i * 0.8 / max(num_species - 1, 1)) for i in range(num_species)
+        ]
 
         for i, (species_name, bed_path) in enumerate(species_beds):
             bed_basename = os.path.basename(bed_path)
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
-            f.write(f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{species_name},\t{va},\t{bed_basename}\n")
+            f.write(
+                f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{species_name},\t{va},\t{bed_basename}\n"
+            )
 
         f.write("\n# edges\n")
         for i, links_file in enumerate(links_files):
@@ -957,10 +979,7 @@ def generate_layouts_file(
 
 
 def save_alg_associations(
-    algs: List[ALGAssociation],
-    sp1: str,
-    sp2: str,
-    output_path: str
+    algs: List[ALGAssociation], sp1: str, sp2: str, output_path: str
 ) -> None:
     """
     Save ALG associations to a TSV file for inspection.
@@ -971,12 +990,16 @@ def save_alg_associations(
         sp2: Species 2 name
         output_path: Output TSV file path
     """
-    with open(output_path, 'a') as f:
+    with open(output_path, "a") as f:
         if os.path.getsize(output_path) == 0:
-            f.write("species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n")
+            f.write(
+                "species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n"
+            )
         for alg in algs:
-            f.write(f"{sp1}\t{sp2}\t{alg.chr1}\t{alg.chr2}\t"
-                    f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\t{alg.alg_id}\n")
+            f.write(
+                f"{sp1}\t{sp2}\t{alg.chr1}\t{alg.chr2}\t"
+                f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\t{alg.alg_id}\n"
+            )
 
 
 def get_species_order(
@@ -984,7 +1007,7 @@ def get_species_order(
     assembly_busco_path: str,
     accession_order_file: str,
     manual_refs: str,
-    busco_refs_pattern: str
+    busco_refs_pattern: str,
 ) -> List[Tuple[str, str]]:
     """
     Determine species order and collect BUSCO paths.
@@ -1051,7 +1074,8 @@ def run(
     min_busco_genes: int = 0,
     custom_color_file: str = "",
     custom_names: str = "",
-    hide_non_significant: bool = False
+    hide_non_significant: bool = False,
+    skip_alg: bool = False,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -1067,14 +1091,14 @@ def run(
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
         min_busco_genes: Minimum complete BUSCO genes required per sequence
-        custom_color_file: Path to custom color file. When provided, ALG
-                           statistical test is skipped and colors are applied
-                           directly from the file.
+        custom_color_file: Path to custom color file for gene coloring.
         custom_names: Comma-separated custom names for JCVI tracks. If one name
                       is provided, it applies only to the assembly. If multiple
                       names are provided, the count must match species count.
         hide_non_significant: If True, hide links between chromosome pairs
                               without significant associations.
+        skip_alg: If True, skip ALG statistical testing when using custom
+                  colors. Only effective with custom_color_file.
 
     Returns:
         Dictionary with paths to generated files
@@ -1093,7 +1117,7 @@ def run(
     ref_busco_paths = {}
     for ref_dir in busco_refs:
         # Extract accession from directory name (busco_reference_ACCESSION)
-        dirname = os.path.basename(ref_dir.rstrip('/'))
+        dirname = os.path.basename(ref_dir.rstrip("/"))
         if dirname.startswith("busco_reference_"):
             accession = dirname.replace("busco_reference_", "")
         else:
@@ -1138,8 +1162,7 @@ def run(
                     f"{len(species_order) - 1} references"
                 )
             species_order = [
-                (names_list[i], species_order[i][1])
-                for i in range(len(species_order))
+                (names_list[i], species_order[i][1]) for i in range(len(species_order))
             ]
 
     # Load all BUSCO data
@@ -1157,7 +1180,7 @@ def run(
 
     # Detect ALGs and generate links for consecutive species pairs
     alg_output = os.path.join(output_dir, "alg_associations.tsv")
-    open(alg_output, 'w').close()  # Create empty file
+    open(alg_output, "w").close()  # Create empty file
 
     # Phase 1: Transitive ALG detection across all species (if not using custom colors)
     all_associations: List[PairwiseAssociation] = []
@@ -1179,13 +1202,19 @@ def run(
         else:
             # Filter associations for this pair
             pair_associations = [
-                a for a in all_associations
+                a
+                for a in all_associations
                 if a.species1 == sp1_name and a.species2 == sp2_name
             ]
             # Build gene colors from ALG membership
             gene_colors = build_gene_colors_from_algs(
-                sp1_busco, sp2_busco, sp1_name, sp2_name, chr_to_alg, alg_colors,
-                pair_associations
+                sp1_busco,
+                sp2_busco,
+                sp1_name,
+                sp2_name,
+                chr_to_alg,
+                alg_colors,
+                pair_associations,
             )
             # Convert to ALGAssociation with alg_id
             algs = [
@@ -1193,9 +1222,11 @@ def run(
                     chr1=a.chr1,
                     chr2=a.chr2,
                     p_value=a.p_value,
-                    color=alg_colors.get(chr_to_alg.get((a.species1, a.chr1), -1), "lightgrey"),
+                    color=alg_colors.get(
+                        chr_to_alg.get((a.species1, a.chr1), -1), "lightgrey"
+                    ),
                     gene_count=a.gene_count,
-                    alg_id=chr_to_alg.get((a.species1, a.chr1), -1)
+                    alg_id=chr_to_alg.get((a.species1, a.chr1), -1),
                 )
                 for a in pair_associations
             ]
@@ -1203,9 +1234,15 @@ def run(
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")
-        generate_links_file(sp1_busco, sp2_busco, gene_colors,
-                            sp1_name, sp2_name, links_path,
-                            hide_non_significant=hide_non_significant)
+        generate_links_file(
+            sp1_busco,
+            sp2_busco,
+            gene_colors,
+            sp1_name,
+            sp2_name,
+            links_path,
+            hide_non_significant=hide_non_significant,
+        )
         links_files.append(links_path)
 
     seqids_path = os.path.join(output_dir, "seqids")
@@ -1221,7 +1258,7 @@ def run(
         "layouts": layouts_path,
         "alg_associations": alg_output,
         "bed_files": [p for _, p in bed_files],
-        "links_files": links_files
+        "links_files": links_files,
     }
 
 
@@ -1231,67 +1268,61 @@ def main():
         description="Generate JCVI karyotype files from BUSCO data with ALG detection"
     )
     parser.add_argument(
-        '--busco_assembly',
+        "--busco_assembly", required=True, help="Path to assembly BUSCO full_table.tsv"
+    )
+    parser.add_argument(
+        "--assembly-fasta", required=True, help="Path to the assembly fasta file"
+    )
+    parser.add_argument(
+        "--busco_references",
+        nargs="+",
         required=True,
-        help="Path to assembly BUSCO full_table.tsv"
+        help="Paths to reference BUSCO directories",
     )
     parser.add_argument(
-        '--assembly-fasta',
+        "--accession_order",
         required=True,
-        help="Path to the assembly fasta file"
+        help="Path to file with accessions in order (MASH distance)",
     )
     parser.add_argument(
-        '--busco_references',
-        nargs='+',
-        required=True,
-        help="Paths to reference BUSCO directories"
+        "--manual_refs", default="", help="Semicolon-separated manual reference paths"
+    )
+    parser.add_argument("--output_dir", required=True, help="Output directory")
+    parser.add_argument(
+        "--assembly_name", default="assembly", help="Name for assembly in plots"
     )
     parser.add_argument(
-        '--accession_order',
-        required=True,
-        help="Path to file with accessions in order (MASH distance)"
-    )
-    parser.add_argument(
-        '--manual_refs',
-        default="",
-        help="Semicolon-separated manual reference paths"
-    )
-    parser.add_argument(
-        '--output_dir',
-        required=True,
-        help="Output directory"
-    )
-    parser.add_argument(
-        '--assembly_name',
-        default="assembly",
-        help="Name for assembly in plots"
-    )
-    parser.add_argument(
-        '--min-busco-genes',
+        "--min-busco-genes",
         type=int,
         default=0,
-        help="Minimum complete BUSCO genes required per sequence (default: 0)"
+        help="Minimum complete BUSCO genes required per sequence (default: 0)",
     )
     parser.add_argument(
-        '--jcvi-custom-colors',
+        "--jcvi-custom-colors",
         default="",
         help="Path to custom color file (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
-             "When provided, the ALG statistical test is disabled and colors are "
-             "applied directly from the file. Genes not in the file will be shown "
-             "in grey."
+        "By default, ALG statistical testing still runs to determine significance; "
+        "use --skip-alg to disable it. Genes not in the file will be shown in grey.",
     )
     parser.add_argument(
-        '--jcvi-names',
+        "--jcvi-names",
         default="",
         help="Comma-separated custom names for JCVI tracks. If one name is provided, "
-             "it applies only to the assembly. If multiple names are provided, the count "
-             "must equal 1 (assembly) + number of references, in order."
+        "it applies only to the assembly. If multiple names are provided, the count "
+        "must equal 1 (assembly) + number of references, in order.",
     )
     parser.add_argument(
-        '--hide-non-significant',
-        action='store_true',
+        "--hide-non-significant",
+        action="store_true",
         help="Hide links between chromosome pairs without significant associations. "
-             "This produces a cleaner plot showing only ALG-related synteny."
+        "This produces a cleaner plot showing only ALG-related synteny.",
+    )
+    parser.add_argument(
+        "--skip-alg",
+        action="store_true",
+        help="Skip ALG statistical testing when using custom colors. All genes in the "
+        "color file get their custom color; unlisted genes are grey. Only effective "
+        "with --jcvi-custom-colors.",
     )
 
     args = parser.parse_args()
@@ -1308,6 +1339,7 @@ def main():
         custom_color_file=args.jcvi_custom_colors,
         custom_names=args.jcvi_names,
         hide_non_significant=args.hide_non_significant,
+        skip_alg=args.skip_alg,
     )
 
 
