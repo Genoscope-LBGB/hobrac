@@ -34,8 +34,8 @@ setuptools.setup(
             "busco_to_paf=hobrac.busco_to_paf:main",
             "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main",
             "precompute_mash=hobrac.precompute_mash_refseq:main",
-            "jcvi_synteny=hobrac.jcvi_synteny:main"
+            "jcvi_synteny=hobrac.jcvi_synteny:main",
         ],
     },
-    python_requires='>=3.11',
+    python_requires=">=3.11",
 )

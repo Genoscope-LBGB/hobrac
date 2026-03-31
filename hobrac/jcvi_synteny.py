@@ -1050,7 +1050,7 @@ def generate_layouts_file(
         f.write("\n# edges\n")
         for i, links_file in enumerate(links_files):
             links_basename = os.path.basename(links_file)
-            f.write(f"e, {i}, {i+1}, {links_basename}\n")
+            f.write(f"e, {i}, {i + 1}, {links_basename}\n")
 
 
 def save_alg_associations(
