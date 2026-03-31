@@ -470,6 +470,28 @@ def detect_algs_transitive(
     return all_associations, chr_to_alg, alg_colors
 
 
+def build_alg_association_list(
+    pair_associations: List[PairwiseAssociation],
+    chr_to_alg: Dict[Tuple[str, str], int],
+    alg_colors: Dict[int, str],
+) -> List[ALGAssociation]:
+    """Convert pairwise associations to ALGAssociation list with alg_id and color."""
+    result = []
+    for a in pair_associations:
+        alg_id = chr_to_alg.get((a.species1, a.chr1), -1)
+        result.append(
+            ALGAssociation(
+                chr1=a.chr1,
+                chr2=a.chr2,
+                p_value=a.p_value,
+                color=alg_colors.get(alg_id, "lightgrey"),
+                gene_count=a.gene_count,
+                alg_id=alg_id,
+            )
+        )
+    return result
+
+
 def build_gene_colors_from_algs(
     species1_busco: Dict[str, BuscoGene],
     species2_busco: Dict[str, BuscoGene],
@@ -1235,11 +1257,12 @@ def run(
     alg_output = os.path.join(output_dir, "alg_associations.tsv")
     open(alg_output, "w").close()  # Create empty file
 
-    # Phase 1: Transitive ALG detection across all species (if not using custom colors)
+    # Phase 1: Transitive ALG detection across all species
+    # Skip only when custom colors are provided AND skip_alg is True
     all_associations: List[PairwiseAssociation] = []
     chr_to_alg: Dict[Tuple[str, str], int] = {}
     alg_colors: Dict[int, str] = {}
-    if not custom_colors:
+    if not (custom_colors and skip_alg):
         all_associations, chr_to_alg, alg_colors = detect_algs_transitive(species_busco)
 
     # Phase 2: Generate outputs for each pair
@@ -1248,18 +1271,31 @@ def run(
         sp1_name, sp1_busco = species_busco[i]
         sp2_name, sp2_busco = species_busco[i + 1]
 
-        if custom_colors:
+        pair_associations = [
+            a
+            for a in all_associations
+            if a.species1 == sp1_name and a.species2 == sp2_name
+        ]
+
+        if custom_colors and skip_alg:
             # Use custom colors directly, skip statistical analysis
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
             algs: List[ALGAssociation] = []
+        elif custom_colors:
+            # Hybrid: custom colors filtered by ALG significance
+            gene_colors = apply_custom_colors_with_algs(
+                sp1_busco,
+                sp2_busco,
+                sp1_name,
+                sp2_name,
+                chr_to_alg,
+                alg_colors,
+                pair_associations,
+                custom_colors,
+            )
+            algs = build_alg_association_list(pair_associations, chr_to_alg, alg_colors)
         else:
-            # Filter associations for this pair
-            pair_associations = [
-                a
-                for a in all_associations
-                if a.species1 == sp1_name and a.species2 == sp2_name
-            ]
-            # Build gene colors from ALG membership
+            # No custom colors: full ALG pipeline
             gene_colors = build_gene_colors_from_algs(
                 sp1_busco,
                 sp2_busco,
@@ -1269,20 +1305,7 @@ def run(
                 alg_colors,
                 pair_associations,
             )
-            # Convert to ALGAssociation with alg_id
-            algs = [
-                ALGAssociation(
-                    chr1=a.chr1,
-                    chr2=a.chr2,
-                    p_value=a.p_value,
-                    color=alg_colors.get(
-                        chr_to_alg.get((a.species1, a.chr1), -1), "lightgrey"
-                    ),
-                    gene_count=a.gene_count,
-                    alg_id=chr_to_alg.get((a.species1, a.chr1), -1),
-                )
-                for a in pair_associations
-            ]
+            algs = build_alg_association_list(pair_associations, chr_to_alg, alg_colors)
 
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 
