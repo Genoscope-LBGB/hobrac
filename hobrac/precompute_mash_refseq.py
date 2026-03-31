@@ -12,7 +12,7 @@ import time
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import List
 
 
 @dataclass
@@ -87,7 +87,9 @@ def download_taxdump(output_dir):
     os.makedirs(taxdump, exist_ok=True)
 
     taxdump_gz = os.path.join(taxdump, "taxdump.tar.gz")
-    os.system(f"wget -c https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz -O {taxdump_gz}")
+    os.system(
+        f"wget -c https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz -O {taxdump_gz}"
+    )
     os.system(f"cd {taxdump} && tar -xzf {taxdump_gz} && rm {taxdump_gz}")
 
 
@@ -99,7 +101,10 @@ def extract_phylum(output_dir, euk_list_file):
     accession_list = os.path.join(output_dir, "final_list.txt")
 
     os.environ["TAXONKIT_DB"] = taxdump
-    os.system(f"cat {genome_list} | taxonkit reformat -I 3 --format '{{p}}' -r 'no_returned_phylum' " f" > {accession_list}")
+    os.system(
+        f"cat {genome_list} | taxonkit reformat -I 3 --format '{{p}}' -r 'no_returned_phylum' "
+        f" > {accession_list}"
+    )
 
     shutil.rmtree(taxdump)
 
@@ -154,7 +159,7 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
                     partial_path = f"/genomes/all/GCA/{match.group(1)}/{match.group(2)}/{match.group(3)}"
                     try:
                         ftp.cwd(partial_path)
-                    except:
+                    except Exception:
                         print(gca_accession, file=current_list)
                         continue
 
@@ -168,13 +173,17 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
                             break
 
                     if not full_folder_name:
-                        print(f"Could not find folder for {gca_accession}, url: {partial_path}")
+                        print(
+                            f"Could not find folder for {gca_accession}, url: {partial_path}"
+                        )
                         print(gca_accession, file=current_list)
                         continue
 
                     ftp.cwd(full_folder_name)
                     file_name = f"{full_folder_name}_genomic.fna.gz"
-                    genome.url = f"{base_https_url}{partial_path}/{full_folder_name}/{file_name}"
+                    genome.url = (
+                        f"{base_https_url}{partial_path}/{full_folder_name}/{file_name}"
+                    )
 
                     time.sleep(0.5)
 
@@ -182,14 +191,16 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
         print(e)
         try:
             ftp.quit()
-        except:
+        except Exception:
             pass
         return get_ncbi_genome_ftp_url(phylums, output_dir)
 
     return phylums
 
 
-def download_and_process_genomes(phylums: defaultdict[str, List[Genome]], download_dir: str, mash_output_dir: str):
+def download_and_process_genomes(
+    phylums: defaultdict[str, List[Genome]], download_dir: str, mash_output_dir: str
+):
     """Download genomes and immediately process them: decompress → mash sketch → delete."""
     already_downloaded_path = os.path.join(download_dir, "already_downloaded.txt")
 
@@ -204,15 +215,21 @@ def download_and_process_genomes(phylums: defaultdict[str, List[Genome]], downlo
             accession = genome.accession
             taxid = genome.taxid
             url = genome.url
-            compressed_name = os.path.join(phylums_download_dir, f"{accession}_{taxid}.fna.gz")
+            compressed_name = os.path.join(
+                phylums_download_dir, f"{accession}_{taxid}.fna.gz"
+            )
 
             # Download the compressed genome
             try:
-                print(f"Downloading {accession} from {url}", flush=True, file=sys.stderr)
+                print(
+                    f"Downloading {accession} from {url}", flush=True, file=sys.stderr
+                )
                 response = requests.get(url, stream=True)
                 response.raise_for_status()
             except Exception as e:
-                print(f"Error downloading {accession}: {e}", flush=True, file=sys.stderr)
+                print(
+                    f"Error downloading {accession}: {e}", flush=True, file=sys.stderr
+                )
                 continue
 
             with open(compressed_name, "wb") as f:
@@ -227,14 +244,24 @@ def download_and_process_genomes(phylums: defaultdict[str, List[Genome]], downlo
             try:
                 decompressed_path = decompress_single_file(compressed_name)
             except Exception as e:
-                print(f"Error decompressing {accession}: {e}, skipping mash processing", flush=True, file=sys.stderr)
+                print(
+                    f"Error decompressing {accession}: {e}, skipping mash processing",
+                    flush=True,
+                    file=sys.stderr,
+                )
                 continue
 
             # Immediately run mash sketch on the decompressed genome
             try:
-                run_mash_single_file(decompressed_path, phylum, accession, taxid, mash_output_dir)
+                run_mash_single_file(
+                    decompressed_path, phylum, accession, taxid, mash_output_dir
+                )
             except Exception as e:
-                print(f"Error running mash on {accession}: {e}", flush=True, file=sys.stderr)
+                print(
+                    f"Error running mash on {accession}: {e}",
+                    flush=True,
+                    file=sys.stderr,
+                )
                 # Clean up decompressed file if mash fails
                 if os.path.exists(decompressed_path):
                     os.remove(decompressed_path)
@@ -256,7 +283,9 @@ def download_genomes(phylums: defaultdict[str, List[Genome]], output_dir):
             accession = genome.accession
             taxid = genome.taxid
             url = genome.url
-            compressed_name = os.path.join(phylums_download_dir, f"{accession}_{taxid}.fna.gz")
+            compressed_name = os.path.join(
+                phylums_download_dir, f"{accession}_{taxid}.fna.gz"
+            )
 
             try:
                 response = requests.get(url, stream=True)
@@ -265,7 +294,10 @@ def download_genomes(phylums: defaultdict[str, List[Genome]], output_dir):
                 print(e)
                 continue
 
-            with open(compressed_name, "wb") as f, open(already_downloaded_path, "a") as current_list:
+            with (
+                open(compressed_name, "wb") as f,
+                open(already_downloaded_path, "a") as current_list,
+            ):
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
 
@@ -288,7 +320,9 @@ def decompress_single_file(compressed_path: str) -> str:
                         break
                     f_out.write(chunk)
     except Exception as e:
-        print(f"Error decompressing {compressed_path}: {e}", flush=True, file=sys.stderr)
+        print(
+            f"Error decompressing {compressed_path}: {e}", flush=True, file=sys.stderr
+        )
         raise
 
     # Remove compressed file after successful decompression
@@ -318,14 +352,29 @@ def decompress(output_dir):
         os.remove(f)
 
 
-def run_mash_single_file(fna_path: str, phylum: str, accession: str, taxid: str, output_dir: str) -> str:
+def run_mash_single_file(
+    fna_path: str, phylum: str, accession: str, taxid: str, output_dir: str
+) -> str:
     """Run mash sketch on a single decompressed genome file and delete it afterward."""
     identifier = f"{accession}:{taxid}"
     output_path = os.path.join(output_dir, phylum, os.path.basename(fna_path))
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     print(f"Running mash sketch on {fna_path}", flush=True, file=sys.stderr)
-    subprocess.run(["mash", "sketch", "-s", "10000", "-I", identifier, "-o", output_path, fna_path], check=True)
+    subprocess.run(
+        [
+            "mash",
+            "sketch",
+            "-s",
+            "10000",
+            "-I",
+            identifier,
+            "-o",
+            output_path,
+            fna_path,
+        ],
+        check=True,
+    )
 
     # Remove decompressed file after mash processing
     os.remove(fna_path)
@@ -336,7 +385,9 @@ def run_mash_single_file(fna_path: str, phylum: str, accession: str, taxid: str,
 
 def run_mash(input_dir, output_dir):
     """Run mash sketch on all .fna files (legacy function, not used in optimized workflow)."""
-    pattern = r".*/(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna$"
+    pattern = (
+        r".*/(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna$"
+    )
 
     for f in glob.glob(f"{input_dir}/*/*.fna"):
         match = re.search(pattern, f)
@@ -351,7 +402,10 @@ def run_mash(input_dir, output_dir):
         output_path = os.path.join(output_dir, phylum, os.path.basename(f))
         os.makedirs(output_path, exist_ok=True)
 
-        subprocess.run(["mash", "sketch", "-s", "10000", "-I", identifier, "-o", output_path, f], check=True)
+        subprocess.run(
+            ["mash", "sketch", "-s", "10000", "-I", identifier, "-o", output_path, f],
+            check=True,
+        )
         os.remove(f)
 
 
@@ -375,13 +429,24 @@ def paste_mash(input_dir, output_dir):
 
     for phylum in phylums:
         mash_fofn = os.path.join(output_dir, f"{phylum}.fofn")
-        subprocess.run(["mash", "paste", f"{input_dir}/{phylum}.msh", "-l", mash_fofn], check=True)
+        subprocess.run(
+            ["mash", "paste", f"{input_dir}/{phylum}.msh", "-l", mash_fofn], check=True
+        )
         os.remove(mash_fofn)
 
         global_sketch = os.path.join(output_dir, f"{phylum}.msh")
         if os.path.exists(global_sketch):
             new_global_sketch = os.path.join(output_dir, "new_references")
-            subprocess.run(["mash", "paste", new_global_sketch, global_sketch, f"{input_dir}/{phylum}.msh"], check=True)
+            subprocess.run(
+                [
+                    "mash",
+                    "paste",
+                    new_global_sketch,
+                    global_sketch,
+                    f"{input_dir}/{phylum}.msh",
+                ],
+                check=True,
+            )
             os.rename(f"{new_global_sketch}.msh", global_sketch)
         else:
             os.rename(f"{input_dir}/{phylum}.msh", global_sketch)

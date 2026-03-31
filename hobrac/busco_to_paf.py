@@ -1,45 +1,51 @@
 #!/usr/bin/env python3
 import argparse
 import os
-import sys
 import uuid
 from Bio import SeqIO
 
+
 def read_busco_tsv(file_path):
     busco_data = {}
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         for line in file:
             if line.startswith("#"):
                 continue
-            parts = line.strip().split('\t')
+            parts = line.strip().split("\t")
             if parts[1] == "Complete":
                 busco_id = parts[0]
                 busco_data[busco_id] = {
-                    'chr': parts[2],
-                    'start': int(parts[3]),
-                    'end': int(parts[4])
+                    "chr": parts[2],
+                    "start": int(parts[3]),
+                    "end": int(parts[4]),
                 }
     return busco_data
 
+
 def calculate_fasta_lengths(file_path):
     lengths = {}
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         for record in SeqIO.parse(file, "fasta"):
             lengths[record.id] = len(record.seq)
     return lengths
 
+
 def write_idx_file(file_path, keyword, lengths):
-    with open(file_path, 'w') as file:
+    with open(file_path, "w") as file:
         file.write(f"{keyword}\n")
         for seq_id, length in lengths.items():
             file.write(f"{seq_id}\t{length}\n")
 
+
 def generate_paf(busco1_data, busco2_data, len_query, len_target, output_file):
-    with open(output_file, 'w') as outfile:
+    with open(output_file, "w") as outfile:
         for busco_id, data in busco1_data.items():
             if busco_id in busco2_data:
-                target = busco2_data[busco_id]['chr']
-                outfile.write(f"{data['chr']}\t{len_query[data['chr']]}\t{data['start']}\t{data['end']}\t+\t{target}\t{len_target[target]}\t{busco2_data[busco_id]['start']}\t{busco2_data[busco_id]['end']}\t1000\t1000\t60\n")
+                target = busco2_data[busco_id]["chr"]
+                outfile.write(
+                    f"{data['chr']}\t{len_query[data['chr']]}\t{data['start']}\t{data['end']}\t+\t{target}\t{len_target[target]}\t{busco2_data[busco_id]['start']}\t{busco2_data[busco_id]['end']}\t1000\t1000\t60\n"
+                )
+
 
 def run(busco_query, busco_ref, query_fasta, ref_fasta, output_dir=None):
     # Generate a unique output directory name if not provided
@@ -68,12 +74,24 @@ def run(busco_query, busco_ref, query_fasta, ref_fasta, output_dir=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate PAF and index files from BUSCO and FASTA files.")
-    parser.add_argument('--busco_query', required=True, help="Path to the query BUSCO TSV file.")
-    parser.add_argument('--busco_ref', required=True, help="Path to the reference BUSCO TSV file.")
-    parser.add_argument('--query', required=True, help="Path to the query FASTA file.")
-    parser.add_argument('--ref', required=True, help="Path to the reference FASTA file.")
-    parser.add_argument('--out', required=False, help="Output directory. If not specified, a unique directory name will be generated.")
+    parser = argparse.ArgumentParser(
+        description="Generate PAF and index files from BUSCO and FASTA files."
+    )
+    parser.add_argument(
+        "--busco_query", required=True, help="Path to the query BUSCO TSV file."
+    )
+    parser.add_argument(
+        "--busco_ref", required=True, help="Path to the reference BUSCO TSV file."
+    )
+    parser.add_argument("--query", required=True, help="Path to the query FASTA file.")
+    parser.add_argument(
+        "--ref", required=True, help="Path to the reference FASTA file."
+    )
+    parser.add_argument(
+        "--out",
+        required=False,
+        help="Output directory. If not specified, a unique directory name will be generated.",
+    )
 
     args = parser.parse_args()
 

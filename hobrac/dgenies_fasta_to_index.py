@@ -3,13 +3,11 @@
 # Code from https://github.com/genotoul-bioinfo/dgenies
 
 import argparse
-import io
 import re
 from xopen import xopen
 
 
 class Index:
-
     """
     Manage Fasta Index
     """
@@ -86,8 +84,16 @@ class Index:
         with open(index_file, "w") as idx:
             idx.write(name + "\n")
             for contig in order:
-                idx.write("\t".join([contig, str(contigs[contig]), "1" if reversed_c[contig] else "0"])
-                          + "\n")
+                idx.write(
+                    "\t".join(
+                        [
+                            contig,
+                            str(contigs[contig]),
+                            "1" if reversed_c[contig] else "0",
+                        ]
+                    )
+                    + "\n"
+                )
 
 
 def index_file(fasta_path, fasta_name, out, write_fa=None):
@@ -115,8 +121,10 @@ def index_file(fasta_path, fasta_name, out, write_fa=None):
     write_f = None
     if write_fa is not None:
         write_f = open(write_fa, "w")
-    with (xopen(fasta_path) if compressed else open(fasta_path)) as fasta, \
-            open(out, "w") as out_file:
+    with (
+        xopen(fasta_path) if compressed else open(fasta_path) as fasta,
+        open(out, "w") as out_file,
+    ):
         out_file.write(fasta_name + "\n")
         contig = None
         len_c = 0
@@ -138,9 +146,16 @@ def index_file(fasta_path, fasta_name, out, write_fa=None):
                 contig = re.split("\s", line[1:])[0]
                 len_c = 0
             elif len(line) > 0:
-                if next_header or re.match(r"^[ATGCKMRYSWBVHDXN.\-]+$", line.upper()) is None:
+                if (
+                    next_header
+                    or re.match(r"^[ATGCKMRYSWBVHDXN.\-]+$", line.upper()) is None
+                ):
                     if next_header:
-                        return False, 0, "Error: new header line expected at line %d" % nb_line
+                        return (
+                            False,
+                            0,
+                            "Error: new header line expected at line %d" % nb_line,
+                        )
                     return False, 0, "Error: invalid sequence at line %d" % nb_line
                 len_c += len(line)
             elif len(line) == 0:
@@ -158,9 +173,13 @@ def index_file(fasta_path, fasta_name, out, write_fa=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Split huge contigs")
-    parser.add_argument('-i', '--input', type=str, required=True, help="Input fasta file")
-    parser.add_argument('-n', '--name', type=str, required=True, help="Input name")
-    parser.add_argument('-o', '--output', type=str, required=True, help="Output index file")
+    parser.add_argument(
+        "-i", "--input", type=str, required=True, help="Input fasta file"
+    )
+    parser.add_argument("-n", "--name", type=str, required=True, help="Input name")
+    parser.add_argument(
+        "-o", "--output", type=str, required=True, help="Output index file"
+    )
     args = parser.parse_args()
 
     success, nb_contigs, message = index_file(args.input, args.name, args.output)
