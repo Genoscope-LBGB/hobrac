@@ -1,8 +1,4 @@
-"""Tests verifying --jcvi-hide-non-significant works across all flag combinations.
-
-Covers the 6-row behavior matrix from TICKET-004:
-  custom_colors | skip_alg | hide_non_significant | Expected behavior
-"""
+"""Tests verifying --jcvi-hide-non-significant works across all flag combinations."""
 
 import os
 import tempfile
@@ -229,7 +225,7 @@ def test_custom_skip_alg_hide_true(species_busco, custom_colors):
     assert all(color != "lightgrey" for _, color in lines)
 
 
-# Key check from ticket: custom + ALG + hide → sig genes not in custom file
+# custom + ALG + hide → sig genes not in custom file
 # should appear with ALG palette color
 def test_alg_fallback_visible_when_hidden(species_busco, alg_data, custom_colors):
     sp1, sp2 = species_busco
