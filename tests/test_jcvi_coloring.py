@@ -63,43 +63,37 @@ class TestApplyCustomColors:
 
 class TestApplyCustomColorsWithAlgsEdgeCases:
     @pytest.fixture
-    def alg_fixture(self):
+    def chain_fixture(self):
         sp1 = {"g1": _gene("chr1"), "g2": _gene("chr3")}
         sp2 = {"g1": _gene("chrA"), "g2": _gene("chrC")}
-        chr_to_alg = {("sp1", "chr1"): 0, ("sp2", "chrA"): 0}
-        alg_colors = {0: "#ff0000"}
-        sig = [PairwiseAssociation("sp1", "sp2", "chr1", "chrA", 0.001, 10)]
-        return sp1, sp2, chr_to_alg, alg_colors, sig
+        gene_to_chain = {"g1": 0, "g2": -1}
+        chain_colors = {0: "#ff0000"}
+        return sp1, sp2, gene_to_chain, chain_colors
 
-    def test_empty_custom_colors_matches_build_gene_colors(self, alg_fixture):
-        sp1, sp2, chr_to_alg, alg_colors, sig = alg_fixture
+    def test_empty_custom_colors_matches_build_gene_colors(self, chain_fixture):
+        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
         hybrid = apply_custom_colors_with_algs(
-            sp1, sp2, "sp1", "sp2", chr_to_alg, alg_colors, sig, {}
+            sp1, sp2, gene_to_chain, chain_colors, {}
         )
-        alg_only = build_gene_colors_from_algs(
-            sp1, sp2, "sp1", "sp2", chr_to_alg, alg_colors, sig
-        )
+        alg_only = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
         assert hybrid == alg_only
 
-    def test_all_genes_in_custom(self, alg_fixture):
-        sp1, sp2, chr_to_alg, alg_colors, sig = alg_fixture
+    def test_all_genes_in_custom(self, chain_fixture):
+        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
         result = apply_custom_colors_with_algs(
             sp1,
             sp2,
-            "sp1",
-            "sp2",
-            chr_to_alg,
-            alg_colors,
-            sig,
+            gene_to_chain,
+            chain_colors,
             {"g1": "#00ff00", "g2": "#0000ff"},
         )
         assert result["g1"] == "#00ff00"
         assert result["g2"] == "lightgrey"
 
-    def test_no_genes_in_custom(self, alg_fixture):
-        sp1, sp2, chr_to_alg, alg_colors, sig = alg_fixture
+    def test_no_genes_in_custom(self, chain_fixture):
+        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
         result = apply_custom_colors_with_algs(
-            sp1, sp2, "sp1", "sp2", chr_to_alg, alg_colors, sig, {}
+            sp1, sp2, gene_to_chain, chain_colors, {}
         )
         assert result["g1"] == "#ff0000"
         assert result["g2"] == "lightgrey"

@@ -7,7 +7,6 @@ import pytest
 
 from hobrac.jcvi_synteny import (
     BuscoGene,
-    PairwiseAssociation,
     apply_custom_colors,
     apply_custom_colors_with_algs,
     build_gene_colors_from_algs,
@@ -39,33 +38,16 @@ def species_busco():
 
 
 @pytest.fixture
-def alg_data():
-    chr_to_alg = {
-        ("sp1", "chr1"): 0,
-        ("sp2", "chrA"): 0,
-        ("sp1", "chr2"): 0,
-        ("sp2", "chrB"): 0,
+def chain_data(species_busco):
+    sp1, sp2 = species_busco
+    gene_to_chain = {
+        "sig_gene1": 0,
+        "sig_gene2": 0,
+        "nonsig_gene1": -1,
+        "nonsig_gene2": -1,
     }
-    alg_colors = {0: "#ff0000"}
-    significant_associations = [
-        PairwiseAssociation(
-            species1="sp1",
-            species2="sp2",
-            chr1="chr1",
-            chr2="chrA",
-            p_value=0.001,
-            gene_count=10,
-        ),
-        PairwiseAssociation(
-            species1="sp1",
-            species2="sp2",
-            chr1="chr2",
-            chr2="chrB",
-            p_value=0.001,
-            gene_count=10,
-        ),
-    ]
-    return chr_to_alg, alg_colors, significant_associations
+    chain_colors = {0: "#ff0000"}
+    return gene_to_chain, chain_colors
 
 
 @pytest.fixture
@@ -109,19 +91,11 @@ def _write_links(sp1_busco, sp2_busco, gene_colors, hide):
 
 
 # Row 1: No custom_colors, hide=False → all links shown, non-sig in lightgrey
-def test_no_custom_hide_false(species_busco, alg_data):
+def test_no_custom_hide_false(species_busco, chain_data):
     sp1, sp2 = species_busco
-    chr_to_alg, alg_colors, sig_assocs = alg_data
+    gene_to_chain, chain_colors = chain_data
 
-    gene_colors = build_gene_colors_from_algs(
-        sp1,
-        sp2,
-        "sp1",
-        "sp2",
-        chr_to_alg,
-        alg_colors,
-        sig_assocs,
-    )
+    gene_colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
     lines = _write_links(sp1, sp2, gene_colors, hide=False)
 
     sig_blocks = [g for g, c in lines if c != "lightgrey"]
@@ -131,19 +105,11 @@ def test_no_custom_hide_false(species_busco, alg_data):
 
 
 # Row 2: No custom_colors, hide=True → only ALG-significant links shown
-def test_no_custom_hide_true(species_busco, alg_data):
+def test_no_custom_hide_true(species_busco, chain_data):
     sp1, sp2 = species_busco
-    chr_to_alg, alg_colors, sig_assocs = alg_data
+    gene_to_chain, chain_colors = chain_data
 
-    gene_colors = build_gene_colors_from_algs(
-        sp1,
-        sp2,
-        "sp1",
-        "sp2",
-        chr_to_alg,
-        alg_colors,
-        sig_assocs,
-    )
+    gene_colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
     # Only significant (non-lightgrey) blocks remain
@@ -152,19 +118,12 @@ def test_no_custom_hide_true(species_busco, alg_data):
 
 
 # Row 3: custom_colors + skip_alg=False + hide=False → all links, sig use custom/ALG
-def test_custom_with_alg_hide_false(species_busco, alg_data, custom_colors):
+def test_custom_with_alg_hide_false(species_busco, chain_data, custom_colors):
     sp1, sp2 = species_busco
-    chr_to_alg, alg_colors, sig_assocs = alg_data
+    gene_to_chain, chain_colors = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1,
-        sp2,
-        "sp1",
-        "sp2",
-        chr_to_alg,
-        alg_colors,
-        sig_assocs,
-        custom_colors,
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=False)
 
@@ -176,19 +135,12 @@ def test_custom_with_alg_hide_false(species_busco, alg_data, custom_colors):
 
 
 # Row 4: custom_colors + skip_alg=False + hide=True → only significant links
-def test_custom_with_alg_hide_true(species_busco, alg_data, custom_colors):
+def test_custom_with_alg_hide_true(species_busco, chain_data, custom_colors):
     sp1, sp2 = species_busco
-    chr_to_alg, alg_colors, sig_assocs = alg_data
+    gene_to_chain, chain_colors = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1,
-        sp2,
-        "sp1",
-        "sp2",
-        chr_to_alg,
-        alg_colors,
-        sig_assocs,
-        custom_colors,
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
@@ -226,24 +178,17 @@ def test_custom_skip_alg_hide_true(species_busco, custom_colors):
 
 
 # custom + ALG + hide → sig genes not in custom file
-# should appear with ALG palette color
-def test_alg_fallback_visible_when_hidden(species_busco, alg_data, custom_colors):
+# should appear with chain palette color
+def test_alg_fallback_visible_when_hidden(species_busco, chain_data, custom_colors):
     sp1, sp2 = species_busco
-    chr_to_alg, alg_colors, sig_assocs = alg_data
+    gene_to_chain, chain_colors = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1,
-        sp2,
-        "sp1",
-        "sp2",
-        chr_to_alg,
-        alg_colors,
-        sig_assocs,
-        custom_colors,
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
     all_colors = {color for _, color in lines}
-    # Both custom color and ALG fallback should be present
+    # Both custom color and chain fallback should be present
     assert "#00ff00" in all_colors  # custom color for sig_gene1
-    assert "#ff0000" in all_colors  # ALG fallback for sig_gene2
+    assert "#ff0000" in all_colors  # chain fallback for sig_gene2

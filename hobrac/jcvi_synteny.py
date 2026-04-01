@@ -178,50 +178,36 @@ def apply_custom_colors(
 def apply_custom_colors_with_algs(
     species1_busco: Dict[str, BuscoGene],
     species2_busco: Dict[str, BuscoGene],
-    species1: str,
-    species2: str,
-    chr_to_alg: Dict[Tuple[str, str], int],
-    alg_colors: Dict[int, str],
-    significant_associations: List[PairwiseAssociation],
+    gene_to_chain: Dict[str, int],
+    chain_colors: Dict[int, str],
     custom_colors: Dict[str, str],
 ) -> Dict[str, str]:
     """
-    Merge ALG significance with custom colors.
+    Merge chain significance with custom colors.
 
-    Significant genes get their custom color (if available) or ALG palette
-    fallback. Non-significant genes get lightgrey.
+    Genes on a chain (ID >= 0) get their custom color (if available) or chain
+    palette fallback. Genes not on any chain (ID -1) get lightgrey.
 
     Args:
         species1_busco: BUSCO data for species 1
         species2_busco: BUSCO data for species 2
-        species1: Name of species 1
-        species2: Name of species 2
-        chr_to_alg: Dict mapping (species, chr) to alg_id
-        alg_colors: Dict mapping alg_id to color
-        significant_associations: List of significant associations for this pair
+        gene_to_chain: Dict mapping BUSCO gene ID to chain ID (-1 = no chain)
+        chain_colors: Dict mapping chain ID to hex color
         custom_colors: Dictionary mapping BUSCO ID to hex color
 
     Returns:
         Dictionary mapping BUSCO ID to color
     """
-    significant_pairs = {(assoc.chr1, assoc.chr2) for assoc in significant_associations}
     common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
     gene_colors = {}
 
     for busco_id in common_ids:
-        chr1 = species1_busco[busco_id].chromosome
-        chr2 = species2_busco[busco_id].chromosome
-
-        if (chr1, chr2) in significant_pairs:
+        chain_id = gene_to_chain.get(busco_id, -1)
+        if chain_id >= 0:
             if busco_id in custom_colors:
                 gene_colors[busco_id] = custom_colors[busco_id]
             else:
-                node1 = (species1, chr1)
-                alg_id = chr_to_alg.get(node1)
-                if alg_id is not None:
-                    gene_colors[busco_id] = alg_colors[alg_id]
-                else:
-                    gene_colors[busco_id] = "lightgrey"
+                gene_colors[busco_id] = chain_colors[chain_id]
         else:
             gene_colors[busco_id] = "lightgrey"
 
@@ -556,52 +542,27 @@ def build_alg_association_list(
 def build_gene_colors_from_algs(
     species1_busco: Dict[str, BuscoGene],
     species2_busco: Dict[str, BuscoGene],
-    species1: str,
-    species2: str,
-    chr_to_alg: Dict[Tuple[str, str], int],
-    alg_colors: Dict[int, str],
-    significant_associations: List[PairwiseAssociation],
+    gene_to_chain: Dict[str, int],
+    chain_colors: Dict[int, str],
 ) -> Dict[str, str]:
     """
-    Build gene-to-color mapping for a species pair using ALG membership.
+    Build gene-to-color mapping for a species pair using chain membership.
 
-    Only genes on chromosome pairs with significant associations are colored.
-    Genes on non-significant chromosome pairs are colored grey.
+    Genes on a chain (ID >= 0) get their chain color.
+    Genes not on any chain (ID -1) get lightgrey.
 
     Args:
         species1_busco: BUSCO data for species 1
         species2_busco: BUSCO data for species 2
-        species1: Name of species 1
-        species2: Name of species 2
-        chr_to_alg: Dict mapping (species, chr) to alg_id
-        alg_colors: Dict mapping alg_id to color
-        significant_associations: List of significant associations for this pair
+        gene_to_chain: Dict mapping BUSCO gene ID to chain ID (-1 = no chain)
+        chain_colors: Dict mapping chain ID to hex color
 
     Returns:
         Dictionary mapping BUSCO ID to color
     """
-    # Build set of significant chromosome pairs
-    significant_pairs = {(assoc.chr1, assoc.chr2) for assoc in significant_associations}
-
-    common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
-    gene_colors = {}
-
-    for busco_id in common_ids:
-        chr1 = species1_busco[busco_id].chromosome
-        chr2 = species2_busco[busco_id].chromosome
-
-        # Only color if this specific chromosome pair has a significant association
-        if (chr1, chr2) in significant_pairs:
-            node1 = (species1, chr1)
-            alg_id = chr_to_alg.get(node1)
-            if alg_id is not None:
-                gene_colors[busco_id] = alg_colors[alg_id]
-            else:
-                gene_colors[busco_id] = "lightgrey"
-        else:
-            gene_colors[busco_id] = "lightgrey"
-
-    return gene_colors
+    return apply_custom_colors_with_algs(
+        species1_busco, species2_busco, gene_to_chain, chain_colors, {}
+    )
 
 
 def detect_algs_pairwise(
