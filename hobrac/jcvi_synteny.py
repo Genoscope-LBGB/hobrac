@@ -7,7 +7,7 @@ Group) detection using Fisher's exact test with Bonferroni correction.
 import argparse
 import glob
 import os
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Set, Tuple
 
@@ -357,68 +357,6 @@ def _gene_matches_chain(
     return compared
 
 
-def build_alg_graph(
-    pairwise_associations: List[PairwiseAssociation],
-) -> Dict[Tuple[str, str], Set[Tuple[str, str]]]:
-    """
-    Build adjacency list from significant associations.
-
-    Args:
-        pairwise_associations: List of PairwiseAssociation objects
-
-    Returns:
-        Graph where nodes are (species, chromosome) tuples
-    """
-    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]] = defaultdict(set)
-    for assoc in pairwise_associations:
-        node1 = (assoc.species1, assoc.chr1)
-        node2 = (assoc.species2, assoc.chr2)
-        graph[node1].add(node2)
-        graph[node2].add(node1)
-    return dict(graph)
-
-
-def find_connected_components(
-    graph: Dict[Tuple[str, str], Set[Tuple[str, str]]],
-) -> List[Set[Tuple[str, str]]]:
-    """
-    Find connected components
-
-    Args:
-        graph: Adjacency list representation of the graph
-
-    Returns:
-        List of component sets, where each set contains (species, chr) tuples
-    """
-    if not graph:
-        return []
-
-    visited: Set[Tuple[str, str]] = set()
-    components: List[Set[Tuple[str, str]]] = []
-
-    for start_node in graph:
-        if start_node in visited:
-            continue
-
-        component: Set[Tuple[str, str]] = set()
-        queue = deque([start_node])
-
-        while queue:
-            node = queue.popleft()
-            if node in visited:
-                continue
-            visited.add(node)
-            component.add(node)
-
-            for neighbor in graph.get(node, set()):
-                if neighbor not in visited:
-                    queue.append(neighbor)
-
-        components.append(component)
-
-    return components
-
-
 def read_busco_tsv(file_path: str, min_busco_genes: int = 0) -> Dict[str, BuscoGene]:
     """
     Parse BUSCO full_table.tsv and return only Complete single-copy genes.
@@ -560,9 +498,10 @@ def detect_algs_transitive(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
     alpha: float = 0.01,
     min_genes: int = 5,
-) -> Tuple[List[PairwiseAssociation], Dict[Tuple[str, str], int], Dict[int, str]]:
+) -> Tuple[List[PairwiseAssociation], Dict[str, int], Dict[int, str]]:
     """
-    Detect ALGs with consistent colors across all species.
+    Detect ALGs with consistent colors across all species using chain-based
+    grouping.
 
     Args:
         species_busco: List of (species_name, busco_data) tuples
@@ -572,8 +511,8 @@ def detect_algs_transitive(
     Returns:
         Tuple of:
         - all_associations: List of PairwiseAssociation objects
-        - chr_to_alg: Dict mapping (species, chr) to alg_id
-        - alg_colors: Dict mapping alg_id to color
+        - gene_to_chain: Dict mapping BUSCO gene ID to chain ID
+        - chain_colors: Dict mapping chain ID to hex color
     """
     all_associations: List[PairwiseAssociation] = []
     for i in range(len(species_busco) - 1):
@@ -584,19 +523,12 @@ def detect_algs_transitive(
         )
         all_associations.extend(associations)
 
-    graph = build_alg_graph(all_associations)
-    components = find_connected_components(graph)
+    chains = enumerate_chains(all_associations)
+    gene_to_chain = build_gene_chain_mapping(species_busco, chains)
 
-    chr_to_alg: Dict[Tuple[str, str], int] = {}
-    alg_colors: Dict[int, str] = {}
+    chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
 
-    for alg_id, component in enumerate(components):
-        color = ALG_PALETTE[alg_id % len(ALG_PALETTE)]
-        alg_colors[alg_id] = color
-        for node in component:
-            chr_to_alg[node] = alg_id
-
-    return all_associations, chr_to_alg, alg_colors
+    return all_associations, gene_to_chain, chain_colors
 
 
 def build_alg_association_list(
