@@ -9,6 +9,7 @@ from hobrac.jcvi_synteny import (
     PairwiseAssociation,
     apply_custom_colors,
     apply_custom_colors_with_algs,
+    build_gene_chain_mapping,
     build_gene_colors_from_algs,
     enumerate_chains,
     generate_links_file,
@@ -283,3 +284,111 @@ class TestEnumerateChains:
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1")] in chains
         assert [("B", "B3"), ("C", "C4")] in chains
+
+
+class TestBuildGeneChainMapping:
+    def test_exact_match_three_species(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C2")}),
+        ]
+        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2")]]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == 0
+
+    def test_no_match_gives_minus_one(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B9")}),
+        ]
+        chains = [[("A", "A1"), ("B", "B1")]]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == -1
+
+    def test_partial_match_gene_absent_from_one_species(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {}),
+        ]
+        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2")]]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == 0
+
+    def test_ambiguous_picks_most_populated_chain(self):
+        # g2, g4 exactly match chain 0; g3 exactly matches chain 1
+        # g1 absent from C → matches both → picks chain 0 (2 genes vs 1)
+        species_busco = [
+            ("A", {k: _gene("A1") for k in ("g1", "g2", "g3", "g4")}),
+            ("B", {k: _gene("B1") for k in ("g1", "g2", "g3", "g4")}),
+            ("C", {"g2": _gene("C2"), "g3": _gene("C3"), "g4": _gene("C2")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1"), ("C", "C2")],
+            [("A", "A1"), ("B", "B1"), ("C", "C3")],
+        ]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g2"] == 0
+        assert result["g4"] == 0
+        assert result["g3"] == 1
+        assert result["g1"] == 0
+
+    def test_ambiguous_tiebreak_lowest_id(self):
+        # Equal population → tie-break by lowest chain ID
+        species_busco = [
+            ("A", {k: _gene("A1") for k in ("g1", "g2", "g3")}),
+            ("B", {k: _gene("B1") for k in ("g1", "g2", "g3")}),
+            ("C", {"g2": _gene("C2"), "g3": _gene("C3")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1"), ("C", "C2")],
+            [("A", "A1"), ("B", "B1"), ("C", "C3")],
+        ]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == 0
+
+    def test_two_species_baseline(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1")],
+            [("A", "A2"), ("B", "B2")],
+        ]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == 0
+        assert result["g2"] == 1
+
+    def test_four_species(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C2")}),
+            ("D", {"g1": _gene("D3")}),
+        ]
+        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2"), ("D", "D3")]]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert result["g1"] == 0
+
+    def test_gene_in_single_species_excluded(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "lone": _gene("A9")}),
+            ("B", {"g1": _gene("B1")}),
+        ]
+        chains = [[("A", "A1"), ("B", "B1")]]
+        result = build_gene_chain_mapping(species_busco, chains)
+        assert "lone" not in result
+
+    def test_empty_chains_all_minus_one(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+        ]
+        result = build_gene_chain_mapping(species_busco, [])
+        assert result["g1"] == -1
+
+    def test_empty_species_returns_empty(self):
+        result = build_gene_chain_mapping([], [[("A", "A1")]])
+        assert result == {}
