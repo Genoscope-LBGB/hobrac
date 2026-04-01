@@ -484,7 +484,12 @@ def detect_algs_transitive(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
     alpha: float = 0.01,
     min_genes: int = 5,
-) -> Tuple[List[PairwiseAssociation], Dict[str, int], Dict[int, str]]:
+) -> Tuple[
+    List[PairwiseAssociation],
+    List[List[Tuple[str, str]]],
+    Dict[str, int],
+    Dict[int, str],
+]:
     """
     Detect ALGs with consistent colors across all species using chain-based
     grouping.
@@ -497,6 +502,7 @@ def detect_algs_transitive(
     Returns:
         Tuple of:
         - all_associations: List of PairwiseAssociation objects
+        - chains: List of chromosome chains
         - gene_to_chain: Dict mapping BUSCO gene ID to chain ID
         - chain_colors: Dict mapping chain ID to hex color
     """
@@ -514,24 +520,24 @@ def detect_algs_transitive(
 
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
 
-    return all_associations, gene_to_chain, chain_colors
+    return all_associations, chains, gene_to_chain, chain_colors
 
 
 def build_alg_association_list(
     pair_associations: List[PairwiseAssociation],
-    chr_to_alg: Dict[Tuple[str, str], int],
-    alg_colors: Dict[int, str],
+    edge_to_chain: Dict[Tuple[str, str, str, str], int],
+    chain_colors: Dict[int, str],
 ) -> List[ALGAssociation]:
-    """Convert pairwise associations to ALGAssociation list with alg_id and color."""
+    """Convert pairwise associations to ALGAssociation list with chain-based IDs."""
     result = []
     for a in pair_associations:
-        alg_id = chr_to_alg.get((a.species1, a.chr1), -1)
+        alg_id = edge_to_chain.get((a.species1, a.chr1, a.species2, a.chr2), -1)
         result.append(
             ALGAssociation(
                 chr1=a.chr1,
                 chr2=a.chr2,
                 p_value=a.p_value,
-                color=alg_colors.get(alg_id, "lightgrey"),
+                color=chain_colors.get(alg_id, "lightgrey"),
                 gene_count=a.gene_count,
                 alg_id=alg_id,
             )
@@ -1282,10 +1288,23 @@ def run(
     # Phase 1: Transitive ALG detection across all species
     # Skip only when custom colors are provided AND skip_alg is True
     all_associations: List[PairwiseAssociation] = []
-    chr_to_alg: Dict[Tuple[str, str], int] = {}
-    alg_colors: Dict[int, str] = {}
+    chains: List[List[Tuple[str, str]]] = []
+    gene_to_chain: Dict[str, int] = {}
+    chain_colors: Dict[int, str] = {}
     if not (custom_colors and skip_alg):
-        all_associations, chr_to_alg, alg_colors = detect_algs_transitive(species_busco)
+        all_associations, chains, gene_to_chain, chain_colors = detect_algs_transitive(
+            species_busco
+        )
+
+    # Build edge-to-chain lookup once for TSV output
+    edge_to_chain: Dict[Tuple[str, str, str, str], int] = {}
+    for chain_id, chain in enumerate(chains):
+        for j in range(len(chain) - 1):
+            sp1, chr1 = chain[j]
+            sp2, chr2 = chain[j + 1]
+            edge = (sp1, chr1, sp2, chr2)
+            if edge not in edge_to_chain:
+                edge_to_chain[edge] = chain_id
 
     # Phase 2: Generate outputs for each pair
     links_files = []
@@ -1300,34 +1319,27 @@ def run(
         ]
 
         if custom_colors and skip_alg:
-            # Use custom colors directly, skip statistical analysis
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
             algs: List[ALGAssociation] = []
-        elif custom_colors:
-            # Hybrid: custom colors filtered by ALG significance
-            gene_colors = apply_custom_colors_with_algs(
-                sp1_busco,
-                sp2_busco,
-                sp1_name,
-                sp2_name,
-                chr_to_alg,
-                alg_colors,
-                pair_associations,
-                custom_colors,
-            )
-            algs = build_alg_association_list(pair_associations, chr_to_alg, alg_colors)
         else:
-            # No custom colors: full ALG pipeline
-            gene_colors = build_gene_colors_from_algs(
-                sp1_busco,
-                sp2_busco,
-                sp1_name,
-                sp2_name,
-                chr_to_alg,
-                alg_colors,
-                pair_associations,
+            if custom_colors:
+                gene_colors = apply_custom_colors_with_algs(
+                    sp1_busco,
+                    sp2_busco,
+                    gene_to_chain,
+                    chain_colors,
+                    custom_colors,
+                )
+            else:
+                gene_colors = build_gene_colors_from_algs(
+                    sp1_busco,
+                    sp2_busco,
+                    gene_to_chain,
+                    chain_colors,
+                )
+            algs = build_alg_association_list(
+                pair_associations, edge_to_chain, chain_colors
             )
-            algs = build_alg_association_list(pair_associations, chr_to_alg, alg_colors)
 
         save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 

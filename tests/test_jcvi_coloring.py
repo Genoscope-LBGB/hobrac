@@ -145,7 +145,7 @@ class TestRunBranching:
             "generate_seqids_file": {},
             "generate_layouts_file": {},
             "save_alg_associations": {},
-            "detect_algs_transitive": {"return_value": ([], {}, {})},
+            "detect_algs_transitive": {"return_value": ([], [], {}, {})},
             "build_alg_association_list": {"return_value": []},
             "apply_custom_colors": {"return_value": {"g1": "lightgrey"}},
             "apply_custom_colors_with_algs": {"return_value": {"g1": "lightgrey"}},
@@ -400,11 +400,12 @@ class TestDetectAlgsTransitive:
             _assoc("sp1", "sp2", "A2", "B2"),
         ]
 
-        assocs, gene_to_chain, chain_colors = detect_algs_transitive(
+        assocs, chains, gene_to_chain, chain_colors = detect_algs_transitive(
             [("sp1", sp1), ("sp2", sp2)]
         )
 
         assert len(assocs) == 2
+        assert len(chains) == 2
         assert isinstance(gene_to_chain, dict)
         assert all(isinstance(v, int) for v in gene_to_chain.values())
         assert gene_to_chain["g1"] != gene_to_chain["g2"]
@@ -420,7 +421,7 @@ class TestDetectAlgsTransitive:
             _assoc("sp1", "sp2", "A2", "B2"),
         ]
 
-        _, _, chain_colors = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)])
+        _, _, _, chain_colors = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)])
 
         for chain_id, color in chain_colors.items():
             assert color == ALG_PALETTE[chain_id % len(ALG_PALETTE)]
@@ -435,7 +436,7 @@ class TestDetectAlgsTransitive:
             [_assoc("sp2", "sp3", "B1", "C1"), _assoc("sp2", "sp3", "B1", "C2")],
         ]
 
-        _, gene_to_chain, chain_colors = detect_algs_transitive(
+        _, _, gene_to_chain, chain_colors = detect_algs_transitive(
             [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)]
         )
 
@@ -448,10 +449,11 @@ class TestDetectAlgsTransitive:
         sp2 = {"g1": _gene("B1")}
         mock_pairwise.return_value = []
 
-        assocs, gene_to_chain, chain_colors = detect_algs_transitive(
+        assocs, chains, gene_to_chain, chain_colors = detect_algs_transitive(
             [("sp1", sp1), ("sp2", sp2)]
         )
 
         assert assocs == []
+        assert chains == []
         assert chain_colors == {}
         assert all(v == -1 for v in gene_to_chain.values())
