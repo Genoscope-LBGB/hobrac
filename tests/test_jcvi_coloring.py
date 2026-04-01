@@ -281,6 +281,28 @@ class TestEnumerateChains:
         assert [("A", "A1"), ("B", "B1")] in chains
         assert [("B", "B3"), ("C", "C4")] in chains
 
+    def test_four_species_spanning_chain(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C2"),
+            _assoc("C", "D", "C2", "D3"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C2"), ("D", "D3")]]
+
+    def test_diamond_converging_at_last_species(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("A", "B", "A1", "B2"),
+            _assoc("B", "C", "B1", "C2"),
+            _assoc("B", "C", "B2", "C2"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert len(chains) == 2
+        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
+        assert [("A", "A1"), ("B", "B2"), ("C", "C2")] in chains
+
+
 
 class TestBuildGeneChainMapping:
     def test_exact_match_three_species(self):
@@ -457,3 +479,170 @@ class TestDetectAlgsTransitive:
         assert chains == []
         assert chain_colors == {}
         assert all(v == -1 for v in gene_to_chain.values())
+
+    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    def test_single_species_returns_empty(self, mock_pairwise):
+        sp1 = {"g1": _gene("A1")}
+
+        assocs, chains, gene_to_chain, chain_colors = detect_algs_transitive(
+            [("sp1", sp1)]
+        )
+
+        mock_pairwise.assert_not_called()
+        assert assocs == []
+        assert chains == []
+        assert gene_to_chain == {}
+        assert chain_colors == {}
+
+
+class TestThreeSpeciesIntegration:
+    """Integration tests: BUSCO data → detect_algs_transitive → coloring."""
+
+    @pytest.fixture
+    def branching_species(self):
+        """A1-B1-C2 and A1-B2-C3: genes differ by B chromosome linkage."""
+        sp1 = {
+            "g_b1": _gene("A1"),
+            "g_b2": _gene("A1"),
+            "g_nosig": _gene("A9"),
+        }
+        sp2 = {
+            "g_b1": _gene("B1"),
+            "g_b2": _gene("B2"),
+            "g_nosig": _gene("B9"),
+        }
+        sp3 = {
+            "g_b1": _gene("C2"),
+            "g_b2": _gene("C3"),
+            "g_nosig": _gene("C9"),
+        }
+        return [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)]
+
+    @pytest.fixture
+    def branching_pairwise(self):
+        return [
+            [_assoc("sp1", "sp2", "A1", "B1"), _assoc("sp1", "sp2", "A1", "B2")],
+            [_assoc("sp2", "sp3", "B1", "C2"), _assoc("sp2", "sp3", "B2", "C3")],
+        ]
+
+    @pytest.fixture
+    def linear_species(self):
+        """A1-B1-C2: single linear chain."""
+        sp1 = {
+            "g_sig": _gene("A1"),
+            "g_nosig": _gene("A9"),
+        }
+        sp2 = {
+            "g_sig": _gene("B1"),
+            "g_nosig": _gene("B9"),
+        }
+        sp3 = {
+            "g_sig": _gene("C2"),
+            "g_nosig": _gene("C9"),
+        }
+        return [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)]
+
+    @pytest.fixture
+    def linear_pairwise(self):
+        return [
+            [_assoc("sp1", "sp2", "A1", "B1")],
+            [_assoc("sp2", "sp3", "B1", "C2")],
+        ]
+
+    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    def test_branching_genes_get_different_colors(
+        self, mock_pairwise, branching_species, branching_pairwise
+    ):
+        mock_pairwise.side_effect = branching_pairwise
+
+        _, _, gene_to_chain, chain_colors = detect_algs_transitive(branching_species)
+
+        assert gene_to_chain["g_b1"] != gene_to_chain["g_b2"]
+        assert gene_to_chain["g_b1"] >= 0
+        assert gene_to_chain["g_b2"] >= 0
+        assert gene_to_chain["g_nosig"] == -1
+
+        sp1_busco = branching_species[0][1]
+        sp2_busco = branching_species[1][1]
+        colors_ab = build_gene_colors_from_algs(
+            sp1_busco, sp2_busco, gene_to_chain, chain_colors
+        )
+        assert colors_ab["g_b1"] != colors_ab["g_b2"]
+        assert colors_ab["g_b1"] != "lightgrey"
+        assert colors_ab["g_b2"] != "lightgrey"
+        assert colors_ab["g_nosig"] == "lightgrey"
+
+    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    def test_linear_chain_same_color_across_pairs(
+        self, mock_pairwise, linear_species, linear_pairwise
+    ):
+        mock_pairwise.side_effect = linear_pairwise
+
+        _, _, gene_to_chain, chain_colors = detect_algs_transitive(linear_species)
+
+        colors_ab = build_gene_colors_from_algs(
+            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors
+        )
+        colors_bc = build_gene_colors_from_algs(
+            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors
+        )
+
+        assert colors_ab["g_sig"] == colors_bc["g_sig"]
+        assert colors_ab["g_sig"] != "lightgrey"
+
+    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    def test_linear_chain_with_custom_colors(
+        self, mock_pairwise, linear_species, linear_pairwise
+    ):
+        mock_pairwise.side_effect = linear_pairwise
+
+        _, _, gene_to_chain, chain_colors = detect_algs_transitive(linear_species)
+
+        custom = {"g_sig": "#00ff00"}
+        sp1_busco = linear_species[0][1]
+        sp2_busco = linear_species[1][1]
+
+        colors = apply_custom_colors_with_algs(
+            sp1_busco, sp2_busco, gene_to_chain, chain_colors, custom
+        )
+
+        assert colors["g_sig"] == "#00ff00"
+        assert colors["g_nosig"] == "lightgrey"
+
+
+class TestTwoSpeciesBackwardCompat:
+    """Verify 2-species chain-based pipeline produces correct coloring."""
+
+    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    def test_two_species_coloring_matches_chain_assignment(self, mock_pairwise):
+        sp1 = {
+            "g1": _gene("A1"),
+            "g2": _gene("A2"),
+            "g3": _gene("A1"),
+            "g_nosig": _gene("A9"),
+        }
+        sp2 = {
+            "g1": _gene("B1"),
+            "g2": _gene("B2"),
+            "g3": _gene("B1"),
+            "g_nosig": _gene("B9"),
+        }
+        mock_pairwise.return_value = [
+            _assoc("sp1", "sp2", "A1", "B1"),
+            _assoc("sp1", "sp2", "A2", "B2"),
+        ]
+
+        _, chains, gene_to_chain, chain_colors = detect_algs_transitive(
+            [("sp1", sp1), ("sp2", sp2)]
+        )
+
+        colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
+
+        assert colors["g1"] == colors["g3"]
+        assert colors["g1"] != colors["g2"]
+        assert colors["g1"] in ALG_PALETTE
+        assert colors["g2"] in ALG_PALETTE
+        assert colors["g_nosig"] == "lightgrey"
+        assert len(chains) == 2
+        for cid, color in chain_colors.items():
+            assert color == ALG_PALETTE[cid % len(ALG_PALETTE)]
