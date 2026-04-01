@@ -9,7 +9,6 @@ from hobrac.jcvi_synteny import (
     BuscoGene,
     apply_custom_colors,
     apply_custom_colors_with_algs,
-    build_gene_colors_from_algs,
     generate_links_file,
 )
 
@@ -95,7 +94,9 @@ def test_no_custom_hide_false(species_busco, chain_data):
     sp1, sp2 = species_busco
     gene_to_chain, chain_colors = chain_data
 
-    gene_colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
+    gene_colors = apply_custom_colors_with_algs(
+        sp1, sp2, gene_to_chain, chain_colors, {}
+    )
     lines = _write_links(sp1, sp2, gene_colors, hide=False)
 
     sig_blocks = [g for g, c in lines if c != "lightgrey"]
@@ -109,7 +110,9 @@ def test_no_custom_hide_true(species_busco, chain_data):
     sp1, sp2 = species_busco
     gene_to_chain, chain_colors = chain_data
 
-    gene_colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
+    gene_colors = apply_custom_colors_with_algs(
+        sp1, sp2, gene_to_chain, chain_colors, {}
+    )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
     # Only significant (non-lightgrey) blocks remain

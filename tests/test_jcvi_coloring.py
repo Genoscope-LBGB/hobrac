@@ -11,7 +11,6 @@ from hobrac.jcvi_synteny import (
     apply_custom_colors,
     apply_custom_colors_with_algs,
     build_gene_chain_mapping,
-    build_gene_colors_from_algs,
     detect_algs_transitive,
     enumerate_chains,
     generate_links_file,
@@ -70,13 +69,12 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         chain_colors = {0: "#ff0000"}
         return sp1, sp2, gene_to_chain, chain_colors
 
-    def test_empty_custom_colors_matches_build_gene_colors(self, chain_fixture):
+    def test_empty_custom_colors_gives_chain_colors(self, chain_fixture):
         sp1, sp2, gene_to_chain, chain_colors = chain_fixture
-        hybrid = apply_custom_colors_with_algs(
+        result = apply_custom_colors_with_algs(
             sp1, sp2, gene_to_chain, chain_colors, {}
         )
-        alg_only = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
-        assert hybrid == alg_only
+        assert result["g1"] == chain_colors[0]
 
     def test_all_genes_in_custom(self, chain_fixture):
         sp1, sp2, gene_to_chain, chain_colors = chain_fixture
@@ -149,7 +147,6 @@ class TestRunBranching:
             "build_alg_association_list": {"return_value": []},
             "apply_custom_colors": {"return_value": {"g1": "lightgrey"}},
             "apply_custom_colors_with_algs": {"return_value": {"g1": "lightgrey"}},
-            "build_gene_colors_from_algs": {"return_value": {"g1": "lightgrey"}},
             "parse_custom_colors": {"return_value": {"g1": "#00ff00"}},
         }
         patchers = []
@@ -180,7 +177,6 @@ class TestRunBranching:
         run_mocks["apply_custom_colors"].assert_called()
         run_mocks["detect_algs_transitive"].assert_not_called()
         run_mocks["apply_custom_colors_with_algs"].assert_not_called()
-        run_mocks["build_gene_colors_from_algs"].assert_not_called()
 
     def test_custom_without_skip_alg(self, tmp_path, run_mocks):
         self._call_run(tmp_path, custom_color_file="/fake/colors.tsv", skip_alg=False)
@@ -188,15 +184,13 @@ class TestRunBranching:
         run_mocks["apply_custom_colors_with_algs"].assert_called()
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
-        run_mocks["build_gene_colors_from_algs"].assert_not_called()
 
     def test_no_custom_colors(self, tmp_path, run_mocks):
         self._call_run(tmp_path, custom_color_file="", skip_alg=False)
 
-        run_mocks["build_gene_colors_from_algs"].assert_called()
+        run_mocks["apply_custom_colors_with_algs"].assert_called()
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
-        run_mocks["apply_custom_colors_with_algs"].assert_not_called()
 
 
 def _assoc(sp1, sp2, chr1, chr2):
@@ -301,7 +295,6 @@ class TestEnumerateChains:
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
         assert [("A", "A1"), ("B", "B2"), ("C", "C2")] in chains
-
 
 
 class TestBuildGeneChainMapping:
@@ -564,8 +557,8 @@ class TestThreeSpeciesIntegration:
 
         sp1_busco = branching_species[0][1]
         sp2_busco = branching_species[1][1]
-        colors_ab = build_gene_colors_from_algs(
-            sp1_busco, sp2_busco, gene_to_chain, chain_colors
+        colors_ab = apply_custom_colors_with_algs(
+            sp1_busco, sp2_busco, gene_to_chain, chain_colors, {}
         )
         assert colors_ab["g_b1"] != colors_ab["g_b2"]
         assert colors_ab["g_b1"] != "lightgrey"
@@ -580,11 +573,11 @@ class TestThreeSpeciesIntegration:
 
         _, _, gene_to_chain, chain_colors = detect_algs_transitive(linear_species)
 
-        colors_ab = build_gene_colors_from_algs(
-            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors
+        colors_ab = apply_custom_colors_with_algs(
+            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors, {}
         )
-        colors_bc = build_gene_colors_from_algs(
-            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors
+        colors_bc = apply_custom_colors_with_algs(
+            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors, {}
         )
 
         assert colors_ab["g_sig"] == colors_bc["g_sig"]
@@ -636,7 +629,9 @@ class TestTwoSpeciesBackwardCompat:
             [("sp1", sp1), ("sp2", sp2)]
         )
 
-        colors = build_gene_colors_from_algs(sp1, sp2, gene_to_chain, chain_colors)
+        colors = apply_custom_colors_with_algs(
+            sp1, sp2, gene_to_chain, chain_colors, {}
+        )
 
         assert colors["g1"] == colors["g3"]
         assert colors["g1"] != colors["g2"]

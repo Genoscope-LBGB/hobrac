@@ -11,7 +11,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Set, Tuple
 
+import math
+
 from scipy.stats import fisher_exact
+
+DEFAULT_COLOR = "lightgrey"
 
 
 @dataclass
@@ -171,7 +175,7 @@ def apply_custom_colors(
     common_ids = set(busco1.keys()) & set(busco2.keys())
     gene_colors = {}
     for busco_id in common_ids:
-        gene_colors[busco_id] = custom_colors.get(busco_id, "lightgrey")
+        gene_colors[busco_id] = custom_colors.get(busco_id, DEFAULT_COLOR)
     return gene_colors
 
 
@@ -209,7 +213,7 @@ def apply_custom_colors_with_algs(
             else:
                 gene_colors[busco_id] = chain_colors[chain_id]
         else:
-            gene_colors[busco_id] = "lightgrey"
+            gene_colors[busco_id] = DEFAULT_COLOR
 
     return gene_colors
 
@@ -537,38 +541,12 @@ def build_alg_association_list(
                 chr1=a.chr1,
                 chr2=a.chr2,
                 p_value=a.p_value,
-                color=chain_colors.get(alg_id, "lightgrey"),
+                color=chain_colors.get(alg_id, DEFAULT_COLOR),
                 gene_count=a.gene_count,
                 alg_id=alg_id,
             )
         )
     return result
-
-
-def build_gene_colors_from_algs(
-    species1_busco: Dict[str, BuscoGene],
-    species2_busco: Dict[str, BuscoGene],
-    gene_to_chain: Dict[str, int],
-    chain_colors: Dict[int, str],
-) -> Dict[str, str]:
-    """
-    Build gene-to-color mapping for a species pair using chain membership.
-
-    Genes on a chain (ID >= 0) get their chain color.
-    Genes not on any chain (ID -1) get lightgrey.
-
-    Args:
-        species1_busco: BUSCO data for species 1
-        species2_busco: BUSCO data for species 2
-        gene_to_chain: Dict mapping BUSCO gene ID to chain ID (-1 = no chain)
-        chain_colors: Dict mapping chain ID to hex color
-
-    Returns:
-        Dictionary mapping BUSCO ID to color
-    """
-    return apply_custom_colors_with_algs(
-        species1_busco, species2_busco, gene_to_chain, chain_colors, {}
-    )
 
 
 def detect_algs_pairwise(
@@ -609,17 +587,13 @@ def detect_algs_pairwise(
             )
         )
 
+    alg_lookup = {(alg.chr1, alg.chr2): alg.color for alg in significant}
     common_ids = set(busco1.keys()) & set(busco2.keys())
     gene_colors = {}
     for busco_id in common_ids:
         chr1 = busco1[busco_id].chromosome
         chr2 = busco2[busco_id].chromosome
-        color = "lightgrey"
-        for alg in significant:
-            if alg.chr1 == chr1 and alg.chr2 == chr2:
-                color = alg.color
-                break
-        gene_colors[busco_id] = color
+        gene_colors[busco_id] = alg_lookup.get((chr1, chr2), DEFAULT_COLOR)
 
     return significant, gene_colors
 
@@ -729,7 +703,7 @@ def generate_links_file(
                         "end2": busco_id,
                         "score": 1,
                         "orientation": "+",
-                        "color": gene_colors.get(busco_id, "lightgrey"),
+                        "color": gene_colors.get(busco_id, DEFAULT_COLOR),
                     }
                 )
             continue
@@ -763,12 +737,12 @@ def generate_links_file(
     # Write .simple file in JCVI format
     # Color prefix format: "color*gene_name" (e.g., "#ff0000*gene1")
     # Write lightgrey (non-significant) blocks first so significant ones render on top
-    blocks.sort(key=lambda b: b.get("color", "lightgrey") != "lightgrey")
+    blocks.sort(key=lambda b: b.get("color", DEFAULT_COLOR) != DEFAULT_COLOR)
     with open(output_path, "w") as f:
         for block in blocks:
-            color = block.get("color", "lightgrey")
+            color = block.get("color", DEFAULT_COLOR)
             # Skip non-significant blocks if requested
-            if hide_non_significant and color == "lightgrey":
+            if hide_non_significant and color == DEFAULT_COLOR:
                 continue
             # Add color prefix if not default grey
             color_prefix = f"{color}*"
@@ -812,9 +786,9 @@ def _make_block(
     # Get most common color in block (for ALG coloring)
     color_counts = defaultdict(int)
     for busco_id, _, _ in orthologs:
-        color = gene_colors.get(busco_id, "lightgrey")
+        color = gene_colors.get(busco_id, DEFAULT_COLOR)
         color_counts[color] += 1
-    dominant_color = max(color_counts.keys(), key=lambda c: color_counts[c])
+    dominant_color = max(color_counts, key=color_counts.get)
 
     return {
         "start1": first[0],
@@ -887,8 +861,6 @@ def calculate_gravity_scores(
     Returns:
         Dictionary mapping (target_chr, query_chr) to gravity score
     """
-    import math
-
     common_ids = set(target_busco.keys()) & set(query_busco.keys())
     if not common_ids:
         return {}
@@ -1094,75 +1066,11 @@ def save_alg_associations(
         output_path: Output TSV file path
     """
     with open(output_path, "a") as f:
-        if os.path.getsize(output_path) == 0:
-            f.write(
-                "species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n"
-            )
         for alg in algs:
             f.write(
                 f"{sp1}\t{sp2}\t{alg.chr1}\t{alg.chr2}\t"
                 f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\t{alg.alg_id}\n"
             )
-
-
-def get_species_order(
-    assembly_name: str,
-    assembly_busco_path: str,
-    accession_order_file: str,
-    manual_refs: str,
-    busco_refs_pattern: str,
-) -> List[Tuple[str, str]]:
-    """
-    Determine species order and collect BUSCO paths.
-
-    Args:
-        assembly_name: Name for the assembly
-        assembly_busco_path: Path to assembly BUSCO full_table.tsv
-        accession_order_file: Path to MASH-ordered accessions file
-        manual_refs: Semicolon-separated manual reference paths (or empty)
-        busco_refs_pattern: Pattern to find reference BUSCO directories
-
-    Returns:
-        List of (species_name, busco_path) tuples in display order
-    """
-    species = [(assembly_name, assembly_busco_path)]
-
-    if manual_refs:
-        # Manual mode: use order given, label = base filename
-        for ref_path in manual_refs.split(";"):
-            name = os.path.splitext(os.path.basename(ref_path))[0]
-            busco_path = find_busco_table(busco_refs_pattern, name)
-            if busco_path:
-                species.append((name, busco_path))
-    else:
-        # MASH-discovered: order from file (already sorted by distance)
-        with open(accession_order_file) as f:
-            for line in f:
-                accession = line.strip()
-                if accession:
-                    busco_path = find_busco_table(busco_refs_pattern, accession)
-                    if busco_path:
-                        species.append((accession, busco_path))
-
-    return species
-
-
-def find_busco_table(pattern: str, accession: str) -> str:
-    """
-    Find the BUSCO full_table.tsv for a given accession.
-
-    Args:
-        pattern: Glob pattern containing {accession} placeholder
-        accession: Accession ID to search for
-
-    Returns:
-        Path to full_table.tsv or empty string if not found
-    """
-    search_pattern = pattern.replace("{accession}", accession)
-    matches = glob.glob(search_pattern)
-    if matches:
-        return matches[0]
-    return ""
 
 
 def run(
@@ -1283,7 +1191,8 @@ def run(
 
     # Detect ALGs and generate links for consecutive species pairs
     alg_output = os.path.join(output_dir, "alg_associations.tsv")
-    open(alg_output, "w").close()  # Create empty file
+    with open(alg_output, "w") as f:
+        f.write("species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n")
 
     # Phase 1: Transitive ALG detection across all species
     # Skip only when custom colors are provided AND skip_alg is True
@@ -1306,17 +1215,20 @@ def run(
             if edge not in edge_to_chain:
                 edge_to_chain[edge] = chain_id
 
+    # Pre-group associations by species pair
+    associations_by_pair: Dict[Tuple[str, str], List[PairwiseAssociation]] = (
+        defaultdict(list)
+    )
+    for a in all_associations:
+        associations_by_pair[(a.species1, a.species2)].append(a)
+
     # Phase 2: Generate outputs for each pair
     links_files = []
     for i in range(len(species_busco) - 1):
         sp1_name, sp1_busco = species_busco[i]
         sp2_name, sp2_busco = species_busco[i + 1]
 
-        pair_associations = [
-            a
-            for a in all_associations
-            if a.species1 == sp1_name and a.species2 == sp2_name
-        ]
+        pair_associations = associations_by_pair[(sp1_name, sp2_name)]
 
         if custom_colors and skip_alg:
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
@@ -1331,11 +1243,12 @@ def run(
                     custom_colors,
                 )
             else:
-                gene_colors = build_gene_colors_from_algs(
+                gene_colors = apply_custom_colors_with_algs(
                     sp1_busco,
                     sp2_busco,
                     gene_to_chain,
                     chain_colors,
+                    {},
                 )
             algs = build_alg_association_list(
                 pair_associations, edge_to_chain, chain_colors
