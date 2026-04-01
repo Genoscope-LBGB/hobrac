@@ -228,6 +228,58 @@ def apply_custom_colors_with_algs(
     return gene_colors
 
 
+def enumerate_chains(
+    pairwise_associations: List[PairwiseAssociation],
+) -> List[List[Tuple[str, str]]]:
+    """
+    Enumerate all maximal chromosome chains through the DAG of significant
+    pairwise associations across consecutive species.
+
+    Each chain is a maximal path where edges go from species i to species i+1.
+
+    Args:
+        pairwise_associations: List of significant PairwiseAssociation objects
+
+    Returns:
+        List of chains sorted deterministically, where each chain is a list
+        of (species, chromosome) tuples in species order.
+    """
+    if not pairwise_associations:
+        return []
+
+    outgoing: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(list)
+    has_incoming: Set[Tuple[str, str]] = set()
+
+    for assoc in pairwise_associations:
+        src = (assoc.species1, assoc.chr1)
+        dst = (assoc.species2, assoc.chr2)
+        outgoing[src].append(dst)
+        has_incoming.add(dst)
+
+    for successors in outgoing.values():
+        successors.sort()
+
+    roots = sorted(set(outgoing) - has_incoming)
+
+    chains: List[List[Tuple[str, str]]] = []
+
+    def dfs(node: Tuple[str, str], path: List[Tuple[str, str]]) -> None:
+        successors = outgoing.get(node)
+        if not successors:
+            chains.append(list(path))
+            return
+        for succ in successors:
+            path.append(succ)
+            dfs(succ, path)
+            path.pop()
+
+    for root in roots:
+        dfs(root, [root])
+
+    chains.sort()
+    return chains
+
+
 def build_alg_graph(
     pairwise_associations: List[PairwiseAssociation],
 ) -> Dict[Tuple[str, str], Set[Tuple[str, str]]]:

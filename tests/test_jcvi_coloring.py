@@ -10,6 +10,7 @@ from hobrac.jcvi_synteny import (
     apply_custom_colors,
     apply_custom_colors_with_algs,
     build_gene_colors_from_algs,
+    enumerate_chains,
     generate_links_file,
     run,
 )
@@ -199,3 +200,86 @@ class TestRunBranching:
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
         run_mocks["apply_custom_colors_with_algs"].assert_not_called()
+
+
+def _assoc(sp1, sp2, chr1, chr2):
+    return PairwiseAssociation(sp1, sp2, chr1, chr2, p_value=0.001, gene_count=10)
+
+
+class TestEnumerateChains:
+    def test_empty_input(self):
+        assert enumerate_chains([]) == []
+
+    def test_two_species_single_pair(self):
+        assocs = [_assoc("A", "B", "A1", "B1")]
+        chains = enumerate_chains(assocs)
+        assert chains == [[("A", "A1"), ("B", "B1")]]
+
+    def test_two_species_multiple_pairs(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("A", "B", "A2", "B2"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert len(chains) == 2
+        assert [("A", "A1"), ("B", "B1")] in chains
+        assert [("A", "A2"), ("B", "B2")] in chains
+
+    def test_three_species_linear(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C1"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C1")]]
+
+    def test_three_species_downstream_branching(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C2"),
+            _assoc("B", "C", "B1", "C3"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert len(chains) == 2
+        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
+        assert [("A", "A1"), ("B", "B1"), ("C", "C3")] in chains
+
+    def test_three_species_upstream_merging(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("A", "B", "A2", "B1"),
+            _assoc("B", "C", "B1", "C2"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert len(chains) == 2
+        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
+        assert [("A", "A2"), ("B", "B1"), ("C", "C2")] in chains
+
+    def test_three_species_dead_end(self):
+        assocs = [_assoc("A", "B", "A1", "B1")]
+        chains = enumerate_chains(assocs)
+        assert chains == [[("A", "A1"), ("B", "B1")]]
+
+    def test_orphan_chain_later_species(self):
+        assocs = [_assoc("B", "C", "B3", "C4")]
+        chains = enumerate_chains(assocs)
+        assert chains == [[("B", "B3"), ("C", "C4")]]
+
+    def test_deterministic_ordering(self):
+        assocs = [
+            _assoc("A", "B", "A2", "B2"),
+            _assoc("A", "B", "A1", "B1"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert chains[0] == [("A", "A1"), ("B", "B1")]
+        assert chains[1] == [("A", "A2"), ("B", "B2")]
+
+    def test_mixed_dead_end_and_orphan(self):
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B3", "C4"),
+        ]
+        chains = enumerate_chains(assocs)
+        assert len(chains) == 2
+        assert [("A", "A1"), ("B", "B1")] in chains
+        assert [("B", "B3"), ("C", "C4")] in chains
