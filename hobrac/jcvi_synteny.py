@@ -187,10 +187,15 @@ def apply_custom_colors_with_algs(
     custom_colors: Dict[str, str],
 ) -> Dict[str, str]:
     """
-    Merge chain significance with custom colors.
+    Determine link colors for a species pair.
 
-    Genes on a chain (ID >= 0) get their custom color (if available) or chain
-    palette fallback. Genes not on any chain (ID -1) get lightgrey.
+    When custom_colors is provided, the color file is authoritative: every
+    listed gene gets its custom color and every other common gene gets
+    lightgrey (chain assignment is not used as a fallback).
+
+    When custom_colors is empty, chain assignment drives coloring: genes on a
+    chain (ID >= 0) get the chain palette color and genes not on any chain
+    (ID -1) get lightgrey.
 
     Args:
         species1_busco: BUSCO data for species 1
@@ -202,16 +207,16 @@ def apply_custom_colors_with_algs(
     Returns:
         Dictionary mapping BUSCO ID to color
     """
+    if custom_colors:
+        return apply_custom_colors(species1_busco, species2_busco, custom_colors)
+
     common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
     gene_colors = {}
 
     for busco_id in common_ids:
         chain_id = gene_to_chain.get(busco_id, -1)
         if chain_id >= 0:
-            if busco_id in custom_colors:
-                gene_colors[busco_id] = custom_colors[busco_id]
-            else:
-                gene_colors[busco_id] = chain_colors[chain_id]
+            gene_colors[busco_id] = chain_colors[chain_id]
         else:
             gene_colors[busco_id] = DEFAULT_COLOR
 
@@ -1234,22 +1239,13 @@ def run(
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
             algs: List[ALGAssociation] = []
         else:
-            if custom_colors:
-                gene_colors = apply_custom_colors_with_algs(
-                    sp1_busco,
-                    sp2_busco,
-                    gene_to_chain,
-                    chain_colors,
-                    custom_colors,
-                )
-            else:
-                gene_colors = apply_custom_colors_with_algs(
-                    sp1_busco,
-                    sp2_busco,
-                    gene_to_chain,
-                    chain_colors,
-                    {},
-                )
+            gene_colors = apply_custom_colors_with_algs(
+                sp1_busco,
+                sp2_busco,
+                gene_to_chain,
+                chain_colors,
+                custom_colors,
+            )
             algs = build_alg_association_list(
                 pair_associations, edge_to_chain, chain_colors
             )

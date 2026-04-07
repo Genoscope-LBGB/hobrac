@@ -85,8 +85,10 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
             chain_colors,
             {"g1": "#00ff00", "g2": "#0000ff"},
         )
+        # With custom_colors, the file is authoritative: chain membership
+        # does not matter — every listed gene gets its custom color.
         assert result["g1"] == "#00ff00"
-        assert result["g2"] == "lightgrey"
+        assert result["g2"] == "#0000ff"
 
     def test_no_genes_in_custom(self, chain_fixture):
         sp1, sp2, gene_to_chain, chain_colors = chain_fixture

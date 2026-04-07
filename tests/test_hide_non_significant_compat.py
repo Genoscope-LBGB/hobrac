@@ -180,9 +180,11 @@ def test_custom_skip_alg_hide_true(species_busco, custom_colors):
     assert all(color != "lightgrey" for _, color in lines)
 
 
-# custom + ALG + hide → sig genes not in custom file
-# should appear with chain palette color
-def test_alg_fallback_visible_when_hidden(species_busco, chain_data, custom_colors):
+# custom + ALG + hide → every gene in the custom file survives regardless of
+# whether it was on a chain; unlisted genes (including on-chain ones) are hidden.
+def test_custom_file_is_sole_source_when_hidden(
+    species_busco, chain_data, custom_colors
+):
     sp1, sp2 = species_busco
     gene_to_chain, chain_colors = chain_data
 
@@ -192,6 +194,10 @@ def test_alg_fallback_visible_when_hidden(species_busco, chain_data, custom_colo
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
     all_colors = {color for _, color in lines}
-    # Both custom color and chain fallback should be present
-    assert "#00ff00" in all_colors  # custom color for sig_gene1
-    assert "#ff0000" in all_colors  # chain fallback for sig_gene2
+    # sig_gene1 (on chain, in custom) and nonsig_gene1 (off chain, in custom)
+    # both survive with their custom colors.
+    assert "#00ff00" in all_colors
+    assert "#0000ff" in all_colors
+    # The chain palette color must NOT appear — unlisted on-chain genes are
+    # lightgrey and therefore filtered out by hide_non_significant.
+    assert "#ff0000" not in all_colors
