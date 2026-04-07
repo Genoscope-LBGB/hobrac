@@ -187,15 +187,13 @@ def apply_custom_colors_with_algs(
     custom_colors: Dict[str, str],
 ) -> Dict[str, str]:
     """
-    Determine link colors for a species pair.
+    Determine link colors for a species pair, gated by chain significance.
 
-    When custom_colors is provided, the color file is authoritative: every
-    listed gene gets its custom color and every other common gene gets
-    lightgrey (chain assignment is not used as a fallback).
-
-    When custom_colors is empty, chain assignment drives coloring: genes on a
-    chain (ID >= 0) get the chain palette color and genes not on any chain
-    (ID -1) get lightgrey.
+    Non-significant genes (not on any chain) are always lightgrey, regardless
+    of whether they appear in custom_colors. Significant genes (on a chain)
+    get their custom color when listed in custom_colors, the chain palette
+    color when no custom file is provided, or lightgrey when a custom file is
+    provided but the gene is not listed.
 
     Args:
         species1_busco: BUSCO data for species 1
@@ -207,18 +205,17 @@ def apply_custom_colors_with_algs(
     Returns:
         Dictionary mapping BUSCO ID to color
     """
-    if custom_colors:
-        return apply_custom_colors(species1_busco, species2_busco, custom_colors)
-
     common_ids = set(species1_busco.keys()) & set(species2_busco.keys())
     gene_colors = {}
 
     for busco_id in common_ids:
         chain_id = gene_to_chain.get(busco_id, -1)
-        if chain_id >= 0:
-            gene_colors[busco_id] = chain_colors[chain_id]
-        else:
+        if chain_id < 0:
             gene_colors[busco_id] = DEFAULT_COLOR
+        elif custom_colors:
+            gene_colors[busco_id] = custom_colors.get(busco_id, DEFAULT_COLOR)
+        else:
+            gene_colors[busco_id] = chain_colors[chain_id]
 
     return gene_colors
 

@@ -8,11 +8,11 @@ def _gene(chromosome):
     return BuscoGene(busco_id="", chromosome=chromosome, start=0, end=100)
 
 
-def test_custom_colors_is_authoritative():
-    """With custom_colors, the file drives coloring and chain assignment is ignored.
+def test_custom_colors_gated_by_chain():
+    """Custom colors only apply to significant (on-chain) genes.
 
-    Listed genes get their custom color regardless of chain membership; unlisted
-    genes always get lightgrey, even if they are on a chain.
+    Non-significant genes are always lightgrey, even when listed in the file.
+    Significant genes get their custom color if listed, lightgrey otherwise.
     """
     species1_busco = {
         "gene_sig_custom": _gene("chr1"),
@@ -48,11 +48,12 @@ def test_custom_colors_is_authoritative():
         custom_colors,
     )
 
-    # In custom file → custom color (chain membership irrelevant)
+    # On chain + in custom file → custom color
     assert result["gene_sig_custom"] == "#00ff00"
-    assert result["gene_nonsig_custom"] == "#0000ff"
-    # NOT in custom file → lightgrey (even when on a chain)
+    # On chain + NOT in custom file → lightgrey (no chain fallback)
     assert result["gene_sig_no_custom"] == "lightgrey"
+    # Not on chain → lightgrey even when listed in custom file
+    assert result["gene_nonsig_custom"] == "lightgrey"
     assert result["gene_nonsig_no_custom"] == "lightgrey"
 
 
