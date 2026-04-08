@@ -636,14 +636,19 @@ def generate_links_file(
     sp1: str,
     sp2: str,
     output_path: str,
-    max_gap: int = 10,
     hide_non_significant: bool = False,
 ) -> None:
     """
-    Generate JCVI .simple file with synteny blocks between two species.
+    Generate a JCVI .simple file with one line per BUSCO gene pair.
 
-    JCVI karyotype expects 6-column format:
-    startGene1 endGene1 startGene2 endGene2 score orientation
+    Each line represents a single ortholog and uses its ``gene_colors`` entry
+    as the link color. Because ``gene_colors`` is derived from the single,
+    run-wide ``gene_to_chain`` mapping, this guarantees that a gene keeps the
+    same color across every .simple file of a single run — no block-level
+    majority vote can override its assignment.
+
+    JCVI karyotype expects the 6-column format:
+    ``startGene1 endGene1 startGene2 endGene2 score orientation``
 
     Args:
         busco1: BUSCO data for species 1
@@ -652,155 +657,32 @@ def generate_links_file(
         sp1: Species 1 name
         sp2: Species 2 name
         output_path: Output .simple file path
-        max_gap: Maximum rank gap to consider genes as part of same block
-        hide_non_significant: If True, skip blocks with no significant association
+        hide_non_significant: If True, skip genes colored lightgrey
     """
     common_ids = set(busco1.keys()) & set(busco2.keys())
     if not common_ids:
-        # Write empty file
         open(output_path, "w").close()
         return
 
-    # Build chromosome-sorted gene lists for each species
-    # and assign positional ranks within each chromosome
-    def get_chr_ranks(busco_data: Dict[str, BuscoGene]) -> Dict[str, Tuple[str, int]]:
-        """Return dict: busco_id -> (chromosome, rank_on_chromosome)"""
-        # Group by chromosome
-        chr_genes = defaultdict(list)
-        for busco_id, gene in busco_data.items():
-            if busco_id in common_ids:
-                chr_genes[gene.chromosome].append((busco_id, min(gene.start, gene.end)))
+    # Non-significant (grey) genes are written first so that JCVI draws the
+    # significant ribbons on top of them. Ties are broken by gene id for
+    # deterministic output.
+    sorted_ids = sorted(
+        common_ids,
+        key=lambda gid: (
+            gene_colors.get(gid, DEFAULT_COLOR) != DEFAULT_COLOR,
+            gid,
+        ),
+    )
 
-        # Sort each chromosome by position and assign ranks
-        result = {}
-        for chrom, genes in chr_genes.items():
-            genes.sort(key=lambda x: x[1])
-            for rank, (busco_id, _) in enumerate(genes):
-                result[busco_id] = (chrom, rank)
-        return result
-
-    ranks1 = get_chr_ranks(busco1)
-    ranks2 = get_chr_ranks(busco2)
-
-    # Group orthologs by chromosome pair
-    chr_pair_orthologs = defaultdict(list)
-    for busco_id in common_ids:
-        if busco_id in ranks1 and busco_id in ranks2:
-            chr1, rank1 = ranks1[busco_id]
-            chr2, rank2 = ranks2[busco_id]
-            chr_pair_orthologs[(chr1, chr2)].append((busco_id, rank1, rank2))
-
-    # For each chromosome pair, identify syntenic blocks
-    blocks = []
-    for (chr1, chr2), orthologs in chr_pair_orthologs.items():
-        if len(orthologs) < 2:
-            # Single gene - still output as a block
-            if orthologs:
-                busco_id, rank1, rank2 = orthologs[0]
-                blocks.append(
-                    {
-                        "start1": busco_id,
-                        "end1": busco_id,
-                        "start2": busco_id,
-                        "end2": busco_id,
-                        "score": 1,
-                        "orientation": "+",
-                        "color": gene_colors.get(busco_id, DEFAULT_COLOR),
-                    }
-                )
-            continue
-
-        # Sort by position in species 1
-        orthologs.sort(key=lambda x: x[1])
-
-        # Detect blocks: consecutive in sp1, check direction in sp2
-        current_block = [orthologs[0]]
-        for i in range(1, len(orthologs)):
-            busco_id, rank1, rank2 = orthologs[i]
-            prev_busco, prev_rank1, prev_rank2 = current_block[-1]
-
-            # Check if this gene continues the block
-            gap1 = rank1 - prev_rank1
-            gap2 = abs(rank2 - prev_rank2)
-
-            if gap1 <= max_gap and gap2 <= max_gap:
-                # Continue current block
-                current_block.append(orthologs[i])
-            else:
-                # Save current block and start new one
-                if current_block:
-                    blocks.append(_make_block(current_block, gene_colors))
-                current_block = [orthologs[i]]
-
-        # Don't forget last block
-        if current_block:
-            blocks.append(_make_block(current_block, gene_colors))
-
-    # Write .simple file in JCVI format
-    # Color prefix format: "color*gene_name" (e.g., "#ff0000*gene1")
-    # Write lightgrey (non-significant) blocks first so significant ones render on top
-    blocks.sort(key=lambda b: b.get("color", DEFAULT_COLOR) != DEFAULT_COLOR)
     with open(output_path, "w") as f:
-        for block in blocks:
-            color = block.get("color", DEFAULT_COLOR)
-            # Skip non-significant blocks if requested
+        for busco_id in sorted_ids:
+            color = gene_colors.get(busco_id, DEFAULT_COLOR)
             if hide_non_significant and color == DEFAULT_COLOR:
                 continue
-            # Add color prefix if not default grey
-            color_prefix = f"{color}*"
-            gene1_start = f"{color_prefix}{sp1}_{block['start1']}"
-            gene1_end = f"{sp1}_{block['end1']}"
-            gene2_start = f"{sp2}_{block['start2']}"
-            gene2_end = f"{sp2}_{block['end2']}"
-            f.write(
-                f"{gene1_start}\t{gene1_end}\t{gene2_start}\t{gene2_end}\t"
-                f"{block['score']}\t{block['orientation']}\n"
-            )
-
-
-def _make_block(
-    orthologs: List[Tuple[str, int, int]], gene_colors: Dict[str, str]
-) -> Dict:
-    """
-    Create a synteny block from a list of orthologs.
-
-    Args:
-        orthologs: List of (busco_id, rank1, rank2) tuples, sorted by rank1
-        gene_colors: Dictionary mapping BUSCO ID to color
-
-    Returns:
-        Block dictionary with start/end genes, score, orientation, color
-    """
-    first = orthologs[0]
-    last = orthologs[-1]
-
-    # Determine orientation based on rank2 direction
-    rank2_first = first[2]
-    rank2_last = last[2]
-    orientation = "+" if rank2_last >= rank2_first else "-"
-
-    # For inverted blocks, swap start2/end2 so they're in correct order
-    if orientation == "+":
-        start2, end2 = first[0], last[0]
-    else:
-        start2, end2 = last[0], first[0]
-
-    # Get most common color in block (for ALG coloring)
-    color_counts = defaultdict(int)
-    for busco_id, _, _ in orthologs:
-        color = gene_colors.get(busco_id, DEFAULT_COLOR)
-        color_counts[color] += 1
-    dominant_color = max(color_counts, key=color_counts.get)
-
-    return {
-        "start1": first[0],
-        "end1": last[0],
-        "start2": start2,
-        "end2": end2,
-        "score": len(orthologs),
-        "orientation": orientation,
-        "color": dominant_color,
-    }
+            gene1 = f"{sp1}_{busco_id}"
+            gene2 = f"{sp2}_{busco_id}"
+            f.write(f"{color}*{gene1}\t{gene1}\t{gene2}\t{gene2}\t1\t+\n")
 
 
 def get_chromosome_order(

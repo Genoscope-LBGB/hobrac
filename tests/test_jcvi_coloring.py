@@ -130,6 +130,164 @@ class TestGenerateLinksHideNonSignificant:
         assert "lightgrey" in content
 
 
+def _parse_simple_file(path):
+    """Return a dict {busco_id: color} parsed from a .simple file."""
+    result = {}
+    with open(path) as f:
+        for line in f:
+            parts = line.rstrip("\n").split("\t")
+            assert len(parts) == 6, f"expected 6 columns, got {len(parts)}: {parts!r}"
+            first = parts[0]
+            assert "*" in first, f"missing color prefix in {first!r}"
+            color, gene1_start = first.split("*", 1)
+            # Format: "{sp}_{busco_id}", and start == end for single-gene lines
+            assert (
+                parts[1] == gene1_start
+            ), "start1 != end1 (blocks must be single-gene)"
+            assert parts[2] == parts[3], "start2 != end2 (blocks must be single-gene)"
+            assert parts[4] == "1", f"score must be 1, got {parts[4]}"
+            assert parts[5] == "+", f"orientation must be +, got {parts[5]}"
+            # Strip "{sp}_" prefix — everything after the first underscore is busco_id
+            busco_id = gene1_start.split("_", 1)[1]
+            result[busco_id] = color
+    return result
+
+
+class TestGenerateLinksOneLinePerGene:
+    """The .simple file must contain exactly one line per common BUSCO gene
+    (no block aggregation) so that a gene's color can never be overridden by
+    a block-level majority vote.
+    """
+
+    def test_one_line_per_common_gene(self, tmp_path):
+        # 5 co-linear genes on the same chromosome pair — the old block
+        # detector would have merged them into a single block.
+        sp1 = {f"g{i}": _gene("chr1", i * 1000) for i in range(5)}
+        sp2 = {f"g{i}": _gene("chrA", i * 1000) for i in range(5)}
+        gene_colors = {f"g{i}": "#ff0000" for i in range(5)}
+        path = str(tmp_path / "links.simple")
+
+        generate_links_file(sp1, sp2, gene_colors, "sp1", "sp2", path)
+
+        parsed = _parse_simple_file(path)
+        assert set(parsed.keys()) == {f"g{i}" for i in range(5)}
+        assert all(c == "#ff0000" for c in parsed.values())
+
+    def test_mixed_colors_preserved_not_majority_voted(self, tmp_path):
+        # A mixed run of 5 co-linear genes: 3 red, 2 blue. Old code would
+        # have voted this a single red block. New code must preserve every
+        # gene's individual color.
+        sp1 = {f"g{i}": _gene("chr1", i * 1000) for i in range(5)}
+        sp2 = {f"g{i}": _gene("chrA", i * 1000) for i in range(5)}
+        gene_colors = {
+            "g0": "#ff0000",
+            "g1": "#ff0000",
+            "g2": "#0000ff",
+            "g3": "#ff0000",
+            "g4": "#0000ff",
+        }
+        path = str(tmp_path / "links.simple")
+
+        generate_links_file(sp1, sp2, gene_colors, "sp1", "sp2", path)
+
+        parsed = _parse_simple_file(path)
+        assert parsed == gene_colors
+
+    def test_grey_written_before_colored(self, tmp_path):
+        # JCVI renders later lines on top of earlier ones, so non-significant
+        # (grey) lines must precede significant ones in the file.
+        sp1 = {f"g{i}": _gene("chr1", i * 1000) for i in range(4)}
+        sp2 = {f"g{i}": _gene("chrA", i * 1000) for i in range(4)}
+        gene_colors = {
+            "g0": "#ff0000",
+            "g1": "lightgrey",
+            "g2": "#00ff00",
+            "g3": "lightgrey",
+        }
+        path = str(tmp_path / "links.simple")
+
+        generate_links_file(sp1, sp2, gene_colors, "sp1", "sp2", path)
+
+        with open(path) as f:
+            lines = f.readlines()
+        first_colored_idx = next(
+            i for i, line in enumerate(lines) if not line.startswith("lightgrey*")
+        )
+        last_grey_idx = max(
+            i for i, line in enumerate(lines) if line.startswith("lightgrey*")
+        )
+        assert last_grey_idx < first_colored_idx
+
+
+class TestCrossFileGeneColorConsistency:
+    """Regression: a gene shared between two species pairs must appear with
+    the exact same color in both links.*.simple files.
+    """
+
+    def test_shared_gene_identical_color_across_pairs(self, tmp_path):
+        # Shared ortholog `g_shared` present in all three species. The same
+        # `gene_colors` mapping (derived from a single run-wide gene_to_chain)
+        # must be used for both pairs, and the resulting lines must agree.
+        sp1 = {"g_shared": _gene("chr1", 1000), "g_sp1_only": _gene("chr2", 2000)}
+        sp2 = {"g_shared": _gene("chrA", 1000), "g_sp2_only": _gene("chrB", 2000)}
+        sp3 = {"g_shared": _gene("chrX", 1000), "g_sp3_only": _gene("chrY", 2000)}
+        gene_colors = {
+            "g_shared": "#aabbcc",
+            "g_sp1_only": "lightgrey",
+            "g_sp2_only": "lightgrey",
+            "g_sp3_only": "lightgrey",
+        }
+
+        path_ab = str(tmp_path / "links.sp1.sp2.simple")
+        path_bc = str(tmp_path / "links.sp2.sp3.simple")
+        generate_links_file(sp1, sp2, gene_colors, "sp1", "sp2", path_ab)
+        generate_links_file(sp2, sp3, gene_colors, "sp2", "sp3", path_bc)
+
+        parsed_ab = _parse_simple_file(path_ab)
+        parsed_bc = _parse_simple_file(path_bc)
+        assert parsed_ab["g_shared"] == parsed_bc["g_shared"] == "#aabbcc"
+
+    def test_shared_gene_same_color_despite_different_neighbors(self, tmp_path):
+        # g_shared is surrounded by red neighbors in the A-B pair and by
+        # blue neighbors in the B-C pair. Under the old majority-vote code,
+        # this was exactly the failure mode: a gene "inherited" its block's
+        # dominant color, so it could appear red in A-B and blue in B-C.
+        sp1 = {
+            "g_shared": _gene("chr1", 2000),
+            "g_red1": _gene("chr1", 1000),
+            "g_red2": _gene("chr1", 3000),
+        }
+        sp2 = {
+            "g_shared": _gene("chrA", 2000),
+            "g_red1": _gene("chrA", 1000),
+            "g_red2": _gene("chrA", 3000),
+            "g_blue1": _gene("chrA", 4000),
+            "g_blue2": _gene("chrA", 5000),
+        }
+        sp3 = {
+            "g_shared": _gene("chrX", 3000),
+            "g_blue1": _gene("chrX", 1000),
+            "g_blue2": _gene("chrX", 2000),
+        }
+        gene_colors = {
+            "g_shared": "#00ff00",  # green — a minority in both blocks
+            "g_red1": "#ff0000",
+            "g_red2": "#ff0000",
+            "g_blue1": "#0000ff",
+            "g_blue2": "#0000ff",
+        }
+
+        path_ab = str(tmp_path / "links.sp1.sp2.simple")
+        path_bc = str(tmp_path / "links.sp2.sp3.simple")
+        generate_links_file(sp1, sp2, gene_colors, "sp1", "sp2", path_ab)
+        generate_links_file(sp2, sp3, gene_colors, "sp2", "sp3", path_bc)
+
+        parsed_ab = _parse_simple_file(path_ab)
+        parsed_bc = _parse_simple_file(path_bc)
+        assert parsed_ab["g_shared"] == "#00ff00"
+        assert parsed_bc["g_shared"] == "#00ff00"
+
+
 class TestRunBranching:
     @pytest.fixture
     def run_mocks(self):
