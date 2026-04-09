@@ -39,10 +39,8 @@ rule gen_dgenies_index:
         dgenies_fasta_to_index -i {params.assembly_path} -n "{params.name}" -o query_{params.assembly_prefix}.idx
         dgenies_fasta_to_index -i {params.reference_path} -n "{wildcards.accession}" -o target_{wildcards.accession}.idx
 
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_significance.png --line-thickness 8
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_gravity.png --line-thickness 8 --gravity-ordering-only
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_bw.png --line-thickness 8 --no-color
-        dotplotrs -m 2000 -p aln.paf -o dotplot_{params.assembly_prefix}_vs_{wildcards.accession}_bw_gravity.png --line-thickness 8 --no-color --gravity-ordering-only
+        dotplotrs -m 2000 -p aln.paf -o dotplot.png --line-thickness 4 -dump-significance significance_results.txt
+        dotplotrs -m 2000 -p aln.paf -o dotplot_bw.png --line-thickness 4 --no-color
     """
 
 
