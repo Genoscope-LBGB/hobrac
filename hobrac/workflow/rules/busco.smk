@@ -200,6 +200,6 @@ rule busco_to_paf:
         mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
         mv {output}/target_reference.idx {output}/busco_target_{wildcards.accession}.idx
 
-        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_significance.png --line-thickness 4 --dump-significance significance_results.txt
-        dotplotrs -p {output}/aln_busco.paf -o {output}/busco_bw.png --line-thickness 4 --no-color
+        dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco.png --line-thickness 4 --dump-significance significance_results.txt
+        dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco_bw.png --line-thickness 4 --no-color
     """
