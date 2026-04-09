@@ -5,12 +5,9 @@ import tempfile
 
 import pytest
 
-from hobrac.jcvi_synteny import (
-    BuscoGene,
-    apply_custom_colors,
-    apply_custom_colors_with_algs,
-    generate_links_file,
-)
+from hobrac.jcvi_synteny.models import BuscoGene
+from hobrac.jcvi_synteny.coloring import apply_custom_colors, apply_custom_colors_with_algs
+from hobrac.jcvi_synteny.output import generate_links_file
 
 
 def _gene(chromosome, start):

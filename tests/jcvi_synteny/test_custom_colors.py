@@ -1,7 +1,5 @@
-from hobrac.jcvi_synteny import (
-    BuscoGene,
-    apply_custom_colors_with_algs,
-)
+from hobrac.jcvi_synteny.models import BuscoGene
+from hobrac.jcvi_synteny.coloring import apply_custom_colors_with_algs
 
 
 def _gene(chromosome):

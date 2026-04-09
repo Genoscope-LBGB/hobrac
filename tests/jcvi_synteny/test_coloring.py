@@ -4,20 +4,14 @@ from unittest.mock import patch
 
 import pytest
 
-from hobrac.jcvi_synteny import (
-    ALG_PALETTE,
-    BuscoGene,
-    PairwiseAssociation,
-    apply_custom_colors,
-    apply_custom_colors_with_algs,
-    build_gene_chain_mapping,
-    detect_algs_transitive,
-    enumerate_chains,
-    generate_links_file,
-    run,
-)
+from hobrac.jcvi_synteny.models import ALG_PALETTE, BuscoGene, PairwiseAssociation
+from hobrac.jcvi_synteny.coloring import apply_custom_colors, apply_custom_colors_with_algs
+from hobrac.jcvi_synteny.chains import build_gene_chain_mapping, enumerate_chains
+from hobrac.jcvi_synteny.statistics import detect_algs_transitive
+from hobrac.jcvi_synteny.output import generate_links_file, run
 
-MODULE = "hobrac.jcvi_synteny"
+MODULE = "hobrac.jcvi_synteny.output"
+STATS_MODULE = "hobrac.jcvi_synteny.statistics"
 
 
 def _gene(chromosome, start=0):
@@ -566,7 +560,7 @@ class TestBuildGeneChainMapping:
 
 
 class TestDetectAlgsTransitive:
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_two_species_returns_gene_to_chain(self, mock_pairwise):
         sp1 = {"g1": _gene("A1"), "g2": _gene("A2")}
         sp2 = {"g1": _gene("B1"), "g2": _gene("B2")}
@@ -587,7 +581,7 @@ class TestDetectAlgsTransitive:
         assert gene_to_chain["g1"] in chain_colors
         assert gene_to_chain["g2"] in chain_colors
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_each_chain_gets_palette_color(self, mock_pairwise):
         sp1 = {"g1": _gene("A1"), "g2": _gene("A2")}
         sp2 = {"g1": _gene("B1"), "g2": _gene("B2")}
@@ -601,7 +595,7 @@ class TestDetectAlgsTransitive:
         for chain_id, color in chain_colors.items():
             assert color == ALG_PALETTE[chain_id % len(ALG_PALETTE)]
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_three_species_branching_distinct_chains(self, mock_pairwise):
         sp1 = {"g1": _gene("A1"), "g2": _gene("A1")}
         sp2 = {"g1": _gene("B1"), "g2": _gene("B1")}
@@ -618,7 +612,7 @@ class TestDetectAlgsTransitive:
         assert gene_to_chain["g1"] != gene_to_chain["g2"]
         assert len(chain_colors) == 2
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_no_associations_returns_empty(self, mock_pairwise):
         sp1 = {"g1": _gene("A1")}
         sp2 = {"g1": _gene("B1")}
@@ -633,7 +627,7 @@ class TestDetectAlgsTransitive:
         assert chain_colors == {}
         assert all(v == -1 for v in gene_to_chain.values())
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_single_species_returns_empty(self, mock_pairwise):
         sp1 = {"g1": _gene("A1")}
 
@@ -702,7 +696,7 @@ class TestThreeSpeciesIntegration:
             [_assoc("sp2", "sp3", "B1", "C2")],
         ]
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_branching_genes_get_different_colors(
         self, mock_pairwise, branching_species, branching_pairwise
     ):
@@ -725,7 +719,7 @@ class TestThreeSpeciesIntegration:
         assert colors_ab["g_b2"] != "lightgrey"
         assert colors_ab["g_nosig"] == "lightgrey"
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_linear_chain_same_color_across_pairs(
         self, mock_pairwise, linear_species, linear_pairwise
     ):
@@ -743,7 +737,7 @@ class TestThreeSpeciesIntegration:
         assert colors_ab["g_sig"] == colors_bc["g_sig"]
         assert colors_ab["g_sig"] != "lightgrey"
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_linear_chain_with_custom_colors(
         self, mock_pairwise, linear_species, linear_pairwise
     ):
@@ -766,7 +760,7 @@ class TestThreeSpeciesIntegration:
 class TestTwoSpeciesBackwardCompat:
     """Verify 2-species chain-based pipeline produces correct coloring."""
 
-    @patch(f"{MODULE}.detect_algs_pairwise_raw")
+    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
     def test_two_species_coloring_matches_chain_assignment(self, mock_pairwise):
         sp1 = {
             "g1": _gene("A1"),
