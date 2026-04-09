@@ -1,6 +1,6 @@
 from typing import Dict
 
-from .models import BuscoGene, DEFAULT_COLOR
+from .models import DEFAULT_COLOR, BuscoGene
 
 
 def apply_custom_colors(

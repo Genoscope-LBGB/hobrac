@@ -53,7 +53,11 @@ def get_args():
         "--reference",
         action="append",
         dest="reference",
-        help="Path to a fasta file to use as a reference (disables the reference searching step). Can be specified multiple times.",
+        help=(
+            "Path to a fasta file to use as a reference"
+            " (disables the reference searching step)."
+            " Can be specified multiple times."
+        ),
         default=None,
         type=os.path.abspath,
     )
@@ -61,7 +65,11 @@ def get_args():
         "--busco-assembly",
         action="store",
         dest="busco_assembly",
-        help="Path to a BUSCO result directory (or run dir or full_table.tsv) to reuse for the assembly",
+        help=(
+            "Path to a BUSCO result directory"
+            " (or run dir or full_table.tsv)"
+            " to reuse for the assembly"
+        ),
         default=None,
         type=os.path.abspath,
     )
@@ -69,7 +77,11 @@ def get_args():
         "--busco-reference",
         action="store",
         dest="busco_reference",
-        help="Path to a BUSCO result directory (or run dir or full_table.tsv) to reuse for the reference",
+        help=(
+            "Path to a BUSCO result directory"
+            " (or run dir or full_table.tsv)"
+            " to reuse for the reference"
+        ),
         default=None,
         type=os.path.abspath,
     )
@@ -79,7 +91,10 @@ def get_args():
         "--executor",
         action="store",
         dest="executor",
-        help="Name of a snakemake executor plugin to execute the pipeline on a computing cluster",
+        help=(
+            "Name of a snakemake executor plugin"
+            " to execute the pipeline on a computing cluster"
+        ),
         default="slurm",
     )
     optional_args.add_argument(
@@ -155,7 +170,10 @@ def get_args():
         "--allow-zero-distance",
         action="store_true",
         dest="allow_zero_distance",
-        help="Allows the choice of the closest reference to pick a genome with a Mash distance of 0",
+        help=(
+            "Allows the choice of the closest reference"
+            " to pick a genome with a Mash distance of 0"
+        ),
         default=False,
         required=False,
     )
@@ -208,9 +226,14 @@ def get_args():
         "--jcvi-custom-colors",
         action="store",
         dest="jcvi_custom_colors",
-        help="Path to custom color file for JCVI synteny plot (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
-        "By default, ALG statistical testing still runs to determine significance; "
-        "use --jcvi-skip-alg to disable it. Genes not in the file will be shown in grey.",
+        help=(
+            "Path to custom color file for JCVI synteny plot"
+            " (tab-separated: BUSCO_ID, R,G,B, ALG_NAME)."
+            " By default, ALG statistical testing still runs"
+            " to determine significance;"
+            " use --jcvi-skip-alg to disable it."
+            " Genes not in the file will be shown in grey."
+        ),
         default=None,
         type=os.path.abspath,
     )

@@ -2,6 +2,7 @@
 import argparse
 import os
 import uuid
+
 from Bio import SeqIO
 
 
@@ -90,7 +91,10 @@ def main():
     parser.add_argument(
         "--out",
         required=False,
-        help="Output directory. If not specified, a unique directory name will be generated.",
+        help=(
+            "Output directory. If not specified,"
+            " a unique directory name will be generated."
+        ),
     )
 
     args = parser.parse_args()

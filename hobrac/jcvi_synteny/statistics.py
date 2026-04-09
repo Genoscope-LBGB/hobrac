@@ -3,12 +3,12 @@ from typing import Dict, List, Tuple
 
 from scipy.stats import fisher_exact
 
-from .chains import enumerate_chains, build_gene_chain_mapping
+from .chains import build_gene_chain_mapping, enumerate_chains
 from .models import (
-    ALGAssociation,
     ALG_PALETTE,
-    BuscoGene,
     DEFAULT_COLOR,
+    ALGAssociation,
+    BuscoGene,
     PairwiseAssociation,
 )
 

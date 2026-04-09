@@ -1,39 +1,57 @@
 import os
 
+
 rule aln:
     input:
-        reference = "reference/{accession}.fna",
-        assembly = config["assembly"]
-    output: "aln/vs_{accession}/aln.paf"
+        reference="reference/{accession}.fna",
+        assembly=config["assembly"],
+    output:
+        "aln/vs_{accession}/aln.paf",
+    benchmark:
+        "benchmarks/aln_{accession}.txt"
+    container:
+        HOBRAC_TOOLS
     threads: 12
-    container: HOBRAC_TOOLS
     resources:
-        mem_mb = config["minimap2_memory"],
-        runtime = config["minimap2_runtime"]
-    benchmark: "benchmarks/aln_{accession}.txt"
-    shell: """
+        mem_mb=config["minimap2_memory"],
+        runtime=config["minimap2_runtime"],
+    shell:
+        """
         minimap2 -x asm20 -t {threads} {input.reference} {input.assembly} > {output}
     """
 
 
 rule gen_dgenies_index:
     input:
-        aln = "aln/vs_{accession}/aln.paf",
-        reference = "reference/{accession}.fna",
-        assembly = config["assembly"]
-    output: touch("aln/vs_{accession}/dgenies.done")
-    params: 
-        name = config["scientific_name"],
-        assembly_prefix = config["scientific_name"].replace(" ", "_"),
-        assembly_path = lambda wildcards, input: input.assembly if os.path.isabs(input.assembly) else f"../../{input.assembly}",
-        reference_path = lambda wildcards, input: input.reference if os.path.isabs(input.reference) else f"../../{input.reference}"
-    log: "logs/aln/gen_dgenies_index_{accession}.log"
-    container: HOBRAC_TOOLS
+        aln="aln/vs_{accession}/aln.paf",
+        reference="reference/{accession}.fna",
+        assembly=config["assembly"],
+    output:
+        touch("aln/vs_{accession}/dgenies.done"),
+    log:
+        "logs/aln/gen_dgenies_index_{accession}.log",
+    benchmark:
+        "benchmarks/dgenies_{accession}.txt"
+    container:
+        HOBRAC_TOOLS
     resources:
-        mem_mb = 50000,
-        runtime = 60
-    benchmark: "benchmarks/dgenies_{accession}.txt"
-    shell: """
+        mem_mb=50000,
+        runtime=60,
+    params:
+        name=config["scientific_name"],
+        assembly_prefix=config["scientific_name"].replace(" ", "_"),
+        assembly_path=lambda wildcards, input: (
+            input.assembly
+            if os.path.isabs(input.assembly)
+            else f"../../{input.assembly}"
+        ),
+        reference_path=lambda wildcards, input: (
+            input.reference
+            if os.path.isabs(input.reference)
+            else f"../../{input.reference}"
+        ),
+    shell:
+        """
         cd aln/vs_{wildcards.accession}
 
         dgenies_fasta_to_index -i {params.assembly_path} -n "{params.name}" -o query_{params.assembly_prefix}.idx
@@ -55,16 +73,18 @@ def get_all_ranking_targets(wildcards):
                 accessions.append(line.strip())
     return expand(
         ["aln/vs_{accession}/dgenies.done", "aln/busco_{accession}"],
-        accession=accessions
+        accession=accessions,
     )
+
 
 rule rank_symlinks:
     input:
-        selected_accessions = "mash/selected_accessions.txt",
-        targets = get_all_ranking_targets
+        selected_accessions="mash/selected_accessions.txt",
+        targets=get_all_ranking_targets,
     output:
-        "aln/ranking_symlinks.done"
-    shell: """
+        "aln/ranking_symlinks.done",
+    shell:
+        """
         # Clean existing symlinks to avoid duplicates or stale links
         find aln/ -maxdepth 1 -type l -name "rank*_busco" -delete
         find aln/ -maxdepth 1 -type l -name "rank*_geno" -delete

@@ -7,9 +7,9 @@ from typing import Dict, List, Tuple
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
 from .io import parse_custom_colors, read_busco_tsv, read_fasta_sizes
 from .models import (
+    DEFAULT_COLOR,
     ALGAssociation,
     BuscoGene,
-    DEFAULT_COLOR,
     PairwiseAssociation,
 )
 from .ordering import (

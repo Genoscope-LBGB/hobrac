@@ -4,6 +4,7 @@
 
 import argparse
 import re
+
 from xopen import xopen
 
 
@@ -106,7 +107,8 @@ def index_file(fasta_path, fasta_name, out, write_fa=None):
     :type fasta_name: str
     :param out: output index file
     :type out: str
-    :param write_fa: file path of the new fasta file to write, None to don't save fasta in a new file
+    :param write_fa: file path of the new fasta file to write,
+        None to don't save fasta in a new file
     :type write_fa: str
     :return:
         * [0] True if success, else False
@@ -143,7 +145,7 @@ def index_file(fasta_path, fasta_name, out, write_fa=None):
                         out_file.write("%s\t%d\n" % (contig, len_c))
                     else:
                         return False, 0, "Error: contig is empty: %s" % contig
-                contig = re.split("\s", line[1:])[0]
+                contig = re.split(r"\s", line[1:])[0]
                 len_c = 0
             elif len(line) > 0:
                 if (

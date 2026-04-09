@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 DEFAULT_COLOR = "lightgrey"
 
 

@@ -4,8 +4,8 @@ import os
 import shutil
 import subprocess
 import sys
-from hobrac.command_line import get_args
 
+from hobrac.command_line import get_args
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
@@ -56,7 +56,8 @@ def validate_manual_references(paths):
                 f"Error: Duplicate reference name '{name}' detected.\n"
                 f"  File 1: {seen[name]}\n"
                 f"  File 2: {path}\n"
-                "Please rename one of the files or provide checking references with distinct filenames.",
+                "Please rename one of the files or provide"
+                " checking references with distinct filenames.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -77,7 +78,8 @@ def validate_jcvi_names(jcvi_names: str, ref_count: int):
     if len(names_list) != expected_count:
         print(
             f"Error: Number of custom names ({len(names_list)}) must equal "
-            f"number of species ({expected_count}): 1 assembly + {ref_count} references.\n"
+            f"number of species ({expected_count}):"
+            f" 1 assembly + {ref_count} references.\n"
             f"  Provided names: {', '.join(names_list)}",
             file=sys.stderr,
         )
@@ -85,12 +87,16 @@ def validate_jcvi_names(jcvi_names: str, ref_count: int):
 
 
 def normalize_busco_dir(path: str) -> str:
-    """Normalize a user-provided BUSCO path to the directory that contains run*/full_table.tsv.
+    """Normalize a user-provided BUSCO path to the directory
+    that contains run*/full_table.tsv.
+
     Accepts:
       - a full_table.tsv path
       - a run_* directory path
       - a directory that contains run*/full_table.tsv
-    Returns an absolute path to the directory that contains run*/full_table.tsv, or exits on error.
+
+    Returns an absolute path to the directory that contains
+    run*/full_table.tsv, or exits on error.
     """
     p = os.path.abspath(path)
     if os.path.isfile(p) and os.path.basename(p) == "full_table.tsv":
@@ -112,14 +118,19 @@ def normalize_busco_dir(path: str) -> str:
 
 
 def link_busco_dir(src_dir: str, dest_dir: str):
-    """Create a symlink from dest_dir to src_dir. Fails if a non-symlink exists at dest_dir."""
+    """Create a symlink from dest_dir to src_dir.
+
+    Fails if a non-symlink exists at dest_dir.
+    """
     create_dir(os.path.dirname(dest_dir))
     if os.path.lexists(dest_dir):
         if os.path.islink(dest_dir):
             os.unlink(dest_dir)
         else:
             print(
-                f"Destination {dest_dir} already exists and is not a symlink. Remove it or choose a new output directory.",
+                f"Destination {dest_dir} already exists and is not"
+                " a symlink. Remove it or choose a new"
+                " output directory.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -154,8 +165,10 @@ def get_base_snakemake_args(args) -> str:
         if not taxonkit_db:
             print(
                 "Error: TAXONKIT_DB environment variable is not set.\n"
-                "When using containers, you must provide the path to your taxonkit database.\n"
-                "Download it from https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz and run:\n"
+                "When using containers, you must provide"
+                " the path to your taxonkit database.\n"
+                "Download it from https://ftp.ncbi.nih.gov/"
+                "pub/taxonomy/taxdump.tar.gz and run:\n"
                 "  export TAXONKIT_DB=/path/to/extracted/taxdump",
                 file=sys.stderr,
             )
@@ -164,11 +177,23 @@ def get_base_snakemake_args(args) -> str:
         assembly_dir = os.path.dirname(os.path.realpath(args.assembly))
 
         if args.use_apptainer:
-            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+            cmd += (
+                f"--use-apptainer --apptainer-args"
+                f" '-B {taxonkit_db}:/taxonkit"
+                f" -B {assembly_dir}' "
+            )
         elif args.use_singularity:
-            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+            cmd += (
+                f"--use-singularity --singularity-args"
+                f" '-B {taxonkit_db}:/taxonkit"
+                f" -B {assembly_dir}' "
+            )
         elif args.use_docker:
-            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit -v {assembly_dir}:{assembly_dir}' "
+            cmd += (
+                f"--use-docker --docker-args"
+                f" '-v {taxonkit_db}:/taxonkit"
+                f" -v {assembly_dir}:{assembly_dir}' "
+            )
 
     return cmd
 
@@ -295,7 +320,9 @@ def main():
 
     if process.returncode != 0:
         print(
-            f"\nSnakemake failed with exit code {process.returncode}. Check .snakemake/log/ for details.",
+            f"\nSnakemake failed with exit code"
+            f" {process.returncode}."
+            " Check .snakemake/log/ for details.",
             file=sys.stderr,
         )
 

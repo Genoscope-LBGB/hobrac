@@ -11,26 +11,27 @@ def get_busco_reference_dirs(wildcards):
 
 rule jcvi_synteny:
     input:
-        busco_assembly = "busco/busco_assembly",
-        busco_references = get_busco_reference_dirs,
-        accession_order = "mash/selected_accessions.txt",
-        assembly = config["assembly"]
+        busco_assembly="busco/busco_assembly",
+        busco_references=get_busco_reference_dirs,
+        accession_order="mash/selected_accessions.txt",
+        assembly=config["assembly"],
     output:
-        seqids = "aln/jcvi_karyotype/seqids",
-        layouts = "aln/jcvi_karyotype/layouts"
-    params:
-        manual_refs = config.get("manual_references", ""),
-        assembly_name = config["scientific_name"].replace(" ", "_"),
-        outdir = "aln/jcvi_karyotype",
-        min_busco_genes = config.get("min_busco_genes", 0),
-        jcvi_custom_colors = config.get("jcvi_custom_colors", ""),
-        jcvi_names = config.get("jcvi_names", ""),
-        hide_non_significant = config.get("hide_non_significant", False),
-        skip_alg = config.get("skip_alg", False)
+        seqids="aln/jcvi_karyotype/seqids",
+        layouts="aln/jcvi_karyotype/layouts",
+    benchmark:
+        "benchmarks/jcvi_synteny.txt"
     resources:
-        mem_mb = 8000,
-        runtime = 30
-    benchmark: "benchmarks/jcvi_synteny.txt"
+        mem_mb=8000,
+        runtime=30,
+    params:
+        manual_refs=config.get("manual_references", ""),
+        assembly_name=config["scientific_name"].replace(" ", "_"),
+        outdir="aln/jcvi_karyotype",
+        min_busco_genes=config.get("min_busco_genes", 0),
+        jcvi_custom_colors=config.get("jcvi_custom_colors", ""),
+        jcvi_names=config.get("jcvi_names", ""),
+        hide_non_significant=config.get("hide_non_significant", False),
+        skip_alg=config.get("skip_alg", False),
     shell:
         """
         jcvi_synteny \
@@ -51,15 +52,17 @@ rule jcvi_synteny:
 
 rule jcvi_karyotype:
     input:
-        seqids = "aln/jcvi_karyotype/seqids",
-        layouts = "aln/jcvi_karyotype/layouts"
+        seqids="aln/jcvi_karyotype/seqids",
+        layouts="aln/jcvi_karyotype/layouts",
     output:
-        "aln/jcvi_karyotype/karyotype.png"
-    container: HOBRAC_TOOLS
+        "aln/jcvi_karyotype/karyotype.png",
+    benchmark:
+        "benchmarks/jcvi_karyotype.txt"
+    container:
+        HOBRAC_TOOLS
     resources:
-        mem_mb = 4000,
-        runtime = 10
-    benchmark: "benchmarks/jcvi_karyotype.txt"
+        mem_mb=4000,
+        runtime=10,
     shell:
         """
         cd aln/jcvi_karyotype

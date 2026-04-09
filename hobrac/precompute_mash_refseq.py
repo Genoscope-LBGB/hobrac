@@ -4,15 +4,15 @@ import glob
 import gzip
 import os
 import re
-import requests
 import shutil
 import subprocess
 import sys
 import time
-
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
+
+import requests
 
 
 @dataclass
@@ -25,7 +25,10 @@ class Genome:
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="precompute_mash_refseq",
-        description="\n\nAutomatically download reference genomes and compute their MASH sketches",
+        description=(
+            "\n\nAutomatically download reference genomes"
+            " and compute their MASH sketches"
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         add_help=False,
     )
@@ -35,7 +38,12 @@ def get_args() -> argparse.Namespace:
         "--eukaryote-list",
         action="store",
         dest="euk_list_file",
-        help="File containing the list of chromosome/complete eukaryote genomes at NCBI. TSV format: GCA_accession\\tAssembly_name\\tTaxid",
+        help=(
+            "File containing the list of"
+            " chromosome/complete eukaryote genomes"
+            " at NCBI. TSV format:"
+            " GCA_accession\\tAssembly_name\\tTaxid"
+        ),
         required=True,
         default=None,
         type=os.path.abspath,
@@ -102,7 +110,9 @@ def extract_phylum(output_dir, euk_list_file):
 
     os.environ["TAXONKIT_DB"] = taxdump
     os.system(
-        f"cat {genome_list} | taxonkit reformat -I 3 --format '{{p}}' -r 'no_returned_phylum' "
+        f"cat {genome_list}"
+        f" | taxonkit reformat -I 3"
+        f" --format '{{p}}' -r 'no_returned_phylum'"
         f" > {accession_list}"
     )
 
@@ -156,7 +166,12 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
                         print(gca_accession, file=current_list)
                         continue
 
-                    partial_path = f"/genomes/all/GCA/{match.group(1)}/{match.group(2)}/{match.group(3)}"
+                    partial_path = (
+                        f"/genomes/all/GCA"
+                        f"/{match.group(1)}"
+                        f"/{match.group(2)}"
+                        f"/{match.group(3)}"
+                    )
                     try:
                         ftp.cwd(partial_path)
                     except Exception:
@@ -174,7 +189,9 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
 
                     if not full_folder_name:
                         print(
-                            f"Could not find folder for {gca_accession}, url: {partial_path}"
+                            f"Could not find folder for"
+                            f" {gca_accession},"
+                            f" url: {partial_path}"
                         )
                         print(gca_accession, file=current_list)
                         continue
@@ -201,7 +218,8 @@ def get_ncbi_genome_ftp_url(phylums: defaultdict[str, List[Genome]], output_dir)
 def download_and_process_genomes(
     phylums: defaultdict[str, List[Genome]], download_dir: str, mash_output_dir: str
 ):
-    """Download genomes and immediately process them: decompress → mash sketch → delete."""
+    """Download genomes and immediately process them:
+    decompress, mash sketch, delete."""
     already_downloaded_path = os.path.join(download_dir, "already_downloaded.txt")
 
     for phylum in phylums:
@@ -331,7 +349,10 @@ def decompress_single_file(compressed_path: str) -> str:
 
 
 def decompress(output_dir):
-    """Decompress all .gz files in the output directory (legacy function, not used in optimized workflow)."""
+    """Decompress all .gz files in the output directory.
+
+    Legacy function, not used in optimized workflow.
+    """
     for f in glob.glob(f"{output_dir}/*/*.gz"):
         print(f"Decompressing {f}")
 
@@ -384,7 +405,10 @@ def run_mash_single_file(
 
 
 def run_mash(input_dir, output_dir):
-    """Run mash sketch on all .fna files (legacy function, not used in optimized workflow)."""
+    """Run mash sketch on all .fna files.
+
+    Legacy function, not used in optimized workflow.
+    """
     pattern = (
         r".*/(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna$"
     )
@@ -413,7 +437,11 @@ def paste_mash(input_dir, output_dir):
     for f in glob.glob(f"{output_dir}/*.fofn"):
         os.remove(f)
 
-    pattern = r".*/(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna.msh$"
+    pattern = (
+        r".*/(?P<phylum>[^/]+)/"
+        r"(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)"
+        r"\.fna.msh$"
+    )
     phylums = set()
     for f in glob.glob(f"{input_dir}/*/*.msh"):
         match = re.search(pattern, f)

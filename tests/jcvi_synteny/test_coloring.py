@@ -4,11 +4,14 @@ from unittest.mock import patch
 
 import pytest
 
-from hobrac.jcvi_synteny.models import ALG_PALETTE, BuscoGene, PairwiseAssociation
-from hobrac.jcvi_synteny.coloring import apply_custom_colors, apply_custom_colors_with_algs
 from hobrac.jcvi_synteny.chains import build_gene_chain_mapping, enumerate_chains
-from hobrac.jcvi_synteny.statistics import detect_algs_transitive
+from hobrac.jcvi_synteny.coloring import (
+    apply_custom_colors,
+    apply_custom_colors_with_algs,
+)
+from hobrac.jcvi_synteny.models import ALG_PALETTE, BuscoGene, PairwiseAssociation
 from hobrac.jcvi_synteny.output import generate_links_file, run
+from hobrac.jcvi_synteny.statistics import detect_algs_transitive
 
 MODULE = "hobrac.jcvi_synteny.output"
 STATS_MODULE = "hobrac.jcvi_synteny.statistics"
