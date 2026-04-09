@@ -27,7 +27,6 @@ setuptools.setup(
         "scipy",
         "jcvi",
     ],
-    dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
         "console_scripts": [
             "hobrac=hobrac.main:main",
