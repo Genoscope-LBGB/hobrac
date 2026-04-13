@@ -6,8 +6,6 @@ from scipy.stats import fisher_exact
 from .chains import build_gene_chain_mapping, enumerate_chains
 from .models import (
     ALG_PALETTE,
-    DEFAULT_COLOR,
-    ALGAssociation,
     BuscoGene,
     ChromosomeAssociation,
     PairwiseAssociation,
@@ -162,74 +160,3 @@ def detect_algs_transitive(
         chain_colors,
         all_chromosome_associations,
     )
-
-
-def build_alg_association_list(
-    pair_associations: List[PairwiseAssociation],
-    edge_to_chain: Dict[Tuple[str, str, str, str], int],
-    chain_colors: Dict[int, str],
-) -> List[ALGAssociation]:
-    """Convert pairwise associations to ALGAssociation list with chain-based IDs."""
-    result = []
-    for a in pair_associations:
-        alg_id = edge_to_chain.get((a.species1, a.chr1, a.species2, a.chr2), -1)
-        result.append(
-            ALGAssociation(
-                chr1=a.chr1,
-                chr2=a.chr2,
-                p_value=a.p_value,
-                color=chain_colors.get(alg_id, DEFAULT_COLOR),
-                gene_count=a.gene_count,
-                alg_id=alg_id,
-            )
-        )
-    return result
-
-
-def detect_algs_pairwise(
-    busco1: Dict[str, BuscoGene],
-    busco2: Dict[str, BuscoGene],
-    alpha: float = 0.01,
-    min_genes: int = 5,
-) -> Tuple[List[ALGAssociation], Dict[str, str]]:
-    """
-    Detect ALG associations using Fisher's exact test with Bonferroni correction.
-
-    This is a wrapper for backward compatibility (single pair use case).
-
-    Args:
-        busco1: BUSCO data for species 1
-        busco2: BUSCO data for species 2
-        alpha: Significance level before correction
-        min_genes: Minimum genes in a chr pair to test
-
-    Returns:
-        Tuple of (list of significant ALG associations, dict mapping gene to color)
-    """
-    raw_associations, _ = detect_algs_pairwise_raw(
-        busco1, busco2, "sp1", "sp2", alpha, min_genes
-    )
-
-    significant = []
-    for i, assoc in enumerate(raw_associations):
-        color = ALG_PALETTE[i % len(ALG_PALETTE)]
-        significant.append(
-            ALGAssociation(
-                chr1=assoc.chr1,
-                chr2=assoc.chr2,
-                p_value=assoc.p_value,
-                color=color,
-                gene_count=assoc.gene_count,
-                alg_id=i,
-            )
-        )
-
-    alg_lookup = {(alg.chr1, alg.chr2): alg.color for alg in significant}
-    common_ids = set(busco1.keys()) & set(busco2.keys())
-    gene_colors = {}
-    for busco_id in common_ids:
-        chr1 = busco1[busco_id].chromosome
-        chr2 = busco2[busco_id].chromosome
-        gene_colors[busco_id] = alg_lookup.get((chr1, chr2), DEFAULT_COLOR)
-
-    return significant, gene_colors

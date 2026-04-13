@@ -37,16 +37,6 @@ class ChromosomeAssociation:
     significant: bool
 
 
-@dataclass
-class ALGAssociation:
-    chr1: str
-    chr2: str
-    p_value: float
-    color: str
-    gene_count: int
-    alg_id: int = -1
-
-
 # 37-color palette for ALG visualization
 ALG_PALETTE = [
     "#e6194b",
