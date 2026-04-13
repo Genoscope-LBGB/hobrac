@@ -1,26 +1,21 @@
 import argparse
 import glob
 import os
-from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
 from .io import parse_custom_colors, read_busco_tsv, read_fasta_sizes
 from .models import (
     DEFAULT_COLOR,
-    ALGAssociation,
     BuscoGene,
-    PairwiseAssociation,
+    ChromosomeAssociation,
 )
 from .ordering import (
     get_chromosome_order,
     get_chromosome_order_by_gravity,
     get_chromosome_order_by_span,
 )
-from .statistics import (
-    build_alg_association_list,
-    detect_algs_transitive,
-)
+from .statistics import detect_algs_transitive
 
 
 def generate_bed_file(
@@ -185,23 +180,27 @@ def generate_layouts_file(
             f.write(f"e, {i}, {i + 1}, {links_basename}\n")
 
 
-def save_alg_associations(
-    algs: List[ALGAssociation], sp1: str, sp2: str, output_path: str
+def save_chromosome_associations(
+    associations: List[ChromosomeAssociation], output_path: str
 ) -> None:
     """
-    Save ALG associations to a TSV file for inspection.
+    Save chromosome associations to a TSV file with header.
 
     Args:
-        algs: List of ALG associations
-        sp1: Species 1 name
-        sp2: Species 2 name
+        associations: List of chromosome associations
         output_path: Output TSV file path
     """
-    with open(output_path, "a") as f:
-        for alg in algs:
+    with open(output_path, "w") as f:
+        f.write(
+            "species1\tspecies2\tchr1\tchr2\tp_value\t"
+            "corrected_p_value\tgene_count\tsignificant\n"
+        )
+        for a in associations:
+            significant = "accepted" if a.significant else "rejected"
             f.write(
-                f"{sp1}\t{sp2}\t{alg.chr1}\t{alg.chr2}\t"
-                f"{alg.p_value:.2e}\t{alg.gene_count}\t{alg.color}\t{alg.alg_id}\n"
+                f"{a.species1}\t{a.species2}\t{a.chr1}\t{a.chr2}\t"
+                f"{a.p_value:.2e}\t{a.corrected_p_value:.2e}\t"
+                f"{a.gene_count}\t{significant}\n"
             )
 
 
@@ -322,37 +321,18 @@ def run(
         bed_files.append((name, bed_path))
 
     # Detect ALGs and generate links for consecutive species pairs
-    alg_output = os.path.join(output_dir, "alg_associations.tsv")
-    with open(alg_output, "w") as f:
-        f.write("species1\tspecies2\tchr1\tchr2\tp_value\tgene_count\tcolor\talg_id\n")
+    associations_output = os.path.join(output_dir, "chromosome_associations.tsv")
 
     # Phase 1: Transitive ALG detection across all species
     # Skip only when custom colors are provided AND skip_alg is True
-    all_associations: List[PairwiseAssociation] = []
-    chains: List[List[Tuple[str, str]]] = []
+    all_chromosome_associations: List[ChromosomeAssociation] = []
     gene_to_chain: Dict[str, int] = {}
     chain_colors: Dict[int, str] = {}
     if not (custom_colors and skip_alg):
-        all_associations, chains, gene_to_chain, chain_colors, _ = (
+        _, _, gene_to_chain, chain_colors, all_chromosome_associations = (
             detect_algs_transitive(species_busco)
         )
-
-    # Build edge-to-chain lookup once for TSV output
-    edge_to_chain: Dict[Tuple[str, str, str, str], int] = {}
-    for chain_id, chain in enumerate(chains):
-        for j in range(len(chain) - 1):
-            sp1, chr1 = chain[j]
-            sp2, chr2 = chain[j + 1]
-            edge = (sp1, chr1, sp2, chr2)
-            if edge not in edge_to_chain:
-                edge_to_chain[edge] = chain_id
-
-    # Pre-group associations by species pair
-    associations_by_pair: Dict[Tuple[str, str], List[PairwiseAssociation]] = (
-        defaultdict(list)
-    )
-    for a in all_associations:
-        associations_by_pair[(a.species1, a.species2)].append(a)
+    save_chromosome_associations(all_chromosome_associations, associations_output)
 
     # Phase 2: Generate outputs for each pair
     links_files = []
@@ -360,11 +340,8 @@ def run(
         sp1_name, sp1_busco = species_busco[i]
         sp2_name, sp2_busco = species_busco[i + 1]
 
-        pair_associations = associations_by_pair[(sp1_name, sp2_name)]
-
         if custom_colors and skip_alg:
             gene_colors = apply_custom_colors(sp1_busco, sp2_busco, custom_colors)
-            algs: List[ALGAssociation] = []
         else:
             gene_colors = apply_custom_colors_with_algs(
                 sp1_busco,
@@ -373,11 +350,6 @@ def run(
                 chain_colors,
                 custom_colors,
             )
-            algs = build_alg_association_list(
-                pair_associations, edge_to_chain, chain_colors
-            )
-
-        save_alg_associations(algs, sp1_name, sp2_name, alg_output)
 
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")
         generate_links_file(
@@ -402,7 +374,7 @@ def run(
     return {
         "seqids": seqids_path,
         "layouts": layouts_path,
-        "alg_associations": alg_output,
+        "chromosome_associations": associations_output,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
