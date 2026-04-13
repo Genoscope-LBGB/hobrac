@@ -264,6 +264,15 @@ def get_args():
         "with --jcvi-custom-colors.",
         default=False,
     )
+    optional_args.add_argument(
+        "--jcvi-pvalue",
+        action="store",
+        dest="jcvi_pvalue",
+        help="Base significance threshold (alpha) for ALG detection via Fisher's "
+        "exact test. Bonferroni correction is applied on top of this value.",
+        default=0.01,
+        type=float,
+    )
 
     args = parser.parse_args()
 

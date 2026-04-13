@@ -32,6 +32,7 @@ rule jcvi_synteny:
         jcvi_names=config.get("jcvi_names", ""),
         hide_non_significant=config.get("hide_non_significant", False),
         skip_alg=config.get("skip_alg", False),
+        jcvi_pvalue=config.get("jcvi_pvalue", 0.01),
     shell:
         """
         jcvi_synteny \
@@ -43,6 +44,7 @@ rule jcvi_synteny:
             --assembly_name "{params.assembly_name}" \
             --output_dir {params.outdir} \
             --min-busco-genes {params.min_busco_genes} \
+            --jcvi-pvalue {params.jcvi_pvalue} \
             $([ -n "{params.jcvi_custom_colors}" ] && echo "--jcvi-custom-colors {params.jcvi_custom_colors}") \
             $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}") \
             $([ "{params.hide_non_significant}" = "True" ] && echo "--hide-non-significant") \
