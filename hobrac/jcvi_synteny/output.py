@@ -218,6 +218,7 @@ def run(
     custom_names: str = "",
     hide_non_significant: bool = False,
     skip_alg: bool = False,
+    alpha: float = 0.01,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -330,7 +331,7 @@ def run(
     chain_colors: Dict[int, str] = {}
     if not (custom_colors and skip_alg):
         _, _, gene_to_chain, chain_colors, all_chromosome_associations = (
-            detect_algs_transitive(species_busco)
+            detect_algs_transitive(species_busco, alpha=alpha)
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
 
@@ -442,6 +443,13 @@ def main():
         "color file get their custom color; unlisted genes are grey. Only effective "
         "with --jcvi-custom-colors.",
     )
+    parser.add_argument(
+        "--jcvi-pvalue",
+        type=float,
+        default=0.01,
+        help="Significance threshold (alpha) for Fisher's exact test in ALG "
+        "detection (default: 0.01).",
+    )
 
     args = parser.parse_args()
 
@@ -458,6 +466,7 @@ def main():
         custom_names=args.jcvi_names,
         hide_non_significant=args.hide_non_significant,
         skip_alg=args.skip_alg,
+        alpha=args.jcvi_pvalue,
     )
 
 
