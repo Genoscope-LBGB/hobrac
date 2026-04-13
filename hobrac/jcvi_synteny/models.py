@@ -24,6 +24,20 @@ class PairwiseAssociation:
 
 
 @dataclass
+class ChromosomeAssociation:
+    """Chromosome-chromosome association with statistical significance."""
+
+    species1: str
+    species2: str
+    chr1: str
+    chr2: str
+    p_value: float
+    corrected_p_value: float
+    gene_count: int
+    significant: bool
+
+
+@dataclass
 class ALGAssociation:
     chr1: str
     chr2: str
