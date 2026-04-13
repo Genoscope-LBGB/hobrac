@@ -315,7 +315,7 @@ class TestRunBranching:
         for p in patchers:
             p.stop()
 
-    def _call_run(self, tmp_path, custom_color_file="", skip_alg=False):
+    def _call_run(self, tmp_path, custom_color_file="", skip_alg=False, **kwargs):
         run(
             assembly_busco="/fake/assembly_busco",
             assembly_fasta="/fake/assembly.fasta",
@@ -325,6 +325,7 @@ class TestRunBranching:
             output_dir=str(tmp_path / "output"),
             custom_color_file=custom_color_file,
             skip_alg=skip_alg,
+            **kwargs,
         )
 
     def test_custom_with_skip_alg(self, tmp_path, run_mocks):
@@ -350,6 +351,13 @@ class TestRunBranching:
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
         run_mocks["save_chromosome_associations"].assert_called_once()
+
+    def test_alpha_passed_to_detect_algs_transitive(self, tmp_path, run_mocks):
+        self._call_run(tmp_path, alpha=0.05)
+
+        run_mocks["detect_algs_transitive"].assert_called_once()
+        _, kwargs = run_mocks["detect_algs_transitive"].call_args
+        assert kwargs["alpha"] == 0.05
 
 
 def _assoc(sp1, sp2, chr1, chr2):
