@@ -9,6 +9,7 @@ from .models import (
     DEFAULT_COLOR,
     ALGAssociation,
     BuscoGene,
+    ChromosomeAssociation,
     PairwiseAssociation,
 )
 
@@ -20,9 +21,9 @@ def detect_algs_pairwise_raw(
     species2: str,
     alpha: float = 0.01,
     min_genes: int = 5,
-) -> List[PairwiseAssociation]:
+) -> Tuple[List[PairwiseAssociation], List[ChromosomeAssociation]]:
     """
-    Run Fisher's exact test, return raw associations without colors.
+    Run Fisher's exact test, return significant associations and all tested pairs.
 
     Args:
         busco1: BUSCO data for species 1
@@ -33,11 +34,13 @@ def detect_algs_pairwise_raw(
         min_genes: Minimum genes in a chr pair to test
 
     Returns:
-        List of significant PairwiseAssociation objects
+        Tuple of:
+        - List of significant PairwiseAssociation objects
+        - List of all tested ChromosomeAssociation objects (significant and not)
     """
     common_ids = set(busco1.keys()) & set(busco2.keys())
     if not common_ids:
-        return []
+        return [], []
 
     chr_pair_counts = defaultdict(int)
     chr1_counts = defaultdict(int)
@@ -59,7 +62,7 @@ def detect_algs_pairwise_raw(
     ]
 
     if not testable_pairs:
-        return []
+        return [], []
 
     results = []
     for chr1, chr2, observed in testable_pairs:
@@ -75,8 +78,25 @@ def detect_algs_pairwise_raw(
     p_threshold = alpha / num_tests
 
     significant = []
+    all_tested = []
     for chr1, chr2, p_value, gene_count in results:
-        if p_value < p_threshold:
+        is_significant = p_value < p_threshold
+        corrected_p_value = min(p_value * num_tests, 1.0)
+
+        all_tested.append(
+            ChromosomeAssociation(
+                species1=species1,
+                species2=species2,
+                chr1=chr1,
+                chr2=chr2,
+                p_value=p_value,
+                corrected_p_value=corrected_p_value,
+                gene_count=gene_count,
+                significant=is_significant,
+            )
+        )
+
+        if is_significant:
             significant.append(
                 PairwiseAssociation(
                     species1=species1,
@@ -88,7 +108,7 @@ def detect_algs_pairwise_raw(
                 )
             )
 
-    return significant
+    return significant, all_tested
 
 
 def detect_algs_transitive(
@@ -100,6 +120,7 @@ def detect_algs_transitive(
     List[List[Tuple[str, str]]],
     Dict[str, int],
     Dict[int, str],
+    List[ChromosomeAssociation],
 ]:
     """
     Detect ALGs with consistent colors across all species using chain-based
@@ -116,22 +137,31 @@ def detect_algs_transitive(
         - chains: List of chromosome chains
         - gene_to_chain: Dict mapping BUSCO gene ID to chain ID
         - chain_colors: Dict mapping chain ID to hex color
+        - all_chromosome_associations: List of all tested ChromosomeAssociation objects
     """
     all_associations: List[PairwiseAssociation] = []
+    all_chromosome_associations: List[ChromosomeAssociation] = []
     for i in range(len(species_busco) - 1):
         sp1_name, sp1_busco = species_busco[i]
         sp2_name, sp2_busco = species_busco[i + 1]
-        associations = detect_algs_pairwise_raw(
+        significant, tested = detect_algs_pairwise_raw(
             sp1_busco, sp2_busco, sp1_name, sp2_name, alpha, min_genes
         )
-        all_associations.extend(associations)
+        all_associations.extend(significant)
+        all_chromosome_associations.extend(tested)
 
     chains = enumerate_chains(all_associations)
     gene_to_chain = build_gene_chain_mapping(species_busco, chains)
 
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
 
-    return all_associations, chains, gene_to_chain, chain_colors
+    return (
+        all_associations,
+        chains,
+        gene_to_chain,
+        chain_colors,
+        all_chromosome_associations,
+    )
 
 
 def build_alg_association_list(
@@ -176,7 +206,7 @@ def detect_algs_pairwise(
     Returns:
         Tuple of (list of significant ALG associations, dict mapping gene to color)
     """
-    raw_associations = detect_algs_pairwise_raw(
+    raw_associations, _ = detect_algs_pairwise_raw(
         busco1, busco2, "sp1", "sp2", alpha, min_genes
     )
 

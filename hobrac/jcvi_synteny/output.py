@@ -333,8 +333,8 @@ def run(
     gene_to_chain: Dict[str, int] = {}
     chain_colors: Dict[int, str] = {}
     if not (custom_colors and skip_alg):
-        all_associations, chains, gene_to_chain, chain_colors = detect_algs_transitive(
-            species_busco
+        all_associations, chains, gene_to_chain, chain_colors, _ = (
+            detect_algs_transitive(species_busco)
         )
 
     # Build edge-to-chain lookup once for TSV output
