@@ -333,6 +333,7 @@ class TestRunBranching:
         run_mocks["apply_custom_colors"].assert_called()
         run_mocks["detect_algs_transitive"].assert_not_called()
         run_mocks["apply_custom_colors_with_algs"].assert_not_called()
+        run_mocks["save_chromosome_associations"].assert_called_once()
 
     def test_custom_without_skip_alg(self, tmp_path, run_mocks):
         self._call_run(tmp_path, custom_color_file="/fake/colors.tsv", skip_alg=False)
@@ -340,6 +341,7 @@ class TestRunBranching:
         run_mocks["apply_custom_colors_with_algs"].assert_called()
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
+        run_mocks["save_chromosome_associations"].assert_called_once()
 
     def test_no_custom_colors(self, tmp_path, run_mocks):
         self._call_run(tmp_path, custom_color_file="", skip_alg=False)
@@ -347,6 +349,7 @@ class TestRunBranching:
         run_mocks["apply_custom_colors_with_algs"].assert_called()
         run_mocks["detect_algs_transitive"].assert_called()
         run_mocks["apply_custom_colors"].assert_not_called()
+        run_mocks["save_chromosome_associations"].assert_called_once()
 
 
 def _assoc(sp1, sp2, chr1, chr2):
