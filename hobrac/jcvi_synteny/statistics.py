@@ -139,14 +139,16 @@ def detect_algs_transitive(
     """
     all_associations: List[PairwiseAssociation] = []
     all_chromosome_associations: List[ChromosomeAssociation] = []
-    for i in range(len(species_busco) - 1):
-        sp1_name, sp1_busco = species_busco[i]
-        sp2_name, sp2_busco = species_busco[i + 1]
-        significant, tested = detect_algs_pairwise_raw(
-            sp1_busco, sp2_busco, sp1_name, sp2_name, alpha, min_genes
-        )
-        all_associations.extend(significant)
-        all_chromosome_associations.extend(tested)
+    for i in range(len(species_busco)):
+        for j in range(i + 1, len(species_busco)):
+            sp1_name, sp1_busco = species_busco[i]
+            sp2_name, sp2_busco = species_busco[j]
+            significant, tested = detect_algs_pairwise_raw(
+                sp1_busco, sp2_busco, sp1_name, sp2_name, alpha, min_genes
+            )
+            if j == i + 1:
+                all_associations.extend(significant)
+            all_chromosome_associations.extend(tested)
 
     chains = enumerate_chains(all_associations)
     gene_to_chain = build_gene_chain_mapping(species_busco, chains)

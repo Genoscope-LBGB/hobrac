@@ -621,6 +621,7 @@ class TestDetectAlgsTransitive:
         sp3 = {"g1": _gene("C1"), "g2": _gene("C2")}
         mock_pairwise.side_effect = [
             ([_assoc("sp1", "sp2", "A1", "B1")], []),
+            ([], []),  # sp1-sp3 (non-adjacent, no effect on chains)
             (
                 [
                     _assoc("sp2", "sp3", "B1", "C1"),
@@ -699,6 +700,7 @@ class TestThreeSpeciesIntegration:
                 [_assoc("sp1", "sp2", "A1", "B1"), _assoc("sp1", "sp2", "A1", "B2")],
                 [],
             ),
+            ([], []),  # sp1-sp3 (non-adjacent, no effect on chains)
             (
                 [_assoc("sp2", "sp3", "B1", "C2"), _assoc("sp2", "sp3", "B2", "C3")],
                 [],
@@ -726,6 +728,7 @@ class TestThreeSpeciesIntegration:
     def linear_pairwise(self):
         return [
             ([_assoc("sp1", "sp2", "A1", "B1")], []),
+            ([], []),  # sp1-sp3 (non-adjacent, no effect on chains)
             ([_assoc("sp2", "sp3", "B1", "C2")], []),
         ]
 
