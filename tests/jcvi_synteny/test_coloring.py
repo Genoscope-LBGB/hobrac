@@ -366,11 +366,15 @@ def _assoc(sp1, sp2, chr1, chr2):
 
 class TestEnumerateChains:
     def test_empty_input(self):
-        assert enumerate_chains([]) == []
+        assert enumerate_chains([], []) == []
 
     def test_two_species_single_pair(self):
         assocs = [_assoc("A", "B", "A1", "B1")]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("A", "A1"), ("B", "B1")]]
 
     def test_two_species_multiple_pairs(self):
@@ -378,7 +382,11 @@ class TestEnumerateChains:
             _assoc("A", "B", "A1", "B1"),
             _assoc("A", "B", "A2", "B2"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1")] in chains
         assert [("A", "A2"), ("B", "B2")] in chains
@@ -388,7 +396,12 @@ class TestEnumerateChains:
             _assoc("A", "B", "A1", "B1"),
             _assoc("B", "C", "B1", "C1"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C1")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C1")]]
 
     def test_three_species_downstream_branching(self):
@@ -397,7 +410,12 @@ class TestEnumerateChains:
             _assoc("B", "C", "B1", "C2"),
             _assoc("B", "C", "B1", "C3"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B1")}),
+            ("C", {"g1": _gene("C2"), "g2": _gene("C3")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
         assert [("A", "A1"), ("B", "B1"), ("C", "C3")] in chains
@@ -408,19 +426,34 @@ class TestEnumerateChains:
             _assoc("A", "B", "A2", "B1"),
             _assoc("B", "C", "B1", "C2"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B1")}),
+            ("C", {"g1": _gene("C2"), "g2": _gene("C2")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
         assert [("A", "A2"), ("B", "B1"), ("C", "C2")] in chains
 
     def test_three_species_dead_end(self):
         assocs = [_assoc("A", "B", "A1", "B1")]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("A", "A1"), ("B", "B1")]]
 
     def test_orphan_chain_later_species(self):
         assocs = [_assoc("B", "C", "B3", "C4")]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {}),
+            ("B", {"g1": _gene("B3")}),
+            ("C", {"g1": _gene("C4")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("B", "B3"), ("C", "C4")]]
 
     def test_deterministic_ordering(self):
@@ -428,7 +461,11 @@ class TestEnumerateChains:
             _assoc("A", "B", "A2", "B2"),
             _assoc("A", "B", "A1", "B1"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains[0] == [("A", "A1"), ("B", "B1")]
         assert chains[1] == [("A", "A2"), ("B", "B2")]
 
@@ -437,7 +474,12 @@ class TestEnumerateChains:
             _assoc("A", "B", "A1", "B1"),
             _assoc("B", "C", "B3", "C4"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B3")}),
+            ("C", {"g2": _gene("C4")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1")] in chains
         assert [("B", "B3"), ("C", "C4")] in chains
@@ -448,7 +490,13 @@ class TestEnumerateChains:
             _assoc("B", "C", "B1", "C2"),
             _assoc("C", "D", "C2", "D3"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C2")}),
+            ("D", {"g1": _gene("D3")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C2"), ("D", "D3")]]
 
     def test_diamond_converging_at_last_species(self):
@@ -458,10 +506,36 @@ class TestEnumerateChains:
             _assoc("B", "C", "B1", "C2"),
             _assoc("B", "C", "B2", "C2"),
         ]
-        chains = enumerate_chains(assocs)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+            ("C", {"g1": _gene("C2"), "g2": _gene("C2")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
         assert len(chains) == 2
         assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
         assert [("A", "A1"), ("B", "B2"), ("C", "C2")] in chains
+
+    def test_cross_product_pruned_by_gene_evidence(self):
+        """Shared node B2 should NOT produce cartesian product of chains."""
+        assocs = [
+            _assoc("A", "B", "A4", "B2"),
+            _assoc("A", "B", "A9", "B2"),
+            _assoc("B", "C", "B2", "C11"),
+            _assoc("B", "C", "B2", "C14"),
+        ]
+        species_busco = [
+            ("A", {"g1": _gene("A4"), "g2": _gene("A9")}),
+            ("B", {"g1": _gene("B2"), "g2": _gene("B2")}),
+            ("C", {"g1": _gene("C11"), "g2": _gene("C14")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
+        assert len(chains) == 2
+        assert [("A", "A4"), ("B", "B2"), ("C", "C11")] in chains
+        assert [("A", "A9"), ("B", "B2"), ("C", "C14")] in chains
+        # Spurious chains must NOT exist:
+        assert [("A", "A4"), ("B", "B2"), ("C", "C14")] not in chains
+        assert [("A", "A9"), ("B", "B2"), ("C", "C11")] not in chains
 
 
 class TestBuildGeneChainMapping:

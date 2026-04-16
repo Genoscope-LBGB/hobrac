@@ -4,55 +4,84 @@ from typing import Dict, List, Set, Tuple
 from .models import BuscoGene, PairwiseAssociation
 
 
+def _eligible_genes(
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+) -> Set[str]:
+    """Return gene IDs present in at least two consecutive species."""
+    eligible: Set[str] = set()
+    for i in range(len(species_busco) - 1):
+        eligible |= species_busco[i][1].keys() & species_busco[i + 1][1].keys()
+    return eligible
+
+
 def enumerate_chains(
     pairwise_associations: List[PairwiseAssociation],
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
 ) -> List[List[Tuple[str, str]]]:
     """
-    Enumerate all maximal chromosome chains through the DAG of significant
-    pairwise associations across consecutive species.
+    Enumerate chromosome chains using gene-level evidence to determine which
+    paths through significant associations actually exist.
 
-    Each chain is a maximal path where edges go from species i to species i+1.
+    For each eligible gene, walks its chromosome path across species and
+    extracts maximal contiguous sub-paths where all consecutive edges are
+    significant associations. Only chains supported by real genes are returned.
 
     Args:
         pairwise_associations: List of significant PairwiseAssociation objects
+        species_busco: Ordered list of (species_name, busco_data) tuples
 
     Returns:
         List of chains sorted deterministically, where each chain is a list
         of (species, chromosome) tuples in species order.
     """
-    if not pairwise_associations:
+    if not pairwise_associations or not species_busco:
         return []
 
-    outgoing: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(list)
-    has_incoming: Set[Tuple[str, str]] = set()
-
+    sig_edges: Set[Tuple[Tuple[str, str], Tuple[str, str]]] = set()
     for assoc in pairwise_associations:
-        src = (assoc.species1, assoc.chr1)
-        dst = (assoc.species2, assoc.chr2)
-        outgoing[src].append(dst)
-        has_incoming.add(dst)
+        sig_edges.add(((assoc.species1, assoc.chr1), (assoc.species2, assoc.chr2)))
 
-    for successors in outgoing.values():
-        successors.sort()
+    eligible = _eligible_genes(species_busco)
 
-    roots = sorted(set(outgoing) - has_incoming)
+    observed_chains: Set[Tuple[Tuple[str, str], ...]] = set()
 
-    chains: List[List[Tuple[str, str]]] = []
+    for gene_id in eligible:
+        gene_chroms: Dict[int, Tuple[str, str]] = {}
+        for pos, (sp_name, busco_data) in enumerate(species_busco):
+            if gene_id in busco_data:
+                gene_chroms[pos] = (sp_name, busco_data[gene_id].chromosome)
 
-    def dfs(node: Tuple[str, str], path: List[Tuple[str, str]]) -> None:
-        successors = outgoing.get(node)
-        if not successors:
-            chains.append(list(path))
-            return
-        for succ in successors:
-            path.append(succ)
-            dfs(succ, path)
-            path.pop()
+        current_path: List[Tuple[str, str]] = []
+        last_pos = -1
 
-    for root in roots:
-        dfs(root, [root])
+        for pos in range(len(species_busco)):
+            if pos not in gene_chroms:
+                if len(current_path) >= 2:
+                    observed_chains.add(tuple(current_path))
+                current_path = []
+                last_pos = -1
+                continue
 
-    chains.sort()
+            node = gene_chroms[pos]
+
+            if not current_path:
+                current_path = [node]
+                last_pos = pos
+                continue
+
+            if pos == last_pos + 1 and (gene_chroms[last_pos], node) in sig_edges:
+                current_path.append(node)
+                last_pos = pos
+            else:
+                if len(current_path) >= 2:
+                    observed_chains.add(tuple(current_path))
+                current_path = [node]
+                last_pos = pos
+
+        if len(current_path) >= 2:
+            observed_chains.add(tuple(current_path))
+
+    chains = [list(chain) for chain in sorted(observed_chains)]
     return chains
 
 
@@ -84,9 +113,7 @@ def build_gene_chain_mapping(
         {species_index[sp]: chrom for sp, chrom in chain} for chain in chains
     ]
 
-    eligible = set()
-    for i in range(len(species_busco) - 1):
-        eligible |= species_busco[i][1].keys() & species_busco[i + 1][1].keys()
+    eligible = _eligible_genes(species_busco)
 
     gene_mapping: Dict[str, int] = {}
     chain_counts: Dict[int, int] = defaultdict(int)

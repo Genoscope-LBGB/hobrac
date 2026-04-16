@@ -150,7 +150,7 @@ def detect_algs_transitive(
                 all_associations.extend(significant)
             all_chromosome_associations.extend(tested)
 
-    chains = enumerate_chains(all_associations)
+    chains = enumerate_chains(all_associations, species_busco)
     gene_to_chain = build_gene_chain_mapping(species_busco, chains)
 
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
