@@ -38,12 +38,15 @@ def test_custom_colors_gated_by_chain():
         "gene_nonsig_custom": "#0000ff",
     }
 
+    chains = [[("sp1", "chr1"), ("sp2", "chrA")]]
+
     result = apply_custom_colors_with_algs(
         species1_busco,
         species2_busco,
         gene_to_chain,
         chain_colors,
         custom_colors,
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
 
     # On chain + in custom file → custom color
@@ -60,7 +63,10 @@ def test_excludes_non_common_genes():
     species1_busco = {"common": _gene("chr1"), "only_sp1": _gene("chr1")}
     species2_busco = {"common": _gene("chrA"), "only_sp2": _gene("chrA")}
 
-    result = apply_custom_colors_with_algs(species1_busco, species2_busco, {}, {}, {})
+    result = apply_custom_colors_with_algs(
+        species1_busco, species2_busco, {}, {}, {},
+        chains=[], sp1_name="sp1", sp2_name="sp2",
+    )
 
     assert "common" in result
     assert "only_sp1" not in result
@@ -78,6 +84,7 @@ def test_gene_not_in_gene_to_chain_falls_to_lightgrey():
         {},  # no gene_to_chain mapping
         {},
         {},
+        chains=[], sp1_name="sp1", sp2_name="sp2",
     )
 
     assert result["gene1"] == "lightgrey"

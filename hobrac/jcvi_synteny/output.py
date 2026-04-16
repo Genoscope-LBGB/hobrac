@@ -329,8 +329,9 @@ def run(
     all_chromosome_associations: List[ChromosomeAssociation] = []
     gene_to_chain: Dict[str, int] = {}
     chain_colors: Dict[int, str] = {}
+    chains: List[List[Tuple[str, str]]] = []
     if not (custom_colors and skip_alg):
-        _, _, gene_to_chain, chain_colors, all_chromosome_associations = (
+        _, chains, gene_to_chain, chain_colors, all_chromosome_associations = (
             detect_algs_transitive(species_busco, alpha=alpha)
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
@@ -350,6 +351,9 @@ def run(
                 gene_to_chain,
                 chain_colors,
                 custom_colors,
+                chains=chains,
+                sp1_name=sp1_name,
+                sp2_name=sp2_name,
             )
 
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")

@@ -64,23 +64,26 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         sp2 = {"g1": _gene("chrA"), "g2": _gene("chrC")}
         gene_to_chain = {"g1": 0, "g2": -1}
         chain_colors = {0: "#ff0000"}
-        return sp1, sp2, gene_to_chain, chain_colors
+        chains = [[("sp1", "chr1"), ("sp2", "chrA")]]
+        return sp1, sp2, gene_to_chain, chain_colors, chains
 
     def test_empty_custom_colors_gives_chain_colors(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
+        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {}
+            sp1, sp2, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
         assert result["g1"] == chain_colors[0]
 
     def test_all_genes_in_custom(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
+        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
             sp1,
             sp2,
             gene_to_chain,
             chain_colors,
             {"g1": "#00ff00", "g2": "#0000ff"},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
         # Custom colors are gated by chain membership: g1 is on a chain and
         # listed → custom; g2 is off-chain → lightgrey even though listed.
@@ -88,12 +91,38 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         assert result["g2"] == "lightgrey"
 
     def test_no_genes_in_custom(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors = chain_fixture
+        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {}
+            sp1, sp2, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
         assert result["g1"] == "#ff0000"
         assert result["g2"] == "lightgrey"
+
+    def test_gene_grey_when_chain_does_not_cover_pair(self):
+        """A gene on chain [(B,B1),(C,C1)] must be lightgrey in the A-B pair
+        because the chain does not cover the A→B edge."""
+        sp_a = {"g1": _gene("A1")}
+        sp_b = {"g1": _gene("B1")}
+        sp_c = {"g1": _gene("C1")}
+        # Chain only covers B→C, not A→B
+        chains = [[("B", "B1"), ("C", "C1")]]
+        gene_to_chain = {"g1": 0}
+        chain_colors = {0: "#ff0000"}
+
+        # A-B pair: chain doesn't cover this edge → lightgrey
+        colors_ab = apply_custom_colors_with_algs(
+            sp_a, sp_b, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="A", sp2_name="B",
+        )
+        assert colors_ab["g1"] == "lightgrey"
+
+        # B-C pair: chain covers this edge → colored
+        colors_bc = apply_custom_colors_with_algs(
+            sp_b, sp_c, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="B", sp2_name="C",
+        )
+        assert colors_bc["g1"] == "#ff0000"
 
 
 class TestGenerateLinksHideNonSignificant:
@@ -830,7 +859,9 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = branching_pairwise
 
-        _, _, gene_to_chain, chain_colors, _ = detect_algs_transitive(branching_species)
+        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
+            branching_species
+        )
 
         assert gene_to_chain["g_b1"] != gene_to_chain["g_b2"]
         assert gene_to_chain["g_b1"] >= 0
@@ -840,7 +871,8 @@ class TestThreeSpeciesIntegration:
         sp1_busco = branching_species[0][1]
         sp2_busco = branching_species[1][1]
         colors_ab = apply_custom_colors_with_algs(
-            sp1_busco, sp2_busco, gene_to_chain, chain_colors, {}
+            sp1_busco, sp2_busco, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
         assert colors_ab["g_b1"] != colors_ab["g_b2"]
         assert colors_ab["g_b1"] != "lightgrey"
@@ -853,13 +885,17 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = linear_pairwise
 
-        _, _, gene_to_chain, chain_colors, _ = detect_algs_transitive(linear_species)
+        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
+            linear_species
+        )
 
         colors_ab = apply_custom_colors_with_algs(
-            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors, {}
+            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
         colors_bc = apply_custom_colors_with_algs(
-            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors, {}
+            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp2", sp2_name="sp3",
         )
 
         assert colors_ab["g_sig"] == colors_bc["g_sig"]
@@ -871,14 +907,17 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = linear_pairwise
 
-        _, _, gene_to_chain, chain_colors, _ = detect_algs_transitive(linear_species)
+        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
+            linear_species
+        )
 
         custom = {"g_sig": "#00ff00"}
         sp1_busco = linear_species[0][1]
         sp2_busco = linear_species[1][1]
 
         colors = apply_custom_colors_with_algs(
-            sp1_busco, sp2_busco, gene_to_chain, chain_colors, custom
+            sp1_busco, sp2_busco, gene_to_chain, chain_colors, custom,
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
 
         assert colors["g_sig"] == "#00ff00"
@@ -915,7 +954,8 @@ class TestTwoSpeciesBackwardCompat:
         )
 
         colors = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {}
+            sp1, sp2, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="sp1", sp2_name="sp2",
         )
 
         assert colors["g1"] == colors["g3"]
