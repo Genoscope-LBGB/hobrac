@@ -516,6 +516,24 @@ class TestEnumerateChains:
         assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
         assert [("A", "A1"), ("B", "B2"), ("C", "C2")] in chains
 
+    def test_subchain_removed_when_longer_chain_exists(self):
+        """A gene breaking at a non-significant edge should not create a
+        sub-chain that lets unrelated genes match."""
+        assocs = [
+            _assoc("A", "B", "A1", "B2"),
+            _assoc("B", "C", "B2", "C4"),
+        ]
+        # g1 walks A1→B2 (sig) → C4 (sig) → full chain
+        # g2 walks A1→B2 (sig) → C3 (NOT sig) → would emit sub-chain [(A,A1),(B,B2)]
+        # That sub-chain is a prefix of the full chain and must be dropped.
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
+            ("B", {"g1": _gene("B2"), "g2": _gene("B2")}),
+            ("C", {"g1": _gene("C4"), "g2": _gene("C3")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
+        assert chains == [[("A", "A1"), ("B", "B2"), ("C", "C4")]]
+
     def test_cross_product_pruned_by_gene_evidence(self):
         """Shared node B2 should NOT produce cartesian product of chains."""
         assocs = [

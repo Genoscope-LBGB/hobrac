@@ -81,7 +81,28 @@ def enumerate_chains(
         if len(current_path) >= 2:
             observed_chains.add(tuple(current_path))
 
-    chains = [list(chain) for chain in sorted(observed_chains)]
+    # Remove sub-chains that are contiguous sub-paths of longer chains.
+    # A gene walk can emit a fragment (e.g. [(A,chr1),(B,chr2)]) that is a
+    # prefix/suffix/interior of a longer chain produced by another gene.
+    # Keeping both would let genes match the shorter chain even when they
+    # diverge from the longer one at positions the short chain doesn't cover.
+    filtered: Set[Tuple[Tuple[str, str], ...]] = set()
+    for chain in observed_chains:
+        is_subchain = False
+        for other in observed_chains:
+            if len(other) <= len(chain):
+                continue
+            # Check if chain appears as a contiguous subsequence of other
+            for start in range(len(other) - len(chain) + 1):
+                if other[start : start + len(chain)] == chain:
+                    is_subchain = True
+                    break
+            if is_subchain:
+                break
+        if not is_subchain:
+            filtered.add(chain)
+
+    chains = [list(chain) for chain in sorted(filtered)]
     return chains
 
 
