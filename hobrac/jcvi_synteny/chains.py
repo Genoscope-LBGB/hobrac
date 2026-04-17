@@ -14,36 +14,28 @@ def _eligible_genes(
     return eligible
 
 
-def enumerate_chains(
+def _walk_chain_counts(
     pairwise_associations: List[PairwiseAssociation],
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
-) -> List[List[Tuple[str, str]]]:
+) -> Dict[Tuple[Tuple[str, str], ...], int]:
     """
-    Enumerate chromosome chains using gene-level evidence to determine which
-    paths through significant associations actually exist.
+    Walk each eligible gene through species and count maximal contiguous
+    paths of significant edges. Return a mapping from chain tuple to the
+    number of distinct genes whose maximal walk produced that exact chain.
 
-    For each eligible gene, walks its chromosome path across species and
-    extracts maximal contiguous sub-paths where all consecutive edges are
-    significant associations. Only chains supported by real genes are returned.
-
-    Args:
-        pairwise_associations: List of significant PairwiseAssociation objects
-        species_busco: Ordered list of (species_name, busco_data) tuples
-
-    Returns:
-        List of chains sorted deterministically, where each chain is a list
-        of (species, chromosome) tuples in species order.
+    A gene contributes to a chain only when the chain equals (not merely
+    contains) one of its maximal walks. Genes whose walks are strictly
+    shorter do not contribute to longer chains' counts.
     """
     if not pairwise_associations or not species_busco:
-        return []
+        return {}
 
     sig_edges: Set[Tuple[Tuple[str, str], Tuple[str, str]]] = set()
     for assoc in pairwise_associations:
         sig_edges.add(((assoc.species1, assoc.chr1), (assoc.species2, assoc.chr2)))
 
     eligible = _eligible_genes(species_busco)
-
-    observed_chains: Set[Tuple[Tuple[str, str], ...]] = set()
+    chain_counts: Dict[Tuple[Tuple[str, str], ...], int] = defaultdict(int)
 
     for gene_id in eligible:
         gene_chroms: Dict[int, Tuple[str, str]] = {}
@@ -57,7 +49,7 @@ def enumerate_chains(
         for pos in range(len(species_busco)):
             if pos not in gene_chroms:
                 if len(current_path) >= 2:
-                    observed_chains.add(tuple(current_path))
+                    chain_counts[tuple(current_path)] += 1
                 current_path = []
                 last_pos = -1
                 continue
@@ -74,25 +66,67 @@ def enumerate_chains(
                 last_pos = pos
             else:
                 if len(current_path) >= 2:
-                    observed_chains.add(tuple(current_path))
+                    chain_counts[tuple(current_path)] += 1
                 current_path = [node]
                 last_pos = pos
 
         if len(current_path) >= 2:
-            observed_chains.add(tuple(current_path))
+            chain_counts[tuple(current_path)] += 1
 
-    # Remove sub-chains that are contiguous sub-paths of longer chains.
-    # A gene walk can emit a fragment (e.g. [(A,chr1),(B,chr2)]) that is a
-    # prefix/suffix/interior of a longer chain produced by another gene.
-    # Keeping both would let genes match the shorter chain even when they
-    # diverge from the longer one at positions the short chain doesn't cover.
+    return chain_counts
+
+
+def enumerate_chains(
+    pairwise_associations: List[PairwiseAssociation],
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+    min_chain_genes: int = 0,
+) -> List[List[Tuple[str, str]]]:
+    """
+    Enumerate chromosome chains using gene-level evidence to determine which
+    paths through significant associations actually exist.
+
+    For each eligible gene, walks its chromosome path across species and
+    extracts maximal contiguous sub-paths where all consecutive edges are
+    significant associations. Only chains supported by real genes are returned.
+
+    Args:
+        pairwise_associations: List of significant PairwiseAssociation objects
+        species_busco: Ordered list of (species_name, busco_data) tuples
+        min_chain_genes: Drop chains whose maximal-walk support is strictly
+            below this threshold before sub-chain pruning. Support is the
+            number of distinct genes whose maximal walk equals the chain
+            exactly — distinct from the partial-match count used by
+            :func:`build_gene_chain_mapping`. Default 0 (keep every chain).
+
+    Returns:
+        List of chains sorted deterministically, where each chain is a list
+        of (species, chromosome) tuples in species order.
+    """
+    chain_counts = _walk_chain_counts(pairwise_associations, species_busco)
+    surviving = {
+        chain for chain, count in chain_counts.items() if count >= min_chain_genes
+    }
+    surviving = _prune_subchains(surviving)
+    return [list(chain) for chain in sorted(surviving)]
+
+
+def _prune_subchains(
+    chains: Set[Tuple[Tuple[str, str], ...]],
+) -> Set[Tuple[Tuple[str, str], ...]]:
+    """
+    Remove chains that are contiguous sub-paths of longer chains.
+
+    A gene walk can emit a fragment (e.g. [(A,chr1),(B,chr2)]) that is a
+    prefix/suffix/interior of a longer chain produced by another gene.
+    Keeping both would let genes match the shorter chain even when they
+    diverge from the longer one at positions the short chain doesn't cover.
+    """
     filtered: Set[Tuple[Tuple[str, str], ...]] = set()
-    for chain in observed_chains:
+    for chain in chains:
         is_subchain = False
-        for other in observed_chains:
+        for other in chains:
             if len(other) <= len(chain):
                 continue
-            # Check if chain appears as a contiguous subsequence of other
             for start in range(len(other) - len(chain) + 1):
                 if other[start : start + len(chain)] == chain:
                     is_subchain = True
@@ -101,9 +135,7 @@ def enumerate_chains(
                 break
         if not is_subchain:
             filtered.add(chain)
-
-    chains = [list(chain) for chain in sorted(filtered)]
-    return chains
+    return filtered
 
 
 def build_gene_chain_mapping(

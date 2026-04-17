@@ -707,7 +707,7 @@ class TestDetectAlgsTransitive:
         )
 
         assocs, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2)]
+            [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
         )
 
         assert len(assocs) == 2
@@ -730,7 +730,7 @@ class TestDetectAlgsTransitive:
             [],
         )
 
-        _, _, _, chain_colors, _ = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)])
+        _, _, _, chain_colors, _ = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)], min_chain_genes=1)
 
         for chain_id, color in chain_colors.items():
             assert color == ALG_PALETTE[chain_id % len(ALG_PALETTE)]
@@ -753,7 +753,7 @@ class TestDetectAlgsTransitive:
         ]
 
         _, _, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)]
+            [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)], min_chain_genes=1
         )
 
         assert gene_to_chain["g1"] != gene_to_chain["g2"]
@@ -766,7 +766,7 @@ class TestDetectAlgsTransitive:
         mock_pairwise.return_value = ([], [])
 
         assocs, chains, gene_to_chain, chain_colors, chr_assocs = (
-            detect_algs_transitive([("sp1", sp1), ("sp2", sp2)])
+            detect_algs_transitive([("sp1", sp1), ("sp2", sp2)], min_chain_genes=1)
         )
 
         assert assocs == []
@@ -860,7 +860,7 @@ class TestThreeSpeciesIntegration:
         mock_pairwise.side_effect = branching_pairwise
 
         _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            branching_species
+            branching_species, min_chain_genes=1
         )
 
         assert gene_to_chain["g_b1"] != gene_to_chain["g_b2"]
@@ -886,7 +886,7 @@ class TestThreeSpeciesIntegration:
         mock_pairwise.side_effect = linear_pairwise
 
         _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            linear_species
+            linear_species, min_chain_genes=1
         )
 
         colors_ab = apply_custom_colors_with_algs(
@@ -908,7 +908,7 @@ class TestThreeSpeciesIntegration:
         mock_pairwise.side_effect = linear_pairwise
 
         _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            linear_species
+            linear_species, min_chain_genes=1
         )
 
         custom = {"g_sig": "#00ff00"}
@@ -950,7 +950,7 @@ class TestTwoSpeciesBackwardCompat:
         )
 
         _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2)]
+            [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
         )
 
         colors = apply_custom_colors_with_algs(

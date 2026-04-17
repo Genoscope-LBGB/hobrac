@@ -257,6 +257,7 @@ def run(
     hide_non_significant: bool = False,
     skip_alg: bool = False,
     alpha: float = 0.01,
+    min_chain_genes: int = 5,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -280,6 +281,9 @@ def run(
                               without significant associations.
         skip_alg: If True, skip ALG statistical testing when using custom
                   colors. Only effective with custom_color_file.
+        min_chain_genes: Minimum BUSCO genes a chain must be supported by.
+                         Chains with fewer supporting genes are dropped before
+                         sub-chain pruning.
 
     Returns:
         Dictionary with paths to generated files
@@ -370,7 +374,9 @@ def run(
     chains: List[List[Tuple[str, str]]] = []
     if not (custom_colors and skip_alg):
         _, chains, gene_to_chain, chain_colors, all_chromosome_associations = (
-            detect_algs_transitive(species_busco, alpha=alpha)
+            detect_algs_transitive(
+                species_busco, alpha=alpha, min_chain_genes=min_chain_genes
+            )
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
 
@@ -502,6 +508,15 @@ def main():
         help="Significance threshold (alpha) for Fisher's exact test in ALG "
         "detection (default: 0.01).",
     )
+    parser.add_argument(
+        "--jcvi-min-chain-genes",
+        type=int,
+        default=5,
+        help="Minimum BUSCO genes a chromosome chain must be supported by. "
+        "Chains with fewer genes are dropped before sub-chain pruning, so "
+        "sub-chains hidden inside a dropped long chain can re-emerge "
+        "(default: 5).",
+    )
 
     args = parser.parse_args()
 
@@ -519,6 +534,7 @@ def main():
         hide_non_significant=args.hide_non_significant,
         skip_alg=args.skip_alg,
         alpha=args.jcvi_pvalue,
+        min_chain_genes=args.jcvi_min_chain_genes,
     )
 
 

@@ -273,6 +273,19 @@ def get_args():
         default=0.01,
         type=float,
     )
+    optional_args.add_argument(
+        "--jcvi-min-chain-genes",
+        action="store",
+        dest="jcvi_min_chain_genes",
+        help=(
+            "Minimum BUSCO genes a chromosome chain must be supported by to"
+            " appear in the final output. Chains with fewer genes are dropped"
+            " before sub-chain pruning, so sub-chains hidden inside a dropped"
+            " long chain can re-emerge."
+        ),
+        default=5,
+        type=int,
+    )
 
     args = parser.parse_args()
 

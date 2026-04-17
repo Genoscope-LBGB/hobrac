@@ -228,6 +228,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"busco_runtime={args.busco_runtime * 60} "
     cmd += f"min_busco_genes={args.min_busco_genes} "
     cmd += f"jcvi_pvalue={args.jcvi_pvalue} "
+    cmd += f"jcvi_min_chain_genes={args.jcvi_min_chain_genes} "
 
     if args.jcvi_custom_colors:
         cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
