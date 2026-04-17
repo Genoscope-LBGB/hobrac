@@ -113,6 +113,7 @@ def detect_algs_transitive(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
     alpha: float = 0.01,
     min_genes: int = 5,
+    min_chain_genes: int = 5,
 ) -> Tuple[
     List[PairwiseAssociation],
     List[List[Tuple[str, str]]],
@@ -128,6 +129,10 @@ def detect_algs_transitive(
         species_busco: List of (species_name, busco_data) tuples
         alpha: Significance level before correction
         min_genes: Minimum genes in a chr pair to test
+        min_chain_genes: Minimum BUSCO genes a chain must be supported by to
+            survive. Chains with fewer genes are dropped before sub-chain
+            pruning, so sub-chains contained in a dropped chain can
+            re-emerge. Default 5.
 
     Returns:
         Tuple of:
@@ -150,9 +155,11 @@ def detect_algs_transitive(
                 all_associations.extend(significant)
             all_chromosome_associations.extend(tested)
 
-    chains = enumerate_chains(all_associations)
-    gene_to_chain = build_gene_chain_mapping(species_busco, chains)
+    chains = enumerate_chains(
+        all_associations, species_busco, min_chain_genes=min_chain_genes
+    )
 
+    gene_to_chain = build_gene_chain_mapping(species_busco, chains)
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
 
     return (

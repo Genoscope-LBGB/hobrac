@@ -2,17 +2,7 @@
 HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.5"
 
 
-include: "rules/mash.smk"
-include: "rules/references.smk"
-include: "rules/busco.smk"
-include: "rules/aln.smk"
-include: "rules/jcvi.smk"
-
-
-def get_targets(wildcards):
-    if config.get("stop_after_mash", False):
-        return ["mash/mash.dist"]
-
+def get_pipeline_targets(wildcards):
     checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
 
     accessions = []
@@ -32,6 +22,20 @@ def get_targets(wildcards):
     targets.append("aln/jcvi_karyotype/karyotype.png")
 
     return targets
+
+
+def get_targets(wildcards):
+    if config.get("stop_after_mash", False):
+        return ["mash/mash.dist"]
+
+    return get_pipeline_targets(wildcards) + ["aln/cleanup.done"]
+
+
+include: "rules/mash.smk"
+include: "rules/references.smk"
+include: "rules/busco.smk"
+include: "rules/aln.smk"
+include: "rules/jcvi.smk"
 
 
 rule all:

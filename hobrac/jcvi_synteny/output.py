@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
@@ -204,6 +205,43 @@ def save_chromosome_associations(
             )
 
 
+def save_chains(
+    chains: List[List[Tuple[str, str]]],
+    chain_colors: Dict[int, str],
+    gene_to_chain: Dict[str, int],
+    species_names: List[str],
+    output_path: str,
+) -> None:
+    """
+    Save chromosome chains to a TSV file in wide format.
+
+    One row per chain. Columns: chain_id, color (palette hex), n_genes,
+    then one column per species containing the chromosome covered by that
+    chain, or '-' when the chain does not cover that species. Species
+    columns appear in *species_names* order.
+
+    The file is always written, even when *chains* is empty — in that case
+    only the header row is emitted.
+    """
+    gene_counts: Dict[int, int] = defaultdict(int)
+    for chain_id in gene_to_chain.values():
+        if chain_id >= 0:
+            gene_counts[chain_id] += 1
+
+    header = ["chain_id", "color", "n_genes", *species_names]
+    with open(output_path, "w") as f:
+        f.write("\t".join(header) + "\n")
+        for chain_id, chain in enumerate(chains):
+            chrom_by_species = {sp: chrom for sp, chrom in chain}
+            row = [
+                str(chain_id),
+                chain_colors[chain_id],
+                str(gene_counts[chain_id]),
+                *(chrom_by_species.get(sp, "-") for sp in species_names),
+            ]
+            f.write("\t".join(row) + "\n")
+
+
 def run(
     assembly_busco: str,
     assembly_fasta: str,
@@ -219,6 +257,7 @@ def run(
     hide_non_significant: bool = False,
     skip_alg: bool = False,
     alpha: float = 0.01,
+    min_chain_genes: int = 5,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -242,6 +281,9 @@ def run(
                               without significant associations.
         skip_alg: If True, skip ALG statistical testing when using custom
                   colors. Only effective with custom_color_file.
+        min_chain_genes: Minimum BUSCO genes a chain must be supported by.
+                         Chains with fewer supporting genes are dropped before
+                         sub-chain pruning.
 
     Returns:
         Dictionary with paths to generated files
@@ -329,11 +371,23 @@ def run(
     all_chromosome_associations: List[ChromosomeAssociation] = []
     gene_to_chain: Dict[str, int] = {}
     chain_colors: Dict[int, str] = {}
+    chains: List[List[Tuple[str, str]]] = []
     if not (custom_colors and skip_alg):
-        _, _, gene_to_chain, chain_colors, all_chromosome_associations = (
-            detect_algs_transitive(species_busco, alpha=alpha)
+        _, chains, gene_to_chain, chain_colors, all_chromosome_associations = (
+            detect_algs_transitive(
+                species_busco, alpha=alpha, min_chain_genes=min_chain_genes
+            )
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
+
+    algs_output = os.path.join(output_dir, "algs.tsv")
+    save_chains(
+        chains,
+        chain_colors,
+        gene_to_chain,
+        [name for name, _ in species_busco],
+        algs_output,
+    )
 
     # Phase 2: Generate outputs for each pair
     links_files = []
@@ -350,6 +404,9 @@ def run(
                 gene_to_chain,
                 chain_colors,
                 custom_colors,
+                chains=chains,
+                sp1_name=sp1_name,
+                sp2_name=sp2_name,
             )
 
         links_path = os.path.join(output_dir, f"links.{sp1_name}.{sp2_name}.simple")
@@ -376,6 +433,7 @@ def run(
         "seqids": seqids_path,
         "layouts": layouts_path,
         "chromosome_associations": associations_output,
+        "algs": algs_output,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
@@ -450,6 +508,15 @@ def main():
         help="Significance threshold (alpha) for Fisher's exact test in ALG "
         "detection (default: 0.01).",
     )
+    parser.add_argument(
+        "--jcvi-min-chain-genes",
+        type=int,
+        default=5,
+        help="Minimum BUSCO genes a chromosome chain must be supported by. "
+        "Chains with fewer genes are dropped before sub-chain pruning, so "
+        "sub-chains hidden inside a dropped long chain can re-emerge "
+        "(default: 5).",
+    )
 
     args = parser.parse_args()
 
@@ -467,6 +534,7 @@ def main():
         hide_non_significant=args.hide_non_significant,
         skip_alg=args.skip_alg,
         alpha=args.jcvi_pvalue,
+        min_chain_genes=args.jcvi_min_chain_genes,
     )
 
 

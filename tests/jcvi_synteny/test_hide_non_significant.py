@@ -41,12 +41,16 @@ def chain_data(species_busco):
     sp1, sp2 = species_busco
     gene_to_chain = {
         "sig_gene1": 0,
-        "sig_gene2": 0,
+        "sig_gene2": 1,
         "nonsig_gene1": -1,
         "nonsig_gene2": -1,
     }
-    chain_colors = {0: "#ff0000"}
-    return gene_to_chain, chain_colors
+    chain_colors = {0: "#ff0000", 1: "#ff0000"}
+    chains = [
+        [("sp1", "chr1"), ("sp2", "chrA")],
+        [("sp1", "chr2"), ("sp2", "chrB")],
+    ]
+    return gene_to_chain, chain_colors, chains
 
 
 @pytest.fixture
@@ -92,10 +96,11 @@ def _write_links(sp1_busco, sp2_busco, gene_colors, hide):
 # Row 1: No custom_colors, hide=False → all links shown, non-sig in lightgrey
 def test_no_custom_hide_false(species_busco, chain_data):
     sp1, sp2 = species_busco
-    gene_to_chain, chain_colors = chain_data
+    gene_to_chain, chain_colors, chains = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1, sp2, gene_to_chain, chain_colors, {}
+        sp1, sp2, gene_to_chain, chain_colors, {},
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=False)
 
@@ -108,10 +113,11 @@ def test_no_custom_hide_false(species_busco, chain_data):
 # Row 2: No custom_colors, hide=True → only ALG-significant links shown
 def test_no_custom_hide_true(species_busco, chain_data):
     sp1, sp2 = species_busco
-    gene_to_chain, chain_colors = chain_data
+    gene_to_chain, chain_colors, chains = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1, sp2, gene_to_chain, chain_colors, {}
+        sp1, sp2, gene_to_chain, chain_colors, {},
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
@@ -123,10 +129,11 @@ def test_no_custom_hide_true(species_busco, chain_data):
 # Row 3: custom_colors + skip_alg=False + hide=False → all links, sig use custom/ALG
 def test_custom_with_alg_hide_false(species_busco, chain_data, custom_colors):
     sp1, sp2 = species_busco
-    gene_to_chain, chain_colors = chain_data
+    gene_to_chain, chain_colors, chains = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1, sp2, gene_to_chain, chain_colors, custom_colors
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors,
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=False)
 
@@ -140,10 +147,11 @@ def test_custom_with_alg_hide_false(species_busco, chain_data, custom_colors):
 # Row 4: custom_colors + skip_alg=False + hide=True → only significant links
 def test_custom_with_alg_hide_true(species_busco, chain_data, custom_colors):
     sp1, sp2 = species_busco
-    gene_to_chain, chain_colors = chain_data
+    gene_to_chain, chain_colors, chains = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1, sp2, gene_to_chain, chain_colors, custom_colors
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors,
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
@@ -187,10 +195,11 @@ def test_only_on_chain_and_listed_survives_when_hidden(
     species_busco, chain_data, custom_colors
 ):
     sp1, sp2 = species_busco
-    gene_to_chain, chain_colors = chain_data
+    gene_to_chain, chain_colors, chains = chain_data
 
     gene_colors = apply_custom_colors_with_algs(
-        sp1, sp2, gene_to_chain, chain_colors, custom_colors
+        sp1, sp2, gene_to_chain, chain_colors, custom_colors,
+        chains=chains, sp1_name="sp1", sp2_name="sp2",
     )
     lines = _write_links(sp1, sp2, gene_colors, hide=True)
 
