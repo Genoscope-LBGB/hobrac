@@ -170,6 +170,20 @@ rule busco_assembly:
     """
 
 
+rule cleanup_busco_downloads:
+    input:
+        get_pipeline_targets,
+    output:
+        touch("aln/cleanup.done"),
+    resources:
+        mem_mb=1000,
+        runtime=5,
+    shell:
+        """
+        rm -rf busco/busco_downloads
+    """
+
+
 rule busco_to_paf:
     input:
         reference="reference/{accession}.fna",
