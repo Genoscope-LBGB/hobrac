@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
@@ -204,6 +205,43 @@ def save_chromosome_associations(
             )
 
 
+def save_chains(
+    chains: List[List[Tuple[str, str]]],
+    chain_colors: Dict[int, str],
+    gene_to_chain: Dict[str, int],
+    species_names: List[str],
+    output_path: str,
+) -> None:
+    """
+    Save chromosome chains to a TSV file in wide format.
+
+    One row per chain. Columns: chain_id, color (palette hex), n_genes,
+    then one column per species containing the chromosome covered by that
+    chain, or '-' when the chain does not cover that species. Species
+    columns appear in *species_names* order.
+
+    The file is always written, even when *chains* is empty — in that case
+    only the header row is emitted.
+    """
+    gene_counts: Dict[int, int] = defaultdict(int)
+    for chain_id in gene_to_chain.values():
+        if chain_id >= 0:
+            gene_counts[chain_id] += 1
+
+    header = ["chain_id", "color", "n_genes", *species_names]
+    with open(output_path, "w") as f:
+        f.write("\t".join(header) + "\n")
+        for chain_id, chain in enumerate(chains):
+            chrom_by_species = {sp: chrom for sp, chrom in chain}
+            row = [
+                str(chain_id),
+                chain_colors[chain_id],
+                str(gene_counts[chain_id]),
+                *(chrom_by_species.get(sp, "-") for sp in species_names),
+            ]
+            f.write("\t".join(row) + "\n")
+
+
 def run(
     assembly_busco: str,
     assembly_fasta: str,
@@ -336,6 +374,15 @@ def run(
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
 
+    algs_output = os.path.join(output_dir, "algs.tsv")
+    save_chains(
+        chains,
+        chain_colors,
+        gene_to_chain,
+        [name for name, _ in species_busco],
+        algs_output,
+    )
+
     # Phase 2: Generate outputs for each pair
     links_files = []
     for i in range(len(species_busco) - 1):
@@ -380,6 +427,7 @@ def run(
         "seqids": seqids_path,
         "layouts": layouts_path,
         "chromosome_associations": associations_output,
+        "algs": algs_output,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
