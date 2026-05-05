@@ -1,3 +1,4 @@
+import warnings
 from collections import defaultdict
 from typing import Dict
 
@@ -68,6 +69,38 @@ def parse_custom_colors(color_file: str) -> Dict[str, str]:
                 # Skip malformed lines
                 continue
     return custom_colors
+
+
+def parse_custom_algs(color_file: str) -> Dict[str, str]:
+    """
+    Parse ALG labels from a custom color file.
+
+    Color file format (tab or space separated):
+    BUSCO_ID     R,G,B        ALG_NAME
+
+    Args:
+        color_file: Path to custom color file
+
+    Returns:
+        Dictionary mapping BUSCO ID to ALG label from the third column.
+    """
+    custom_algs = {}
+    with open(color_file, "r") as f:
+        for line_number, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) != 3:
+                warnings.warn(
+                    f"{color_file}:{line_number}: expected 3 columns "
+                    f"(BUSCO_ID, R,G,B, ALG_NAME), found {len(parts)}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            if len(parts) >= 3:
+                custom_algs[parts[0]] = parts[2]
+    return custom_algs
 
 
 def read_busco_tsv(file_path: str, min_busco_genes: int = 0) -> Dict[str, BuscoGene]:

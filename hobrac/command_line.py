@@ -233,6 +233,8 @@ def get_args():
             " to determine significance;"
             " use --jcvi-skip-alg to disable it."
             " Genes not in the file will be shown in grey."
+            " The ALG_NAME column is also used for"
+            " rearrangement index calculation."
         ),
         default=None,
         type=os.path.abspath,

@@ -5,7 +5,12 @@ from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
-from .io import parse_custom_colors, read_busco_tsv, read_fasta_sizes
+from .io import (
+    parse_custom_algs,
+    parse_custom_colors,
+    read_busco_tsv,
+    read_fasta_sizes,
+)
 from .models import (
     DEFAULT_COLOR,
     BuscoGene,
@@ -16,6 +21,7 @@ from .ordering import (
     get_chromosome_order_by_gravity,
     get_chromosome_order_by_span,
 )
+from .rearrangement import calculate_rearrangement_indices, save_rearrangement_indices
 from .statistics import detect_algs_transitive
 
 
@@ -295,8 +301,10 @@ def run(
 
     # Load custom colors if provided
     custom_colors = {}
+    custom_algs = {}
     if custom_color_file:
         custom_colors = parse_custom_colors(custom_color_file)
+        custom_algs = parse_custom_algs(custom_color_file)
 
     # Build mapping from accession to BUSCO path
     ref_busco_paths = {}
@@ -355,6 +363,23 @@ def run(
     for name, path in species_order:
         busco_data = read_busco_tsv(path, min_busco_genes)
         species_busco.append((name, busco_data))
+
+    rearrangement_summary = ""
+    rearrangement_by_alg = ""
+    if custom_algs:
+        rearrangement_summary = os.path.join(output_dir, "rearrangement_index.tsv")
+        rearrangement_by_alg = os.path.join(
+            output_dir, "rearrangement_index_by_alg.tsv"
+        )
+        rearrangement_rows = {
+            name: calculate_rearrangement_indices(name, busco_data, custom_algs)
+            for name, busco_data in species_busco
+        }
+        save_rearrangement_indices(
+            rearrangement_rows,
+            rearrangement_summary,
+            rearrangement_by_alg,
+        )
 
     # Generate BED files
     bed_files = []
@@ -434,6 +459,8 @@ def run(
         "layouts": layouts_path,
         "chromosome_associations": associations_output,
         "algs": algs_output,
+        "rearrangement_index": rearrangement_summary,
+        "rearrangement_index_by_alg": rearrangement_by_alg,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
@@ -479,7 +506,9 @@ def main():
         default="",
         help="Path to custom color file (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
         "By default, ALG statistical testing still runs to determine significance; "
-        "use --skip-alg to disable it. Genes not in the file will be shown in grey.",
+        "use --skip-alg to disable it. Genes not in the file will be shown in grey. "
+        "The ALG_NAME column is also used for rearrangement "
+        "index calculation.",
     )
     parser.add_argument(
         "--jcvi-names",
