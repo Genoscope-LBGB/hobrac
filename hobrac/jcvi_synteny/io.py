@@ -38,11 +38,13 @@ def read_fasta_sizes(fasta_path: str) -> Dict[str, int]:
 
 def parse_custom_colors(color_file: str) -> Dict[str, str]:
     """
-    Parse custom color file and convert RGB values to hex colors.
+    Parse custom color file and normalize colors to hex.
 
     Color file format (tab or space separated):
-    BUSCO_ID     R,G,B        ALG_NAME
+    BUSCO_ID     COLOR        ALG_NAME
     10000at6447  141,78,106   A2
+    10001at6447  #8d4e6a     A2
+    10002at6447  8d4e6a      A2
 
     Args:
         color_file: Path to the custom color file
@@ -60,15 +62,28 @@ def parse_custom_colors(color_file: str) -> Dict[str, str]:
             if len(parts) < 2:
                 continue
             busco_id = parts[0]
-            rgb_str = parts[1]
-            try:
-                r, g, b = map(int, rgb_str.split(","))
-                hex_color = f"#{r:02x}{g:02x}{b:02x}"
-                custom_colors[busco_id] = hex_color
-            except (ValueError, IndexError):
-                # Skip malformed lines
-                continue
+            color = _normalize_custom_color(parts[1])
+            if color:
+                custom_colors[busco_id] = color
     return custom_colors
+
+
+def _normalize_custom_color(color: str) -> str:
+    """Return a normalized #rrggbb color, or an empty string if invalid."""
+    if "," in color:
+        try:
+            channels = [int(channel) for channel in color.split(",")]
+        except ValueError:
+            return ""
+        if len(channels) != 3 or any(channel < 0 or channel > 255 for channel in channels):
+            return ""
+        return f"#{channels[0]:02x}{channels[1]:02x}{channels[2]:02x}"
+
+    hex_color = color[1:] if color.startswith("#") else color
+    if len(hex_color) == 6 and all(c in "0123456789abcdefABCDEF" for c in hex_color):
+        return f"#{hex_color.lower()}"
+
+    return ""
 
 
 def parse_custom_algs(color_file: str) -> Dict[str, str]:
@@ -76,7 +91,7 @@ def parse_custom_algs(color_file: str) -> Dict[str, str]:
     Parse ALG labels from a custom color file.
 
     Color file format (tab or space separated):
-    BUSCO_ID     R,G,B        ALG_NAME
+    BUSCO_ID     COLOR        ALG_NAME
 
     Args:
         color_file: Path to custom color file
@@ -94,7 +109,7 @@ def parse_custom_algs(color_file: str) -> Dict[str, str]:
             if len(parts) != 3:
                 warnings.warn(
                     f"{color_file}:{line_number}: expected 3 columns "
-                    f"(BUSCO_ID, R,G,B, ALG_NAME), found {len(parts)}",
+                    f"(BUSCO_ID, COLOR, ALG_NAME), found {len(parts)}",
                     UserWarning,
                     stacklevel=2,
                 )

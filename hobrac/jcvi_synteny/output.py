@@ -504,7 +504,8 @@ def main():
     parser.add_argument(
         "--jcvi-custom-colors",
         default="",
-        help="Path to custom color file (tab-separated: BUSCO_ID, R,G,B, ALG_NAME). "
+        help="Path to custom color file (tab-separated: BUSCO_ID, COLOR, ALG_NAME; "
+        "COLOR may be R,G,B, #rrggbb, or rrggbb). "
         "By default, ALG statistical testing still runs to determine significance; "
         "use --skip-alg to disable it. Genes not in the file will be shown in grey. "
         "The ALG_NAME column is also used for rearrangement "

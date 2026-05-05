@@ -228,7 +228,8 @@ def get_args():
         dest="jcvi_custom_colors",
         help=(
             "Path to custom color file for JCVI synteny plot"
-            " (tab-separated: BUSCO_ID, R,G,B, ALG_NAME)."
+            " (tab-separated: BUSCO_ID, COLOR, ALG_NAME;"
+            " COLOR may be R,G,B, #rrggbb, or rrggbb)."
             " By default, ALG statistical testing still runs"
             " to determine significance;"
             " use --jcvi-skip-alg to disable it."
