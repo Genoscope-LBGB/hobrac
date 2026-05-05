@@ -75,7 +75,9 @@ def _normalize_custom_color(color: str) -> str:
             channels = [int(channel) for channel in color.split(",")]
         except ValueError:
             return ""
-        if len(channels) != 3 or any(channel < 0 or channel > 255 for channel in channels):
+        if len(channels) != 3 or any(
+            channel < 0 or channel > 255 for channel in channels
+        ):
             return ""
         return f"#{channels[0]:02x}{channels[1]:02x}{channels[2]:02x}"
 

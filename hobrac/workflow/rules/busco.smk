@@ -56,26 +56,21 @@ rule get_closest_busco_dataset:
             for line in datasets_file:
                 line = line.strip()
                 line = line.replace(" ", "")
-
                 if not line.startswith("-"):
                     continue
-
                 line = line.replace("-", "")
                 dataset_name = line.split("_odb")[0].lower()
                 dataset_version = line.lower()
                 datasets[dataset_name] = dataset_version.split("[")[0]
-
         with open(input.lineage[0]) as lineage_file, open(output[0], "w") as out:
             lineage = lineage_file.readline()
             lineage_tree = lineage.split(";")
-
             # Iterate in reverse order to get the most-specific dataset
             for rank in lineage_tree[::-1]:
                 rank = rank.lower()
                 if rank in datasets:
                     print(f"{rank}\t{datasets[rank]}", file=out, end="")
                     return
-
         print(
             "WARNING: no matching dataset found, using eukaryota", file=sys.stderr
         )

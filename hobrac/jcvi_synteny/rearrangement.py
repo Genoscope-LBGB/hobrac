@@ -10,7 +10,7 @@ def calculate_rearrangement_indices(
     gene_to_alg: Dict[str, str],
 ) -> List[RearrangementAlgIndex]:
     """
-    Calculate rearrangement index components for one species 
+    Calculate rearrangement index components for one species
     (https://academic.oup.com/mbe/article/41/9/msae172/7733614#483558069).
 
     Only BUSCO genes that are both present in the species and annotated with an
@@ -72,12 +72,8 @@ def summarize_rearrangement_indices(
     n_algs = len(row_list)
     n_genes = sum(row.alg_gene_count for row in row_list)
     rearrangement_index = sum(row.rearrangement_index for row in row_list) / n_algs
-    splitting_index = (
-        sum(1 - row.splitting_parameter for row in row_list) / n_algs
-    )
-    combining_index = (
-        sum(1 - row.combining_parameter for row in row_list) / n_algs
-    )
+    splitting_index = sum(1 - row.splitting_parameter for row in row_list) / n_algs
+    combining_index = sum(1 - row.combining_parameter for row in row_list) / n_algs
     return rearrangement_index, splitting_index, combining_index, n_algs, n_genes
 
 
@@ -97,8 +93,7 @@ def save_rearrangement_indices(
                 species_rows[species]
             )
             f.write(
-                f"{species}\t{ri:.6f}\t{si:.6f}\t{ci:.6f}\t"
-                f"{n_algs}\t{n_genes}\n"
+                f"{species}\t{ri:.6f}\t{si:.6f}\t{ci:.6f}\t" f"{n_algs}\t{n_genes}\n"
             )
 
     with open(by_alg_path, "w") as f:
