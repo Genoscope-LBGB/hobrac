@@ -233,7 +233,9 @@ def get_args():
             " By default, ALG statistical testing still runs"
             " to determine significance;"
             " use --jcvi-skip-alg to disable it."
-            " Genes not in the file will be shown in grey."
+            " Genes not in the file and genes not significantly associated"
+            " (unless --jcvi-skip-alg is used)"
+            " will be shown in grey."
             " The ALG_NAME column is also used for"
             " rearrangement index calculation."
         ),
