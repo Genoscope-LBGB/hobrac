@@ -37,6 +37,21 @@ class ChromosomeAssociation:
     significant: bool
 
 
+@dataclass
+class RearrangementAlgIndex:
+    """Rearrangement index components for one ALG in one species."""
+
+    species: str
+    alg: str
+    best_chromosome: str
+    alg_gene_count: int
+    chromosome_gene_count: int
+    alg_genes_on_best_chromosome: int
+    splitting_parameter: float
+    combining_parameter: float
+    rearrangement_index: float
+
+
 # 37-color palette for ALG visualization
 ALG_PALETTE = [
     "#e6194b",

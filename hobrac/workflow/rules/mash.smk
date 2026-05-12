@@ -73,32 +73,26 @@ checkpoint select_references:
                     accession = os.path.splitext(os.path.basename(path))[0]
                     print(accession, file=out)
             return
-
         candidates = []
         seen_accessions = set()
         with open(input[0]) as mash:
             for line in mash:
                 line = line.rstrip().split("\t")
                 distance = float(line[2])
-
                 taxid = "0"
                 if ":" in line[0]:
                     taxid = line[0].split(":")[1]
                 if not params.allow_same_taxid and str(params.taxid) == str(taxid):
                     continue
-
                 if distance == 0.0 and not params.allow_zero_distance:
                     continue
-
                 accession = line[0].split(":")[0]
                 if accession in seen_accessions:
                     continue
                 seen_accessions.add(accession)
                 candidates.append((distance, accession))
-
         candidates.sort(key=lambda x: x[0])
         selected = candidates[: int(params.ref_count)]
-
         with open(output[0], "w") as out:
             for _, accession in selected:
                 print(accession, file=out)
