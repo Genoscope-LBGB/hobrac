@@ -589,6 +589,62 @@ class TestEnumerateChains:
         assert [("A", "A4"), ("B", "B2"), ("C", "C14")] not in chains
         assert [("A", "A9"), ("B", "B2"), ("C", "C11")] not in chains
 
+    def test_chain_skips_absent_species(self):
+        """Gene absent in middle species should not break the chain."""
+        assocs = [_assoc("A", "C", "A1", "C1")]
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {}),
+            ("C", {"g1": _gene("C1")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
+        assert chains == [[("A", "A1"), ("C", "C1")]]
+
+    def test_order_independence(self):
+        """Same species set, different input order → same chains."""
+        # B has a fragmented genome for this ALG: gene g1 is NOT in B.
+        # A-C and C-D have significant associations.
+        assocs_order1 = [
+            _assoc("A", "B", "A1", "B9"),
+            _assoc("A", "C", "A1", "C1"),
+            _assoc("A", "D", "A1", "D1"),
+            _assoc("B", "C", "B9", "C1"),
+            _assoc("B", "D", "B9", "D1"),
+            _assoc("C", "D", "C1", "D1"),
+        ]
+        busco_order1 = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {}),
+            ("C", {"g1": _gene("C1")}),
+            ("D", {"g1": _gene("D1")}),
+        ]
+
+        # Same species, B moved to second position
+        assocs_order2 = [
+            _assoc("C", "B", "C1", "B9"),
+            _assoc("C", "A", "C1", "A1"),
+            _assoc("C", "D", "C1", "D1"),
+            _assoc("B", "A", "B9", "A1"),
+            _assoc("B", "D", "B9", "D1"),
+            _assoc("A", "D", "A1", "D1"),
+        ]
+        busco_order2 = [
+            ("C", {"g1": _gene("C1")}),
+            ("B", {}),
+            ("A", {"g1": _gene("A1")}),
+            ("D", {"g1": _gene("D1")}),
+        ]
+
+        chains1 = enumerate_chains(assocs_order1, busco_order1)
+        chains2 = enumerate_chains(assocs_order2, busco_order2)
+
+        # Normalize: sort each chain's nodes by species name, then sort chains
+        def normalize(chains):
+            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
+
+        assert normalize(chains1) == normalize(chains2)
+        assert len(chains1) == 1
+
 
 class TestBuildGeneChainMapping:
     def test_exact_match_three_species(self):
