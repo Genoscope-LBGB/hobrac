@@ -233,6 +233,11 @@ def generate_snakemake_command(args) -> str:
     if args.jcvi_custom_colors:
         cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
 
+    if args.jcvi_color_metazoan_alg:
+        cmd += "jcvi_color_scheme='29ALG' "
+    elif args.jcvi_color_bilaterian_alg:
+        cmd += "jcvi_color_scheme='24BILAT' "
+
     if args.jcvi_names:
         cmd += f"jcvi_names='{args.jcvi_names}' "
 

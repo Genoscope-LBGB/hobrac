@@ -222,7 +222,8 @@ def get_args():
         default=30,
         type=int,
     )
-    optional_args.add_argument(
+    color_group = optional_args.add_mutually_exclusive_group()
+    color_group.add_argument(
         "--jcvi-custom-colors",
         action="store",
         dest="jcvi_custom_colors",
@@ -234,13 +235,38 @@ def get_args():
             " to determine significance;"
             " use --jcvi-skip-alg to disable it."
             " Genes not in the file and genes not significantly associated"
-            " (unless --jcvi-skip-alg is used)"
+            " (unless --jcvi-skip-alg is used)"
             " will be shown in grey."
             " The ALG_NAME column is also used for"
             " rearrangement index calculation."
         ),
         default=None,
         type=os.path.abspath,
+    )
+    color_group.add_argument(
+        "--jcvi-color-metazoan-alg",
+        action="store_true",
+        dest="jcvi_color_metazoan_alg",
+        help=(
+            "Use pre-computed 29-ALG color scheme for JCVI synteny plot."
+            " The color file is automatically selected based on the BUSCO"
+            " dataset. If the dataset is not part of the pre-computed set,"
+            " the pipeline falls back to default coloring."
+        ),
+        default=False,
+    )
+    color_group.add_argument(
+        "--jcvi-color-bilaterian-alg",
+        action="store_true",
+        dest="jcvi_color_bilaterian_alg",
+        help=(
+            "Use pre-computed 24-bilaterian-ALG color scheme for JCVI"
+            " synteny plot. The color file is automatically selected"
+            " based on the BUSCO dataset. If the dataset is not part"
+            " of the pre-computed set, the pipeline falls back to"
+            " default coloring."
+        ),
+        default=False,
     )
     optional_args.add_argument(
         "--jcvi-names",
