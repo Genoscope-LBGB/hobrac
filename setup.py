@@ -18,7 +18,7 @@ setuptools.setup(
     ],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    package_data={"hobrac": ["workflow/*", "workflow/rules/*"]},
+    package_data={"hobrac": ["workflow/*", "workflow/rules/*", "colors/*"]},
     install_requires=[
         "snakemake",
         "snakemake-executor-plugin-slurm",
