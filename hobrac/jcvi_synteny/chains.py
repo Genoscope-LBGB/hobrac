@@ -108,12 +108,13 @@ def _prune_subchains(
     chains: Set[Tuple[Tuple[str, str], ...]],
 ) -> Set[Tuple[Tuple[str, str], ...]]:
     """
-    Remove chains that are contiguous sub-paths of longer chains.
+    Remove chains that are subsequences of longer chains.
 
-    A gene walk can emit a fragment (e.g. [(A,chr1),(B,chr2)]) that is a
-    prefix/suffix/interior of a longer chain produced by another gene.
-    Keeping both would let genes match the shorter chain even when they
-    diverge from the longer one at positions the short chain doesn't cover.
+    A gene walk can emit a fragment (e.g. [(A,chr1),(C,chr3)]) that is a
+    subsequence of a longer chain produced by another gene (which also
+    covers species B). Keeping both would let genes match the shorter
+    chain even when they diverge from the longer one at positions the
+    short chain doesn't cover.
     """
     filtered: Set[Tuple[Tuple[str, str], ...]] = set()
     for chain in chains:
@@ -121,11 +122,9 @@ def _prune_subchains(
         for other in chains:
             if len(other) <= len(chain):
                 continue
-            for start in range(len(other) - len(chain) + 1):
-                if other[start : start + len(chain)] == chain:
-                    is_subchain = True
-                    break
-            if is_subchain:
+            it = iter(other)
+            if all(node in it for node in chain):
+                is_subchain = True
                 break
         if not is_subchain:
             filtered.add(chain)
