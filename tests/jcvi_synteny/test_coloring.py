@@ -600,6 +600,24 @@ class TestEnumerateChains:
         chains = enumerate_chains(assocs, species_busco)
         assert chains == [[("A", "A1"), ("C", "C1")]]
 
+    def test_skip_species_subchain_pruned_by_longer(self):
+        """Chain skipping a species must be pruned when a longer chain
+        covering that species exists."""
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("A", "C", "A1", "C1"),
+            _assoc("B", "C", "B1", "C1"),
+        ]
+        # g1 present in all 3 → walks A1→B1→C1 (full chain)
+        # g2 absent from B → walks A1→C1 (subsequence of full chain)
+        species_busco = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C1"), "g2": _gene("C1")}),
+        ]
+        chains = enumerate_chains(assocs, species_busco)
+        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C1")]]
+
     def test_order_independence(self):
         """Same species set, different input order → same chains."""
         # B has a fragmented genome for this ALG: gene g1 is NOT in B.
