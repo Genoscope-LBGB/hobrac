@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 from scipy.stats import fisher_exact
 
-from .chains import build_gene_chain_mapping, enumerate_chains
+from .chains import build_gene_chain_mapping, enumerate_chains, validate_chains
 from .models import (
     ALG_PALETTE,
     BuscoGene,
@@ -114,6 +114,7 @@ def detect_algs_transitive(
     alpha: float = 0.01,
     min_genes: int = 5,
     min_chain_genes: int = 5,
+    permissive_alg: bool = False,
 ) -> Tuple[
     List[PairwiseAssociation],
     List[List[Tuple[str, str]]],
@@ -158,6 +159,14 @@ def detect_algs_transitive(
     chains = enumerate_chains(
         all_associations, species_busco, min_chain_genes=min_chain_genes
     )
+    if all_chromosome_associations:
+        chains = validate_chains(
+            chains,
+            all_chromosome_associations,
+            permissive=permissive_alg,
+            min_chain_genes=min_chain_genes,
+            species_busco=species_busco,
+        )
 
     gene_to_chain = build_gene_chain_mapping(species_busco, chains)
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}

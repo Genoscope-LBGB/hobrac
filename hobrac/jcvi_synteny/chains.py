@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 
-from .models import BuscoGene, PairwiseAssociation
+from .models import BuscoGene, ChromosomeAssociation, PairwiseAssociation
 
 
 def _eligible_genes(
@@ -211,3 +211,123 @@ def _gene_matches_chain(
                 return False
             compared = True
     return compared
+
+
+def _count_matching_genes(
+    chain: List[Tuple[str, str]],
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+    species_index: Dict[str, int],
+    eligible: Set[str],
+) -> int:
+    chain_path = {species_index[sp]: chrom for sp, chrom in chain}
+    count = 0
+    for gene_id in eligible:
+        if _gene_matches_chain(
+            {
+                pos: busco_data[gene_id].chromosome
+                for pos, (_, busco_data) in enumerate(species_busco)
+                if gene_id in busco_data
+            },
+            chain_path,
+        ):
+            count += 1
+    return count
+
+
+def _count_sig_links(
+    node: Tuple[str, str],
+    nodes: List[Tuple[str, str]],
+    sig_pairs: Set[Tuple[Tuple[str, str], Tuple[str, str]]],
+) -> int:
+    return sum(1 for other in nodes if other is not node and (node, other) in sig_pairs)
+
+
+def validate_chains(
+    chains: List[List[Tuple[str, str]]],
+    all_chromosome_associations: List[ChromosomeAssociation],
+    permissive: bool = False,
+    min_chain_genes: int = 0,
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]] = None,
+) -> List[List[Tuple[str, str]]]:
+    """
+    Validate chains by iteratively pruning nodes that lack enough significant
+    links to other surviving nodes. After pruning, remaining contiguous
+    segments of length >= 2 are kept and deduplicated.
+
+    Args:
+        chains: Chains from enumerate_chains
+        all_chromosome_associations: All tested ChromosomeAssociation objects
+            (significant and non-significant) across all species pairs
+        permissive: If True, require only 1 significant link per node.
+            If False (default), require int(n/2) where n is the chain length.
+        min_chain_genes: Drop sub-chains whose gene support is below this
+            threshold (re-checked after splitting).
+        species_busco: Needed when min_chain_genes > 0 to recount gene
+            support on sub-chains.
+
+    Returns:
+        Validated (and possibly split) chains, sorted deterministically.
+    """
+    sig_pairs: Set[Tuple[Tuple[str, str], Tuple[str, str]]] = set()
+    for assoc in all_chromosome_associations:
+        if assoc.significant:
+            a = (assoc.species1, assoc.chr1)
+            b = (assoc.species2, assoc.chr2)
+            sig_pairs.add((a, b))
+            sig_pairs.add((b, a))
+
+    validated: List[List[Tuple[str, str]]] = []
+    for chain in chains:
+        surviving = list(chain)
+        while True:
+            n = len(surviving)
+            if n < 2:
+                break
+            threshold = 1 if permissive else n // 2
+            still_ok = [
+                node
+                for node in surviving
+                if _count_sig_links(node, surviving, sig_pairs) >= threshold
+            ]
+            if len(still_ok) == len(surviving):
+                break
+            surviving = still_ok
+
+        if len(surviving) < 2:
+            continue
+
+        original_indices = [chain.index(node) for node in surviving]
+        segment: List[Tuple[str, str]] = []
+        prev = -2
+        for k, idx in enumerate(original_indices):
+            if idx == prev + 1:
+                segment.append(surviving[k])
+            else:
+                if len(segment) >= 2:
+                    validated.append(segment)
+                segment = [surviving[k]]
+            prev = idx
+        if len(segment) >= 2:
+            validated.append(segment)
+
+    seen: Set[Tuple[Tuple[str, str], ...]] = set()
+    deduped: List[List[Tuple[str, str]]] = []
+    for seg in validated:
+        key = tuple(seg)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(seg)
+    validated = deduped
+
+    if min_chain_genes > 0 and species_busco:
+        species_index = {name: i for i, (name, _) in enumerate(species_busco)}
+        eligible = _eligible_genes(species_busco)
+        validated = [
+            seg
+            for seg in validated
+            if _count_matching_genes(seg, species_busco, species_index, eligible)
+            >= min_chain_genes
+        ]
+
+    validated = [list(c) for c in _prune_subchains({tuple(c) for c in validated})]
+    return sorted(validated)
