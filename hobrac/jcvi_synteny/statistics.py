@@ -152,8 +152,7 @@ def detect_algs_transitive(
             significant, tested = detect_algs_pairwise_raw(
                 sp1_busco, sp2_busco, sp1_name, sp2_name, alpha, min_genes
             )
-            if j == i + 1:
-                all_associations.extend(significant)
+            all_associations.extend(significant)
             all_chromosome_associations.extend(tested)
 
     chains = enumerate_chains(

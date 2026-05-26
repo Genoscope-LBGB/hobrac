@@ -7,11 +7,12 @@ from .models import BuscoGene, ChromosomeAssociation, PairwiseAssociation
 def _eligible_genes(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
 ) -> Set[str]:
-    """Return gene IDs present in at least two consecutive species."""
-    eligible: Set[str] = set()
-    for i in range(len(species_busco) - 1):
-        eligible |= species_busco[i][1].keys() & species_busco[i + 1][1].keys()
-    return eligible
+    """Return gene IDs present in at least two species."""
+    counts: Dict[str, int] = defaultdict(int)
+    for _, busco_data in species_busco:
+        for gene_id in busco_data:
+            counts[gene_id] += 1
+    return {g for g, c in counts.items() if c >= 2}
 
 
 def _walk_chain_counts(
@@ -19,13 +20,10 @@ def _walk_chain_counts(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
 ) -> Dict[Tuple[Tuple[str, str], ...], int]:
     """
-    Walk each eligible gene through species and count maximal contiguous
-    paths of significant edges. Return a mapping from chain tuple to the
-    number of distinct genes whose maximal walk produced that exact chain.
-
-    A gene contributes to a chain only when the chain equals (not merely
-    contains) one of its maximal walks. Genes whose walks are strictly
-    shorter do not contribute to longer chains' counts.
+    Walk each eligible gene through species and count maximal paths of
+    significant edges, skipping species where the gene is absent. Return
+    a mapping from chain tuple to the number of distinct genes whose
+    maximal walk produced that exact chain.
     """
     if not pairwise_associations or not species_busco:
         return {}
@@ -48,10 +46,6 @@ def _walk_chain_counts(
 
         for pos in range(len(species_busco)):
             if pos not in gene_chroms:
-                if len(current_path) >= 2:
-                    chain_counts[tuple(current_path)] += 1
-                current_path = []
-                last_pos = -1
                 continue
 
             node = gene_chroms[pos]
@@ -61,7 +55,7 @@ def _walk_chain_counts(
                 last_pos = pos
                 continue
 
-            if pos == last_pos + 1 and (gene_chroms[last_pos], node) in sig_edges:
+            if (gene_chroms[last_pos], node) in sig_edges:
                 current_path.append(node)
                 last_pos = pos
             else:
