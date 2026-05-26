@@ -264,6 +264,7 @@ def run(
     skip_alg: bool = False,
     alpha: float = 0.01,
     min_chain_genes: int = 5,
+    permissive_alg: bool = False,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -400,7 +401,10 @@ def run(
     if not (custom_colors and skip_alg):
         _, chains, gene_to_chain, chain_colors, all_chromosome_associations = (
             detect_algs_transitive(
-                species_busco, alpha=alpha, min_chain_genes=min_chain_genes
+                species_busco,
+                alpha=alpha,
+                min_chain_genes=min_chain_genes,
+                permissive_alg=permissive_alg,
             )
         )
     save_chromosome_associations(all_chromosome_associations, associations_output)
@@ -547,6 +551,15 @@ def main():
         "sub-chains hidden inside a dropped long chain can re-emerge "
         "(default: 5).",
     )
+    parser.add_argument(
+        "--jcvi-permissive-alg",
+        action="store_true",
+        default=False,
+        help="Use a permissive threshold for chain validation. By default each "
+        "node in a chain of length n must have significant associations "
+        "with at least n/2 other nodes; this flag relaxes the requirement "
+        "to just 1 significant link per node.",
+    )
 
     args = parser.parse_args()
 
@@ -565,6 +578,7 @@ def main():
         skip_alg=args.skip_alg,
         alpha=args.jcvi_pvalue,
         min_chain_genes=args.jcvi_min_chain_genes,
+        permissive_alg=args.jcvi_permissive_alg,
     )
 
 

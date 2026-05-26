@@ -247,6 +247,9 @@ def generate_snakemake_command(args) -> str:
     if args.skip_alg:
         cmd += "skip_alg=True "
 
+    if args.jcvi_permissive_alg:
+        cmd += "jcvi_permissive_alg=True "
+
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
     if getattr(args, "busco_reference_override_path", None):

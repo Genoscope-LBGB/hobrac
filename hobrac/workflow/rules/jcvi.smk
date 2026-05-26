@@ -68,6 +68,7 @@ rule jcvi_synteny:
         skip_alg=config.get("skip_alg", False),
         jcvi_pvalue=config.get("jcvi_pvalue", 0.01),
         jcvi_min_chain_genes=config.get("jcvi_min_chain_genes", 5),
+        jcvi_permissive_alg=config.get("jcvi_permissive_alg", False),
     shell:
         """
         RESOLVED_COLORS=$(cat {input.resolved_colors})
@@ -93,7 +94,8 @@ rule jcvi_synteny:
             $([ -n "$COLOR_ARG" ] && echo "--jcvi-custom-colors $COLOR_ARG") \
             $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}") \
             $([ "{params.hide_non_significant}" = "True" ] && echo "--hide-non-significant") \
-            $([ "{params.skip_alg}" = "True" ] && echo "--skip-alg")
+            $([ "{params.skip_alg}" = "True" ] && echo "--skip-alg") \
+            $([ "{params.jcvi_permissive_alg}" = "True" ] && echo "--jcvi-permissive-alg")
         """
 
 

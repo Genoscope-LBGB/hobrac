@@ -317,6 +317,18 @@ def get_args():
         default=5,
         type=int,
     )
+    optional_args.add_argument(
+        "--jcvi-permissive-alg",
+        action="store_true",
+        dest="jcvi_permissive_alg",
+        help=(
+            "Use a permissive threshold for chain validation. By default each"
+            " node in a chain of length n must have significant associations"
+            " with at least n/2 other nodes; this flag relaxes the requirement"
+            " to just 1 significant link per node."
+        ),
+        default=False,
+    )
 
     args = parser.parse_args()
 
