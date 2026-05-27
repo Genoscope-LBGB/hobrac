@@ -180,7 +180,7 @@ def _prune_subchains(
     chains: Set[Tuple[Tuple[str, str], ...]],
 ) -> Set[Tuple[Tuple[str, str], ...]]:
     """
-    Remove chains that are subsequences of longer chains.
+    Remove chains whose node set is a subset of a longer chain's nodes.
 
     Keeping both would let genes match the shorter chain even when they
     diverge from the longer one at positions the short chain doesn't cover.
@@ -192,10 +192,7 @@ def _prune_subchains(
         for other in chains:
             if len(other) <= len(chain):
                 continue
-            if not chain_sets[chain].issubset(chain_sets[other]):
-                continue
-            it = iter(other)
-            if all(node in it for node in chain):
+            if chain_sets[chain].issubset(chain_sets[other]):
                 is_subchain = True
                 break
         if not is_subchain:
@@ -375,10 +372,10 @@ def validate_chains(
         if len(segment) >= 2:
             validated.append(segment)
 
-    seen: Set[Tuple[Tuple[str, str], ...]] = set()
+    seen: Set[frozenset] = set()
     deduped: List[List[Tuple[str, str]]] = []
     for seg in validated:
-        key = tuple(seg)
+        key = frozenset(seg)
         if key not in seen:
             seen.add(key)
             deduped.append(seg)
