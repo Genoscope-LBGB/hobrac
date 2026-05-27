@@ -124,6 +124,23 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         )
         assert colors_bc["g1"] == "#ff0000"
 
+    def test_chain_covers_pair_canonical_order(self):
+        """Chain in canonical (lex) order must still cover a pair whose
+        species_busco order is non-lex."""
+        sp_z = {"g1": _gene("Z1")}
+        sp_a = {"g1": _gene("A1")}
+        # Chain in canonical order: A before Z
+        chains = [[("A", "A1"), ("Z", "Z1")]]
+        gene_to_chain = {"g1": 0}
+        chain_colors = {0: "#ff0000"}
+
+        # species_busco order is Z, A (non-lex)
+        colors = apply_custom_colors_with_algs(
+            sp_z, sp_a, gene_to_chain, chain_colors, {},
+            chains=chains, sp1_name="Z", sp2_name="A",
+        )
+        assert colors["g1"] == "#ff0000"
+
 
 class TestGenerateLinksHideNonSignificant:
     @pytest.fixture
@@ -662,6 +679,117 @@ class TestEnumerateChains:
 
         assert normalize(chains1) == normalize(chains2)
         assert len(chains1) == 1
+
+    def test_order_independence_partial_edges(self):
+        """Order independence with partial pairwise edges (not all pairs significant)."""
+        # A-B and B-C significant, but A-C NOT significant.
+        # Gene g1 present in A, B, C → should form chain [A,B,C].
+        assocs_order1 = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C1"),
+        ]
+        busco_order1 = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C1")}),
+        ]
+
+        # Reversed species order
+        assocs_order2 = [
+            _assoc("C", "B", "C1", "B1"),
+            _assoc("B", "A", "B1", "A1"),
+        ]
+        busco_order2 = [
+            ("C", {"g1": _gene("C1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("A", {"g1": _gene("A1")}),
+        ]
+
+        chains1 = enumerate_chains(assocs_order1, busco_order1)
+        chains2 = enumerate_chains(assocs_order2, busco_order2)
+
+        def normalize(chains):
+            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
+
+        assert normalize(chains1) == normalize(chains2)
+        assert len(chains1) == 1
+
+    def test_order_independence_four_species_sparse(self):
+        """Order independence with 4 species, only consecutive edges significant."""
+        assocs_fwd = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C1"),
+            _assoc("C", "D", "C1", "D1"),
+        ]
+        busco_fwd = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C1")}),
+            ("D", {"g1": _gene("D1")}),
+        ]
+
+        # Scrambled order: C, A, D, B
+        # Same 3 significant pairs, species1/species2 follow i<j in new order
+        assocs_scrambled = [
+            _assoc("C", "B", "C1", "B1"),
+            _assoc("C", "D", "C1", "D1"),
+            _assoc("A", "B", "A1", "B1"),
+        ]
+        busco_scrambled = [
+            ("C", {"g1": _gene("C1")}),
+            ("A", {"g1": _gene("A1")}),
+            ("D", {"g1": _gene("D1")}),
+            ("B", {"g1": _gene("B1")}),
+        ]
+
+        chains_fwd = enumerate_chains(assocs_fwd, busco_fwd)
+        chains_scr = enumerate_chains(assocs_scrambled, busco_scrambled)
+
+        def normalize(chains):
+            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
+
+        assert normalize(chains_fwd) == normalize(chains_scr)
+        norm = normalize(chains_fwd)
+        assert len(norm) == 1
+        assert norm[0] == [("A", "A1"), ("B", "B1"), ("C", "C1"), ("D", "D1")]
+
+    def test_order_independence_detect_algs_transitive(self):
+        """Full pipeline: detect_algs_transitive gives same chains regardless
+        of species_busco ordering."""
+        busco_order1 = [
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+            ("C", {"g1": _gene("C1"), "g2": _gene("C2")}),
+        ]
+        busco_order2 = [
+            ("C", {"g1": _gene("C1"), "g2": _gene("C2")}),
+            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
+            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+        ]
+
+        _, chains1, mapping1, _, _ = detect_algs_transitive(
+            busco_order1, min_genes=1, min_chain_genes=0
+        )
+        _, chains2, mapping2, _, _ = detect_algs_transitive(
+            busco_order2, min_genes=1, min_chain_genes=0
+        )
+
+        def normalize(chains):
+            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
+
+        assert normalize(chains1) == normalize(chains2)
+        # Gene-to-chain mapping should match (same gene → same chain content)
+        for gene_id in mapping1:
+            if mapping1[gene_id] == -1:
+                assert mapping2[gene_id] == -1
+            else:
+                chain1_nodes = set(
+                    (sp, ch) for sp, ch in chains1[mapping1[gene_id]]
+                )
+                chain2_nodes = set(
+                    (sp, ch) for sp, ch in chains2[mapping2[gene_id]]
+                )
+                assert chain1_nodes == chain2_nodes, f"gene {gene_id} mapped differently"
 
 
 class TestBuildGeneChainMapping:
