@@ -192,6 +192,101 @@ class TestValidateChains:
         result = validate_chains([chain1, chain2], assocs, permissive=True)
         assert result == [[("sp1", "c1"), ("sp2", "c2")]]
 
+    def test_permissive_does_not_bypass_min_chain_genes(self):
+        """Permissive mode relaxes link threshold but min_chain_genes still applies."""
+        chain = [
+            ("sp1", "c1"),
+            ("sp2", "c2"),
+            ("sp3", "c3"),
+            ("sp4", "c4"),
+            ("sp5", "c5"),
+        ]
+        # All consecutive pairs significant — passes permissive validation (threshold=1)
+        assocs = [
+            _sig("sp1", "c1", "sp2", "c2"),
+            _sig("sp2", "c2", "sp3", "c3"),
+            _sig("sp3", "c3", "sp4", "c4"),
+            _sig("sp4", "c4", "sp5", "c5"),
+        ]
+
+        def _busco(chrom):
+            return BuscoGene(chromosome=chrom, start=0, end=100, busco_id="x")
+
+        # Only 3 genes support this chain — below default min_chain_genes=5
+        species_busco = [
+            ("sp1", {"g1": _busco("c1"), "g2": _busco("c1"), "g3": _busco("c1")}),
+            ("sp2", {"g1": _busco("c2"), "g2": _busco("c2"), "g3": _busco("c2")}),
+            ("sp3", {"g1": _busco("c3"), "g2": _busco("c3"), "g3": _busco("c3")}),
+            ("sp4", {"g1": _busco("c4"), "g2": _busco("c4"), "g3": _busco("c4")}),
+            ("sp5", {"g1": _busco("c5"), "g2": _busco("c5"), "g3": _busco("c5")}),
+        ]
+
+        # Without min_chain_genes, permissive keeps chain intact
+        result_no_min = validate_chains(
+            [chain], assocs, permissive=True, min_chain_genes=0,
+        )
+        assert result_no_min == [chain]
+
+        # With min_chain_genes=5, chain dropped despite permissive=True
+        result_with_min = validate_chains(
+            [chain],
+            assocs,
+            permissive=True,
+            min_chain_genes=5,
+            species_busco=species_busco,
+        )
+        assert result_with_min == []
+
+    def test_subchain_pruned_regardless_of_internal_order(self):
+        """A shorter chain whose nodes are a subset of a longer chain must be
+        pruned even when their internal orderings differ (canonical path
+        direction may flip)."""
+        chain_long = [("sp1", "c1"), ("sp2", "c2"), ("sp3", "c3"), ("sp4", "c4")]
+        chain_short = [("sp3", "c3"), ("sp2", "c2"), ("sp1", "c1")]
+        assocs = [
+            _sig("sp1", "c1", "sp2", "c2"),
+            _sig("sp2", "c2", "sp3", "c3"),
+            _sig("sp3", "c3", "sp4", "c4"),
+            _sig("sp1", "c1", "sp3", "c3"),
+            _sig("sp2", "c2", "sp4", "c4"),
+            _sig("sp1", "c1", "sp4", "c4"),
+        ]
+        result = validate_chains([chain_long, chain_short], assocs)
+        assert result == [chain_long]
+
+    def test_duplicate_chains_different_order_deduplicated(self):
+        """Two chains with identical node sets but different orderings must be
+        deduplicated to a single chain."""
+        chain_a = [("sp1", "c1"), ("sp2", "c2"), ("sp3", "c3")]
+        chain_b = [("sp3", "c3"), ("sp2", "c2"), ("sp1", "c1")]
+        assocs = [
+            _sig("sp1", "c1", "sp2", "c2"),
+            _sig("sp2", "c2", "sp3", "c3"),
+            _sig("sp1", "c1", "sp3", "c3"),
+        ]
+        result = validate_chains([chain_a, chain_b], assocs)
+        assert len(result) == 1
+        assert set(result[0]) == {("sp1", "c1"), ("sp2", "c2"), ("sp3", "c3")}
+
+    def test_validation_pruning_creates_subchain_then_removed(self):
+        """When validation prunes a node from a long chain, creating a shorter
+        chain that is a subset of another surviving chain, the shorter one
+        must be removed."""
+        chain_full = [("sp1", "c1"), ("sp2", "c2"), ("sp3", "c3"), ("sp4", "c4")]
+        chain_partial = [("sp1", "c1"), ("sp2", "c2"), ("sp3", "c3"), ("sp4", "c5")]
+        assocs = [
+            _sig("sp1", "c1", "sp2", "c2"),
+            _sig("sp2", "c2", "sp3", "c3"),
+            _sig("sp3", "c3", "sp4", "c4"),
+            _sig("sp1", "c1", "sp3", "c3"),
+            _sig("sp2", "c2", "sp4", "c4"),
+            _sig("sp1", "c1", "sp4", "c4"),
+            # sp4-c5 has no links → pruned from chain_partial
+            # chain_partial becomes [sp1-c1, sp2-c2, sp3-c3] ⊂ chain_full
+        ]
+        result = validate_chains([chain_full, chain_partial], assocs)
+        assert result == [chain_full]
+
     def test_min_chain_genes_filters_weak_subchains(self):
         # Two chains: one with strong gene support, one with weak
         chain_strong = [("sp1", "c1"), ("sp2", "c2")]
