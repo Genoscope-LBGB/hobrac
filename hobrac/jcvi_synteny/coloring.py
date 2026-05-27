@@ -29,12 +29,9 @@ def apply_custom_colors(
 def _chain_covers_pair(
     chain: List[Tuple[str, str]], sp1_name: str, sp2_name: str
 ) -> bool:
-    """Return True if *chain* contains an adjacent edge for the species pair."""
-    pair = {sp1_name, sp2_name}
-    for i in range(len(chain) - 1):
-        if {chain[i][0], chain[i + 1][0]} == pair:
-            return True
-    return False
+    """Return True if *chain* contains both species of the pair."""
+    species_in_chain = {node[0] for node in chain}
+    return sp1_name in species_in_chain and sp2_name in species_in_chain
 
 
 def apply_custom_colors_with_algs(
