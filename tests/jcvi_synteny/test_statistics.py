@@ -107,7 +107,7 @@ class TestDetectAlgsPairwiseRaw:
         threshold = 0.01 / num_tests
 
         for a in all_tested:
-            expected_sig = a.p_value < threshold
+            expected_sig = a.p_value <= threshold
             assert a.significant == expected_sig, (
                 f"({a.chr1}, {a.chr2}): significant={a.significant} but "
                 f"p_value={a.p_value} vs threshold={threshold}"
