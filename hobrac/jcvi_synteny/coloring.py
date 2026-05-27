@@ -29,9 +29,10 @@ def apply_custom_colors(
 def _chain_covers_pair(
     chain: List[Tuple[str, str]], sp1_name: str, sp2_name: str
 ) -> bool:
-    """Return True if *chain* contains a consecutive edge for the species pair."""
+    """Return True if *chain* contains an adjacent edge for the species pair."""
+    pair = {sp1_name, sp2_name}
     for i in range(len(chain) - 1):
-        if chain[i][0] == sp1_name and chain[i + 1][0] == sp2_name:
+        if {chain[i][0], chain[i + 1][0]} == pair:
             return True
     return False
 

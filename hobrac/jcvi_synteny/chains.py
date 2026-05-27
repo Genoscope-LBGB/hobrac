@@ -1,5 +1,8 @@
+import logging
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
+
+logger = logging.getLogger(__name__)
 
 from .models import BuscoGene, ChromosomeAssociation, PairwiseAssociation
 
@@ -20,54 +23,122 @@ def _walk_chain_counts(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
 ) -> Dict[Tuple[Tuple[str, str], ...], int]:
     """
-    Walk each eligible gene through species and count maximal paths of
-    significant edges, skipping species where the gene is absent. Return
-    a mapping from chain tuple to the number of distinct genes whose
-    maximal walk produced that exact chain.
+    For each eligible gene, build a subgraph of significant associations
+    between its chromosome locations, find the longest path in each
+    connected component, and count how many genes produce each chain.
+
+    Uses bidirectional edges and graph search so results are independent
+    of the ordering of *species_busco*.
     """
     if not pairwise_associations or not species_busco:
         return {}
 
-    sig_edges: Set[Tuple[Tuple[str, str], Tuple[str, str]]] = set()
+    adj: Dict[Tuple[str, str], Set[Tuple[str, str]]] = defaultdict(set)
     for assoc in pairwise_associations:
-        sig_edges.add(((assoc.species1, assoc.chr1), (assoc.species2, assoc.chr2)))
+        a = (assoc.species1, assoc.chr1)
+        b = (assoc.species2, assoc.chr2)
+        adj[a].add(b)
+        adj[b].add(a)
 
     eligible = _eligible_genes(species_busco)
     chain_counts: Dict[Tuple[Tuple[str, str], ...], int] = defaultdict(int)
 
     for gene_id in eligible:
-        gene_chroms: Dict[int, Tuple[str, str]] = {}
-        for pos, (sp_name, busco_data) in enumerate(species_busco):
+        gene_nodes: List[Tuple[str, str]] = []
+        for sp_name, busco_data in species_busco:
             if gene_id in busco_data:
-                gene_chroms[pos] = (sp_name, busco_data[gene_id].chromosome)
+                gene_nodes.append((sp_name, busco_data[gene_id].chromosome))
 
-        current_path: List[Tuple[str, str]] = []
-        last_pos = -1
+        if len(gene_nodes) < 2:
+            continue
 
-        for pos in range(len(species_busco)):
-            if pos not in gene_chroms:
-                continue
+        node_set = set(gene_nodes)
+        gene_adj: Dict[Tuple[str, str], Set[Tuple[str, str]]] = defaultdict(set)
+        for node in gene_nodes:
+            for neighbor in adj.get(node, set()):
+                if neighbor in node_set:
+                    gene_adj[node].add(neighbor)
 
-            node = gene_chroms[pos]
-
-            if not current_path:
-                current_path = [node]
-                last_pos = pos
-                continue
-
-            if (gene_chroms[last_pos], node) in sig_edges:
-                current_path.append(node)
-                last_pos = pos
-            else:
-                if len(current_path) >= 2:
-                    chain_counts[tuple(current_path)] += 1
-                current_path = [node]
-                last_pos = pos
-
-        if len(current_path) >= 2:
-            chain_counts[tuple(current_path)] += 1
+        for chain in _longest_paths_per_component(gene_nodes, gene_adj):
+            chain_counts[chain] += 1
 
     return chain_counts
+
+
+_MAX_DFS_VISITS = 500_000
+
+
+def _longest_paths_per_component(
+    nodes: List[Tuple[str, str]],
+    adj: Dict[Tuple[str, str], Set[Tuple[str, str]]],
+) -> List[Tuple[Tuple[str, str], ...]]:
+    """Find the longest path in each connected component, canonicalized
+    as the lexicographically smaller of the path and its reverse."""
+    visited: Set[Tuple[str, str]] = set()
+    result: List[Tuple[Tuple[str, str], ...]] = []
+
+    for node in nodes:
+        if node in visited:
+            continue
+        component: List[Tuple[str, str]] = []
+        stack = [node]
+        while stack:
+            cur = stack.pop()
+            if cur in visited:
+                continue
+            visited.add(cur)
+            component.append(cur)
+            for nbr in adj.get(cur, set()):
+                if nbr not in visited:
+                    stack.append(nbr)
+
+        if len(component) < 2:
+            continue
+
+        component.sort()
+
+        best: Tuple[Tuple[str, str], ...] = ()
+        total_visits = 0
+        for start in component:
+            if len(best) == len(component):
+                break
+            dfs: List[
+                Tuple[
+                    Tuple[str, str],
+                    Tuple[Tuple[str, str], ...],
+                    frozenset,
+                ]
+            ] = [(start, (start,), frozenset((start,)))]
+            while dfs:
+                total_visits += 1
+                if total_visits > _MAX_DFS_VISITS:
+                    break
+                cur, path, path_visited = dfs.pop()
+                extended = False
+                for nbr in sorted(adj.get(cur, set())):
+                    if nbr not in path_visited:
+                        extended = True
+                        dfs.append(
+                            (nbr, path + (nbr,), path_visited | {nbr})
+                        )
+                if not extended and len(path) >= 2:
+                    canon = min(path, path[::-1])
+                    if len(canon) > len(best) or (
+                        len(canon) == len(best) and canon < best
+                    ):
+                        best = canon
+            if total_visits > _MAX_DFS_VISITS:
+                logger.warning(
+                    "DFS visit limit (%d) reached for component of %d nodes; "
+                    "returning best path found (length %d)",
+                    _MAX_DFS_VISITS, len(component), len(best),
+                )
+                break
+
+        if best:
+            result.append(best)
+
+    return result
 
 
 def enumerate_chains(
@@ -79,9 +150,10 @@ def enumerate_chains(
     Enumerate chromosome chains using gene-level evidence to determine which
     paths through significant associations actually exist.
 
-    For each eligible gene, walks its chromosome path across species and
-    extracts maximal contiguous sub-paths where all consecutive edges are
-    significant associations. Only chains supported by real genes are returned.
+    For each eligible gene, builds a subgraph of significant associations
+    between its chromosome locations and finds the longest path in each
+    connected component. Only chains supported by real genes are returned.
+    Results are independent of the ordering of *species_busco*.
 
     Args:
         pairwise_associations: List of significant PairwiseAssociation objects
@@ -94,7 +166,7 @@ def enumerate_chains(
 
     Returns:
         List of chains sorted deterministically, where each chain is a list
-        of (species, chromosome) tuples in species order.
+        of (species, chromosome) tuples in canonical path order.
     """
     chain_counts = _walk_chain_counts(pairwise_associations, species_busco)
     surviving = {
@@ -110,17 +182,17 @@ def _prune_subchains(
     """
     Remove chains that are subsequences of longer chains.
 
-    A gene walk can emit a fragment (e.g. [(A,chr1),(C,chr3)]) that is a
-    subsequence of a longer chain produced by another gene (which also
-    covers species B). Keeping both would let genes match the shorter
-    chain even when they diverge from the longer one at positions the
-    short chain doesn't cover.
+    Keeping both would let genes match the shorter chain even when they
+    diverge from the longer one at positions the short chain doesn't cover.
     """
+    chain_sets = {chain: set(chain) for chain in chains}
     filtered: Set[Tuple[Tuple[str, str], ...]] = set()
     for chain in chains:
         is_subchain = False
         for other in chains:
             if len(other) <= len(chain):
+                continue
+            if not chain_sets[chain].issubset(chain_sets[other]):
                 continue
             it = iter(other)
             if all(node in it for node in chain):
@@ -148,7 +220,7 @@ def build_gene_chain_mapping(
 
     Returns:
         Dict mapping BUSCO gene ID to chain index (-1 if no matching chain).
-        Only genes present in at least two consecutive species are included.
+        Only genes present in at least two species are included.
     """
     if not species_busco:
         return {}
