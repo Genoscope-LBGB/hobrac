@@ -18,7 +18,7 @@ setuptools.setup(
     ],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    package_data={"hobrac": ["workflow/*", "workflow/rules/*"]},
+    package_data={"hobrac": ["workflow/*", "workflow/rules/*", "colors/*"]},
     install_requires=[
         "snakemake",
         "snakemake-executor-plugin-slurm",
@@ -27,15 +27,14 @@ setuptools.setup(
         "scipy",
         "jcvi",
     ],
-    dependency_links=["http://github.com/user/repo/tarball/master#egg=package-1.0"],
     entry_points={
         "console_scripts": [
             "hobrac=hobrac.main:main",
             "busco_to_paf=hobrac.busco_to_paf:main",
             "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main",
             "precompute_mash=hobrac.precompute_mash_refseq:main",
-            "jcvi_synteny=hobrac.jcvi_synteny:main"
+            "jcvi_synteny=hobrac.jcvi_synteny:main",
         ],
     },
-    python_requires='>=3.11',
+    python_requires=">=3.11",
 )

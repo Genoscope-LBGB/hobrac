@@ -1,0 +1,8 @@
+.venv
+venv
+venv.bak
+.git
+__pycache__
+*.egg-info
+.ruff_cache
+.pytest_cache

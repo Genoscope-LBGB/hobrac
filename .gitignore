@@ -1,5 +1,4 @@
 cmd.txt
-tests*
 *.out
 Felimare_picta/
 hobrac_analysis
@@ -123,6 +122,9 @@ venv.bak/
 
 # mkdocs documentation
 /site
+
+# Ruff
+.ruff_cache/
 
 # mypy
 .mypy_cache/

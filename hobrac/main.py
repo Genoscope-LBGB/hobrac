@@ -4,14 +4,16 @@ import os
 import shutil
 import subprocess
 import sys
-from hobrac.command_line import get_args
 
+from hobrac.command_line import get_args
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
 
 
-def check_dependencies(require_busco: bool = True, require_reference_search: bool = True):
+def check_dependencies(
+    require_busco: bool = True, require_reference_search: bool = True
+):
     deps = ["taxonkit", "mash"]
     if require_reference_search:
         deps.extend(["find_reference_genomes", "datasets"])
@@ -54,7 +56,8 @@ def validate_manual_references(paths):
                 f"Error: Duplicate reference name '{name}' detected.\n"
                 f"  File 1: {seen[name]}\n"
                 f"  File 2: {path}\n"
-                "Please rename one of the files or provide checking references with distinct filenames.",
+                "Please rename one of the files or provide"
+                " checking references with distinct filenames.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -75,21 +78,25 @@ def validate_jcvi_names(jcvi_names: str, ref_count: int):
     if len(names_list) != expected_count:
         print(
             f"Error: Number of custom names ({len(names_list)}) must equal "
-            f"number of species ({expected_count}): 1 assembly + {ref_count} references.\n"
+            f"number of species ({expected_count}):"
+            f" 1 assembly + {ref_count} references.\n"
             f"  Provided names: {', '.join(names_list)}",
             file=sys.stderr,
         )
         sys.exit(1)
 
 
-
 def normalize_busco_dir(path: str) -> str:
-    """Normalize a user-provided BUSCO path to the directory that contains run*/full_table.tsv.
+    """Normalize a user-provided BUSCO path to the directory
+    that contains run*/full_table.tsv.
+
     Accepts:
       - a full_table.tsv path
       - a run_* directory path
       - a directory that contains run*/full_table.tsv
-    Returns an absolute path to the directory that contains run*/full_table.tsv, or exits on error.
+
+    Returns an absolute path to the directory that contains
+    run*/full_table.tsv, or exits on error.
     """
     p = os.path.abspath(path)
     if os.path.isfile(p) and os.path.basename(p) == "full_table.tsv":
@@ -103,19 +110,27 @@ def normalize_busco_dir(path: str) -> str:
     if os.path.isdir(p) and _busco_dir_contains_full_table(p):
         return p
 
-    print(f"Provided BUSCO path does not contain run*/full_table.tsv: {path}", file=sys.stderr)
+    print(
+        f"Provided BUSCO path does not contain run*/full_table.tsv: {path}",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 
 def link_busco_dir(src_dir: str, dest_dir: str):
-    """Create a symlink from dest_dir to src_dir. Fails if a non-symlink exists at dest_dir."""
+    """Create a symlink from dest_dir to src_dir.
+
+    Fails if a non-symlink exists at dest_dir.
+    """
     create_dir(os.path.dirname(dest_dir))
     if os.path.lexists(dest_dir):
         if os.path.islink(dest_dir):
             os.unlink(dest_dir)
         else:
             print(
-                f"Destination {dest_dir} already exists and is not a symlink. Remove it or choose a new output directory.",
+                f"Destination {dest_dir} already exists and is not"
+                " a symlink. Remove it or choose a new"
+                " output directory.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -150,8 +165,10 @@ def get_base_snakemake_args(args) -> str:
         if not taxonkit_db:
             print(
                 "Error: TAXONKIT_DB environment variable is not set.\n"
-                "When using containers, you must provide the path to your taxonkit database.\n"
-                "Download it from https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz and run:\n"
+                "When using containers, you must provide"
+                " the path to your taxonkit database.\n"
+                "Download it from https://ftp.ncbi.nih.gov/"
+                "pub/taxonomy/taxdump.tar.gz and run:\n"
                 "  export TAXONKIT_DB=/path/to/extracted/taxdump",
                 file=sys.stderr,
             )
@@ -160,11 +177,23 @@ def get_base_snakemake_args(args) -> str:
         assembly_dir = os.path.dirname(os.path.realpath(args.assembly))
 
         if args.use_apptainer:
-            cmd += f"--use-apptainer --apptainer-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+            cmd += (
+                f"--use-apptainer --apptainer-args"
+                f" '-B {taxonkit_db}:/taxonkit"
+                f" -B {assembly_dir}' "
+            )
         elif args.use_singularity:
-            cmd += f"--use-singularity --singularity-args '-B {taxonkit_db}:/taxonkit -B {assembly_dir}' "
+            cmd += (
+                f"--use-singularity --singularity-args"
+                f" '-B {taxonkit_db}:/taxonkit"
+                f" -B {assembly_dir}' "
+            )
         elif args.use_docker:
-            cmd += f"--use-docker --docker-args '-v {taxonkit_db}:/taxonkit -v {assembly_dir}:{assembly_dir}' "
+            cmd += (
+                f"--use-docker --docker-args"
+                f" '-v {taxonkit_db}:/taxonkit"
+                f" -v {assembly_dir}:{assembly_dir}' "
+            )
 
     return cmd
 
@@ -198,15 +227,28 @@ def generate_snakemake_command(args) -> str:
     cmd += f"minimap2_runtime={args.minimap2_runtime * 60} "
     cmd += f"busco_runtime={args.busco_runtime * 60} "
     cmd += f"min_busco_genes={args.min_busco_genes} "
+    cmd += f"jcvi_pvalue={args.jcvi_pvalue} "
+    cmd += f"jcvi_min_chain_genes={args.jcvi_min_chain_genes} "
 
     if args.jcvi_custom_colors:
         cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
+
+    if args.jcvi_color_metazoan_alg:
+        cmd += "jcvi_color_scheme='29ALG' "
+    elif args.jcvi_color_bilaterian_alg:
+        cmd += "jcvi_color_scheme='24BILAT' "
 
     if args.jcvi_names:
         cmd += f"jcvi_names='{args.jcvi_names}' "
 
     if args.hide_non_significant:
         cmd += "hide_non_significant=True "
+
+    if args.skip_alg:
+        cmd += "skip_alg=True "
+
+    if args.jcvi_permissive_alg:
+        cmd += "jcvi_permissive_alg=True "
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
@@ -236,24 +278,31 @@ def main():
     if getattr(args, "busco_assembly", None):
         norm = normalize_busco_dir(args.busco_assembly)
         link_busco_dir(norm, os.path.join("busco", "busco_assembly"))
-        args.busco_assembly_override_path = os.path.abspath(os.path.join("busco", "busco_assembly"))
+        args.busco_assembly_override_path = os.path.abspath(
+            os.path.join("busco", "busco_assembly")
+        )
     else:
         args.busco_assembly_override_path = None
 
     if getattr(args, "busco_reference", None):
         norm = normalize_busco_dir(args.busco_reference)
         link_busco_dir(norm, os.path.join("busco", "busco_reference"))
-        args.busco_reference_override_path = os.path.abspath(os.path.join("busco", "busco_reference"))
+        args.busco_reference_override_path = os.path.abspath(
+            os.path.join("busco", "busco_reference")
+        )
     else:
         args.busco_reference_override_path = None
 
     # Dependencies: require busco only if at least one side still needs to run
     if not args.use_docker and not args.use_singularity and not args.use_apptainer:
-        require_busco = not (args.busco_assembly_override_path and args.busco_reference_override_path)
+        require_busco = not (
+            args.busco_assembly_override_path and args.busco_reference_override_path
+        )
         check_dependencies(
             require_busco=require_busco,
             # REQUIRE reference search tools ONLY if NO manual references are provided
-            require_reference_search=(not args.reference) and (not args.stop_after_mash),
+            require_reference_search=(not args.reference)
+            and (not args.stop_after_mash),
         )
 
     if args.reference:
@@ -280,7 +329,11 @@ def main():
     process.wait()
 
     if process.returncode != 0:
-        print(f"\nSnakemake failed with exit code {process.returncode}. Check .snakemake/log/ for details.", file=sys.stderr)
+        print(
+            f"\nSnakemake failed with exit code"
+            f" {process.returncode}."
+            " Check .snakemake/log/ for details.",
+            file=sys.stderr,
+        )
 
     sys.exit(process.returncode)
-
