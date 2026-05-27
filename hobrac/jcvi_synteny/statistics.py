@@ -78,7 +78,7 @@ def detect_algs_pairwise_raw(
     significant = []
     all_tested = []
     for chr1, chr2, p_value, gene_count in results:
-        is_significant = p_value < p_threshold
+        is_significant = p_value <= p_threshold
         corrected_p_value = min(p_value * num_tests, 1.0)
 
         all_tested.append(
