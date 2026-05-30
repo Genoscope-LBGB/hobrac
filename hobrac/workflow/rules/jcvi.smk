@@ -22,10 +22,12 @@ rule resolve_jcvi_color_scheme:
         resolved_path = ""
         scheme = params.scheme
         if scheme:
+            import hobrac
+
             with open(input.chosen_dataset) as f:
                 dataset = f.readline().strip().split("\t")[1]
             colors_dir = os.path.join(
-                os.path.dirname(os.path.dirname(workflow.snakefile)),
+                os.path.dirname(hobrac.__file__),
                 "colors",
             )
             color_file = os.path.join(
