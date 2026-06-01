@@ -113,6 +113,25 @@ class TestDetectAlgsPairwiseRaw:
                 f"p_value={a.p_value} vs threshold={threshold}"
             )
 
+    def test_alpha_one_accepts_all(self):
+        # With alpha=1 every corrected p-value (capped at 1.0) is <= alpha,
+        # so all tested pairs must be significant.
+        sp1_genes = [(f"g{i}", "chr1") for i in range(15)]
+        sp2_genes = [(f"g{i}", "chrA") for i in range(15)]
+        # Weak pair: high p_value, corrected p capped at 1.0.
+        sp1_genes += [(f"h{i}", "chr2") for i in range(5)]
+        sp2_genes += [(f"h{i}", "chrB") for i in range(5)]
+
+        sp1 = _build_busco(sp1_genes)
+        sp2 = _build_busco(sp2_genes)
+
+        significant, all_tested = detect_algs_pairwise_raw(
+            sp1, sp2, "sp1", "sp2", alpha=1.0, min_genes=5
+        )
+
+        assert all(a.significant for a in all_tested)
+        assert len(significant) == len(all_tested)
+
     def test_species_names_propagated(self):
         sp1 = _build_busco([(f"g{i}", "chr1") for i in range(10)])
         sp2 = _build_busco([(f"g{i}", "chrA") for i in range(10)])
