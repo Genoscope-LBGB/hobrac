@@ -248,6 +248,53 @@ def save_chains(
             f.write("\t".join(row) + "\n")
 
 
+def save_gene_chains(
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+    gene_to_chain: Dict[str, int],
+    gene_colors: Dict[str, str],
+    output_path: str,
+) -> None:
+    """
+    Save a per-gene chain table to a TSV file in wide format.
+
+    One row per BUSCO gene present in at least one species. Columns:
+    ``chain_id``, ``gene``, one column per species (in *species_busco* order)
+    holding the gene's own chromosome in that species or ``ABSENT`` when the
+    gene is missing there, and ``color`` (the gene's run-wide identity color).
+
+    ``chain_id`` is the gene's chain index, or ``-1`` when the gene is on no
+    chain. ``gene_colors`` is the run-wide identity color resolved the same way
+    the karyotype renders it (custom override, else chain palette hex, else
+    ``lightgrey``); genes missing from it fall back to ``lightgrey``.
+
+    Rows are ordered with chain genes first, grouped by ``chain_id`` then gene
+    id, and no-chain (grey) genes last by gene id. The file is always written,
+    even when no genes are present — in that case only the header is emitted.
+    """
+    species_names = [name for name, _ in species_busco]
+
+    all_ids = set()
+    for _, busco_data in species_busco:
+        all_ids.update(busco_data.keys())
+
+    def sort_key(gid: str) -> Tuple[bool, int, str]:
+        chain_id = gene_to_chain.get(gid, -1)
+        return (chain_id < 0, chain_id if chain_id >= 0 else 0, gid)
+
+    header = ["chain_id", "gene", *species_names, "color"]
+    with open(output_path, "w") as f:
+        f.write("\t".join(header) + "\n")
+        for gid in sorted(all_ids, key=sort_key):
+            chain_id = gene_to_chain.get(gid, -1)
+            chroms = [
+                busco_data[gid].chromosome if gid in busco_data else "ABSENT"
+                for _, busco_data in species_busco
+            ]
+            color = gene_colors.get(gid, DEFAULT_COLOR)
+            row = [str(chain_id), gid, *chroms, color]
+            f.write("\t".join(row) + "\n")
+
+
 def run(
     assembly_busco: str,
     assembly_fasta: str,
@@ -418,6 +465,34 @@ def run(
         algs_output,
     )
 
+    # Resolve one run-wide identity color per gene, matching how the karyotype
+    # renders it: custom override, else chain palette hex, else lightgrey. In
+    # the custom+skip_alg path there are no chains, so the color is the custom
+    # color or lightgrey.
+    all_gene_ids = set()
+    for _, busco_data in species_busco:
+        all_gene_ids.update(busco_data.keys())
+    gene_identity_colors: Dict[str, str] = {}
+    for gid in all_gene_ids:
+        if custom_colors and skip_alg:
+            gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
+        else:
+            chain_id = gene_to_chain.get(gid, -1)
+            if chain_id < 0:
+                gene_identity_colors[gid] = DEFAULT_COLOR
+            else:
+                gene_identity_colors[gid] = custom_colors.get(
+                    gid, chain_colors[chain_id]
+                )
+
+    gene_chains_output = os.path.join(output_dir, "gene_chains.tsv")
+    save_gene_chains(
+        species_busco,
+        gene_to_chain,
+        gene_identity_colors,
+        gene_chains_output,
+    )
+
     # Phase 2: Generate outputs for each pair
     links_files = []
     for i in range(len(species_busco) - 1):
@@ -463,6 +538,7 @@ def run(
         "layouts": layouts_path,
         "chromosome_associations": associations_output,
         "algs": algs_output,
+        "gene_chains": gene_chains_output,
         "rearrangement_index": rearrangement_summary,
         "rearrangement_index_by_alg": rearrangement_by_alg,
         "bed_files": [p for _, p in bed_files],
