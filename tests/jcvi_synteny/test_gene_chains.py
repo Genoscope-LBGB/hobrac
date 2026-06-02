@@ -41,32 +41,32 @@ class TestSaveGeneChains:
     def test_header(self, tmp_path):
         rows = _build(tmp_path)
         assert rows[0] == [
-            "chain_id", "gene", "Pm", "Bf", "Hl", "color",
+            "chain_id", "gene", "color", "Pm", "Bf", "Hl",
             "Pm_pos", "Bf_pos", "Hl_pos",
         ]
 
     def test_absent_cells(self, tmp_path):
         rows = {r[1]: r for r in _build(tmp_path)[1:]}
         # g2 missing in Bf -> ABSENT; present elsewhere.
-        assert rows["g2"][2:5] == ["chr1", "ABSENT", "chr20"]
+        assert rows["g2"][3:6] == ["chr1", "ABSENT", "chr20"]
         # g4 missing in Hl -> ABSENT.
-        assert rows["g4"][2:5] == ["chr2", "chr5", "ABSENT"]
+        assert rows["g4"][3:6] == ["chr2", "chr5", "ABSENT"]
 
     def test_gene_own_chromosome(self, tmp_path):
         rows = {r[1]: r for r in _build(tmp_path)[1:]}
         # Cells are the gene's actual chromosome, which differs per species.
-        assert rows["g1"][2:5] == ["chr1", "chr3", "chr20"]
+        assert rows["g1"][3:6] == ["chr1", "chr3", "chr20"]
 
     def test_chain_id_and_color(self, tmp_path):
         rows = {r[1]: r for r in _build(tmp_path)[1:]}
-        # color sits right after the chromosome block (index 5 here).
+        # color sits third, right after chain_id and gene.
         assert rows["g1"][0] == "0"
-        assert rows["g1"][5] == "#1f77b4"
+        assert rows["g1"][2] == "#1f77b4"
         assert rows["g3"][0] == "1"
-        assert rows["g3"][5] == "#ff7f0e"
+        assert rows["g3"][2] == "#ff7f0e"
         # No-chain gene: chain_id -1, lightgrey.
         assert rows["g4"][0] == "-1"
-        assert rows["g4"][5] == "lightgrey"
+        assert rows["g4"][2] == "lightgrey"
 
     def test_position_present(self, tmp_path):
         rows = {r[1]: r for r in _build(tmp_path)[1:]}
@@ -91,7 +91,7 @@ class TestSaveGeneChains:
         save_gene_chains([("Pm", {}), ("Bf", {})], {}, {}, str(out))
         rows = _read(out)
         assert rows == [
-            ["chain_id", "gene", "Pm", "Bf", "color", "Pm_pos", "Bf_pos"]
+            ["chain_id", "gene", "color", "Pm", "Bf", "Pm_pos", "Bf_pos"]
         ]
 
     def test_color_fallback_to_lightgrey(self, tmp_path):
@@ -99,6 +99,6 @@ class TestSaveGeneChains:
         out = tmp_path / "fb.tsv"
         save_gene_chains([("Pm", {"g9": _gene("chr1", 5, 9)})], {}, {}, str(out))
         rows = {r[1]: r for r in _read(out)[1:]}
-        # 1 species: chain_id, gene, Pm, color, Pm_pos
-        assert rows["g9"][3] == "lightgrey"
+        # 1 species: chain_id, gene, color, Pm, Pm_pos
+        assert rows["g9"][2] == "lightgrey"
         assert rows["g9"][4] == "5:9"
