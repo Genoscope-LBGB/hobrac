@@ -73,13 +73,12 @@ def detect_algs_pairwise_raw(
         results.append((chr1, chr2, p_value, observed))
 
     num_tests = len(results)
-    p_threshold = alpha / num_tests
 
     significant = []
     all_tested = []
     for chr1, chr2, p_value, gene_count in results:
-        is_significant = p_value <= p_threshold
         corrected_p_value = min(p_value * num_tests, 1.0)
+        is_significant = corrected_p_value <= alpha
 
         all_tested.append(
             ChromosomeAssociation(
