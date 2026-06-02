@@ -258,11 +258,11 @@ def save_gene_chains(
     Save a per-gene chain table to a TSV file in wide format.
 
     One row per BUSCO gene present in at least one species. Columns:
-    ``chain_id``, ``gene``, one column per species (in *species_busco* order)
-    holding the gene's own chromosome in that species or ``ABSENT`` when the
-    gene is missing there, ``color`` (the gene's run-wide identity color), then
-    one ``<species>_pos`` column per species holding the gene's coordinates as
-    ``start:end`` (raw BUSCO ints), or ``ABSENT`` when missing there.
+    ``chain_id``, ``gene``, ``color`` (the gene's run-wide identity color),
+    one column per species (in *species_busco* order) holding the gene's own
+    chromosome in that species or ``ABSENT`` when the gene is missing there,
+    then one ``<species>_pos`` column per species holding the gene's
+    coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when missing.
 
     ``chain_id`` is the gene's chain index, or ``-1`` when the gene is on no
     chain. ``gene_colors`` is the run-wide identity color resolved the same way
@@ -284,7 +284,7 @@ def save_gene_chains(
         return (chain_id < 0, chain_id if chain_id >= 0 else 0, gid)
 
     pos_names = [f"{name}_pos" for name in species_names]
-    header = ["chain_id", "gene", *species_names, "color", *pos_names]
+    header = ["chain_id", "gene", "color", *species_names, *pos_names]
     with open(output_path, "w") as f:
         f.write("\t".join(header) + "\n")
         for gid in sorted(all_ids, key=sort_key):
@@ -300,7 +300,7 @@ def save_gene_chains(
                 for _, busco_data in species_busco
             ]
             color = gene_colors.get(gid, DEFAULT_COLOR)
-            row = [str(chain_id), gid, *chroms, color, *positions]
+            row = [str(chain_id), gid, color, *chroms, *positions]
             f.write("\t".join(row) + "\n")
 
 
