@@ -252,27 +252,35 @@ def save_gene_chains(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
     gene_to_chain: Dict[str, int],
     gene_colors: Dict[str, str],
+    custom_algs: Dict[str, str],
     output_path: str,
 ) -> None:
     """
     Save a per-gene chain table to a TSV file in wide format.
 
     One row per BUSCO gene present in at least one species. Columns:
-    ``chain_id``, ``gene``, ``color`` (the gene's run-wide identity color),
-    one column per species (in *species_busco* order) holding the gene's own
-    chromosome in that species or ``ABSENT`` when the gene is missing there,
-    then one ``<species>_pos`` column per species holding the gene's
-    coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when missing.
+    ``chain_id``, ``custom_alg_id``, ``gene``, ``color`` (the gene's run-wide
+    identity color), one column per species (in *species_busco* order) holding
+    the gene's own chromosome in that species or ``ABSENT`` when the gene is
+    missing there, then one ``<species>_pos`` column per species holding the
+    gene's coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when
+    missing.
 
-    ``chain_id`` is the gene's chain index, or ``-1`` when the gene is on no
-    chain. ``gene_colors`` is the run-wide identity color resolved the same way
-    the karyotype renders it (custom override, else chain palette hex, else
+    ``chain_id`` is hobrac's own chain index, or ``-1`` when the gene is on no
+    chain. ``custom_alg_id`` is the reference ALG label supplied by the user in
+    the custom color file (its third column), or ``-`` when there is no color
+    file or the gene is not listed with an ALG. The two sit side by side so the
+    hobrac-detected chain can be compared against the reference ALG.
+
+    ``gene_colors`` is the run-wide identity color resolved the same way the
+    karyotype renders it (custom override, else chain palette hex, else
     ``lightgrey``); genes missing from it fall back to ``lightgrey``.
 
     Rows are ordered with chain genes first, grouped by ``chain_id`` then gene
     id, and no-chain (grey) genes last by gene id. The file is always written,
     even when no genes are present — in that case only the header is emitted.
     """
+    custom_algs = custom_algs or {}
     species_names = [name for name, _ in species_busco]
 
     all_ids = set()
@@ -284,7 +292,14 @@ def save_gene_chains(
         return (chain_id < 0, chain_id if chain_id >= 0 else 0, gid)
 
     pos_names = [f"{name}_pos" for name in species_names]
-    header = ["chain_id", "gene", "color", *species_names, *pos_names]
+    header = [
+        "chain_id",
+        "custom_alg_id",
+        "gene",
+        "color",
+        *species_names,
+        *pos_names,
+    ]
     with open(output_path, "w") as f:
         f.write("\t".join(header) + "\n")
         for gid in sorted(all_ids, key=sort_key):
@@ -299,8 +314,9 @@ def save_gene_chains(
                 else "ABSENT"
                 for _, busco_data in species_busco
             ]
+            custom_alg = custom_algs.get(gid, "-")
             color = gene_colors.get(gid, DEFAULT_COLOR)
-            row = [str(chain_id), gid, color, *chroms, *positions]
+            row = [str(chain_id), custom_alg, gid, color, *chroms, *positions]
             f.write("\t".join(row) + "\n")
 
 
@@ -499,6 +515,7 @@ def run(
         species_busco,
         gene_to_chain,
         gene_identity_colors,
+        custom_algs,
         gene_chains_output,
     )
 
