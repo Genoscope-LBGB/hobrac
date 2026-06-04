@@ -20,7 +20,7 @@ setuptools.setup(
     include_package_data=True,
     package_data={"hobrac": ["workflow/*", "workflow/rules/*", "colors/*"]},
     install_requires=[
-        "snakemake",
+        "snakemake<9.22.0",
         "snakemake-executor-plugin-slurm",
         "find_reference_genomes",
         "xopen",
