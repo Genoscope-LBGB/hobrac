@@ -313,9 +313,11 @@ def save_gene_chains(
                 for _, busco_data in species_busco
             ]
             positions = [
-                f"{busco_data[gid].start}:{busco_data[gid].end}"
-                if gid in busco_data
-                else "ABSENT"
+                (
+                    f"{busco_data[gid].start}:{busco_data[gid].end}"
+                    if gid in busco_data
+                    else "ABSENT"
+                )
                 for _, busco_data in species_busco
             ]
             custom_alg = custom_algs.get(gid, "-")
