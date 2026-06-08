@@ -1,7 +1,10 @@
 """Tests for the per-gene chain table (save_gene_chains)."""
 
 from hobrac.jcvi_synteny.models import BuscoGene
-from hobrac.jcvi_synteny.output import save_gene_chains
+from hobrac.jcvi_synteny.output import (
+    resolve_gene_identity_colors,
+    save_gene_chains,
+)
 
 
 def _gene(chromosome, start=0, end=100):
@@ -116,6 +119,54 @@ class TestSaveGeneChains:
             ]
         ]
 
+class TestResolveGeneIdentityColors:
+    # g1 on chain 0, g2 on chain 1, g3 on no chain.
+    GENE_TO_CHAIN = {"g1": 0, "g2": 1, "g3": -1}
+    CHAIN_COLORS = {0: "#1f77b4", 1: "#ff7f0e"}
+    ALL_IDS = {"g1", "g2", "g3"}
+
+    def _resolve(self, custom_colors, skip_alg):
+        return resolve_gene_identity_colors(
+            self.ALL_IDS,
+            self.GENE_TO_CHAIN,
+            self.CHAIN_COLORS,
+            custom_colors,
+            skip_alg,
+        )
+
+    def test_no_custom_file_uses_chain_palette(self):
+        # No custom file: chain genes get their palette hex, grey otherwise.
+        colors = self._resolve({}, skip_alg=False)
+        assert colors["g1"] == "#1f77b4"
+        assert colors["g2"] == "#ff7f0e"
+        assert colors["g3"] == "lightgrey"
+
+    def test_custom_file_listed_gene_gets_custom_color(self):
+        colors = self._resolve({"g1": "#aaaaaa"}, skip_alg=False)
+        assert colors["g1"] == "#aaaaaa"
+
+    def test_custom_file_chain_gene_not_listed_is_grey(self):
+        # The bug case: gene on a chain but absent from the custom file must be
+        # lightgrey, not the chain palette, to match the plot.
+        colors = self._resolve({"g1": "#aaaaaa"}, skip_alg=False)
+        assert colors["g2"] == "lightgrey"
+
+    def test_custom_file_no_chain_gene_is_grey(self):
+        colors = self._resolve({"g1": "#aaaaaa"}, skip_alg=False)
+        assert colors["g3"] == "lightgrey"
+
+    def test_skip_alg_listed_gene_gets_custom_color(self):
+        # skip_alg: no chains, custom color applies regardless of chain.
+        colors = self._resolve({"g3": "#aaaaaa"}, skip_alg=True)
+        assert colors["g3"] == "#aaaaaa"
+
+    def test_skip_alg_unlisted_gene_is_grey(self):
+        colors = self._resolve({"g3": "#aaaaaa"}, skip_alg=True)
+        assert colors["g1"] == "lightgrey"
+        assert colors["g2"] == "lightgrey"
+
+
+class TestSaveGeneChainsFallback:
     def test_color_fallback_to_lightgrey(self, tmp_path):
         # Gene missing from gene_colors falls back to lightgrey.
         out = tmp_path / "fb.tsv"
