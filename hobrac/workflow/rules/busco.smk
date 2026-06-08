@@ -27,13 +27,13 @@ rule get_busco_datasets:
     benchmark:
         "benchmarks/get_busco_dataset.txt"
     container:
-        "docker://ezlabgva/busco:v6.0.0_cv1"
+        "docker://ezlabgva/busco:v6.1.0_cv1"
     resources:
         mem_mb=5000,
         runtime=20,
     shell:
         """
-        busco --list-datasets > {output}
+        busco --list-datasets --datasets_version odb12 > {output}
     """
 
 
@@ -86,14 +86,14 @@ rule download_busco_dataset:
     benchmark:
         "benchmarks/download_busco_dataset.txt"
     container:
-        "docker://ezlabgva/busco:v6.0.0_cv1"
+        "docker://ezlabgva/busco:v6.1.0_cv1"
     resources:
         mem_mb=5000,
         runtime=60,
     shell:
         """
         version=$(cat {input} | cut -f 2)
-        busco --download_path {output} --download $version
+        busco --download_path {output} --download $version --datasets_version odb12
     """
 
 
@@ -107,7 +107,7 @@ rule busco_reference:
     benchmark:
         "benchmarks/busco_reference_{accession}.txt"
     container:
-        "docker://ezlabgva/busco:v6.0.0_cv1"
+        "docker://ezlabgva/busco:v6.1.0_cv1"
     threads: 12
     resources:
         mem_mb=config["busco_memory"],
@@ -125,7 +125,7 @@ rule busco_reference:
 
         busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
             -o busco_reference_{wildcards.accession} -l $dataset \
-            --offline --download_path busco_downloads
+            --offline --download_path busco_downloads --datasets_version odb12
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
@@ -141,7 +141,7 @@ rule busco_assembly:
     benchmark:
         "benchmarks/busco_assembly.txt"
     container:
-        "docker://ezlabgva/busco:v6.0.0_cv1"
+        "docker://ezlabgva/busco:v6.1.0_cv1"
     threads: 12
     resources:
         mem_mb=config["busco_memory"],
@@ -159,7 +159,7 @@ rule busco_assembly:
 
         busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
             -o busco_assembly -l $dataset \
-            --offline --download_path busco_downloads
+            --offline --download_path busco_downloads --datasets_version odb12
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
     """
