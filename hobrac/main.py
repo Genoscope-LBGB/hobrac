@@ -155,7 +155,7 @@ def get_base_snakemake_args(args) -> str:
         if args.executor != "local":
             cmd += "--jobs 100 --cores 4000 "
         else:
-            cmd += "--cores all"
+            cmd += "--cores all "
 
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "
