@@ -274,7 +274,11 @@ def save_gene_chains(
 
     ``gene_colors`` is the run-wide identity color resolved the same way the
     karyotype renders it (custom override, else chain palette hex, else
-    ``lightgrey``); genes missing from it fall back to ``lightgrey``.
+    ``lightgrey``); genes missing from it fall back to ``lightgrey``. Because it
+    is run-wide it cannot encode the plot's per-pair ``chains_covering_pair``
+    gating: a gene whose chain spans only some species pairs keeps its color
+    here but is drawn grey on the pairs its chain does not cover. See
+    ``resolve_gene_identity_colors``.
 
     Rows are ordered with chain genes first, grouped by ``chain_id`` then gene
     id, and no-chain (grey) genes last by gene id. The file is always written,
@@ -318,6 +322,59 @@ def save_gene_chains(
             color = gene_colors.get(gid, DEFAULT_COLOR)
             row = [str(chain_id), custom_alg, gid, color, *chroms, *positions]
             f.write("\t".join(row) + "\n")
+
+
+def resolve_gene_identity_colors(
+    all_gene_ids: set,
+    gene_to_chain: Dict[str, int],
+    chain_colors: Dict[int, str],
+    custom_colors: Dict[str, str],
+    skip_alg: bool,
+) -> Dict[str, str]:
+    """
+    Resolve one run-wide identity color per gene, mirroring the plot.
+
+    This is the run-wide counterpart of ``apply_custom_colors_with_algs``: it
+    resolves a single color per gene using the same fallback rules the
+    karyotype applies, minus the per-pair ``chains_covering_pair`` gating that a
+    one-row-per-gene table cannot represent.
+
+    Rules:
+      * ``custom_colors`` provided + ``skip_alg`` (no chains): custom color, or
+        ``lightgrey`` when the gene is not listed.
+      * gene on no chain (``chain_id < 0``): ``lightgrey``.
+      * gene on a chain, ``custom_colors`` provided: custom color, or
+        ``lightgrey`` when the gene is not listed — matching the plot, which
+        never falls back to the chain palette once a custom file is given.
+      * gene on a chain, no ``custom_colors``: the chain palette hex.
+
+    Note the residual run-wide vs per-pair difference: a gene whose chain covers
+    only some species pairs keeps its custom color here but is drawn grey on the
+    pairs its chain does not span.
+
+    Args:
+        all_gene_ids: Every BUSCO id present in at least one species.
+        gene_to_chain: Dict mapping BUSCO gene id to chain id (-1 = no chain).
+        chain_colors: Dict mapping chain id to hex color.
+        custom_colors: Dictionary mapping BUSCO id to hex color (may be empty).
+        skip_alg: Whether ALG/chain detection was skipped.
+
+    Returns:
+        Dictionary mapping BUSCO id to its run-wide identity color.
+    """
+    gene_identity_colors: Dict[str, str] = {}
+    for gid in all_gene_ids:
+        if custom_colors and skip_alg:
+            gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
+        else:
+            chain_id = gene_to_chain.get(gid, -1)
+            if chain_id < 0:
+                gene_identity_colors[gid] = DEFAULT_COLOR
+            elif custom_colors:
+                gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
+            else:
+                gene_identity_colors[gid] = chain_colors[chain_id]
+    return gene_identity_colors
 
 
 def run(
@@ -491,24 +548,13 @@ def run(
     )
 
     # Resolve one run-wide identity color per gene, matching how the karyotype
-    # renders it: custom override, else chain palette hex, else lightgrey. In
-    # the custom+skip_alg path there are no chains, so the color is the custom
-    # color or lightgrey.
+    # renders it (see resolve_gene_identity_colors).
     all_gene_ids = set()
     for _, busco_data in species_busco:
         all_gene_ids.update(busco_data.keys())
-    gene_identity_colors: Dict[str, str] = {}
-    for gid in all_gene_ids:
-        if custom_colors and skip_alg:
-            gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
-        else:
-            chain_id = gene_to_chain.get(gid, -1)
-            if chain_id < 0:
-                gene_identity_colors[gid] = DEFAULT_COLOR
-            else:
-                gene_identity_colors[gid] = custom_colors.get(
-                    gid, chain_colors[chain_id]
-                )
+    gene_identity_colors = resolve_gene_identity_colors(
+        all_gene_ids, gene_to_chain, chain_colors, custom_colors, skip_alg
+    )
 
     gene_chains_output = os.path.join(output_dir, "gene_chains.tsv")
     save_gene_chains(
