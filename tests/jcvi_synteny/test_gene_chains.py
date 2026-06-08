@@ -69,8 +69,8 @@ class TestSaveGeneChains:
         assert rows["g1"][3] == "#1f77b4"
         assert rows["g3"][0] == "1"
         assert rows["g3"][3] == "#ff7f0e"
-        # No-chain gene: chain_id -1, lightgrey.
-        assert rows["g4"][0] == "-1"
+        # No-chain gene: chain_id placeholder, lightgrey.
+        assert rows["g4"][0] == "-"
         assert rows["g4"][3] == "lightgrey"
 
     def test_custom_alg_id_from_file(self, tmp_path):

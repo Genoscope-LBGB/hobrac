@@ -266,7 +266,7 @@ def save_gene_chains(
     gene's coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when
     missing.
 
-    ``chain_id`` is hobrac's own chain index, or ``-1`` when the gene is on no
+    ``chain_id`` is hobrac's own chain index, or ``-`` when the gene is on no
     chain. ``custom_alg_id`` is the reference ALG label supplied by the user in
     the custom color file (its third column), or ``-`` when there is no color
     file or the gene is not listed with an ALG. The two sit side by side so the
@@ -322,7 +322,8 @@ def save_gene_chains(
             ]
             custom_alg = custom_algs.get(gid, "-")
             color = gene_colors.get(gid, DEFAULT_COLOR)
-            row = [str(chain_id), custom_alg, gid, color, *chroms, *positions]
+            chain_label = str(chain_id) if chain_id >= 0 else "-"
+            row = [chain_label, custom_alg, gid, color, *chroms, *positions]
             f.write("\t".join(row) + "\n")
 
 
