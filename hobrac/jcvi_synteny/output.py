@@ -115,7 +115,7 @@ def generate_seqids_file(
     output_path: str,
     use_gravity_ordering: bool = False,
     assembly_fasta_sizes: Dict[str, int] = None,
-) -> None:
+) -> List[List[str]]:
     """
     Generate JCVI seqids file with chromosome order for each species.
 
@@ -126,7 +126,13 @@ def generate_seqids_file(
                               with the species above them
         assembly_fasta_sizes: Dictionary mapping assembly sequence names to sizes.
                               Used for ordering the first species (assembly).
+
+    Returns:
+        The per-species chromosome order (one list per species, in the same
+        order as ``species_data``). This is the exact axis order the ALG
+        dotplots reuse so they line up with the karyotype.
     """
+    all_orders: List[List[str]] = []
     with open(output_path, "w") as f:
         previous_order: List[str] = []
         previous_busco: Dict[str, BuscoGene] = {}
@@ -145,10 +151,34 @@ def generate_seqids_file(
                 chromosomes = get_chromosome_order_by_span(busco_data)
 
             f.write(",".join(chromosomes) + "\n")
+            all_orders.append(chromosomes)
 
             # Store for next iteration
             previous_order = chromosomes
             previous_busco = busco_data
+
+    return all_orders
+
+
+def save_dotplot_axis_orders(
+    species_keys: List[str],
+    orders: List[List[str]],
+    output_dir: str,
+) -> None:
+    """
+    Write one axis-order file per species for the ALG dotplots.
+
+    Each file is named ``<key>.order`` and holds the species' comma-separated
+    chromosome order — identical to its ``seqids`` line. ``species_keys`` are the
+    stable identifiers (assembly name / reference accession) captured *before*
+    any custom ``--jcvi-names`` renaming, so the dotplot rule can look up a
+    species by its accession wildcard regardless of display name.
+    """
+    orders_dir = os.path.join(output_dir, "dotplot_orders")
+    os.makedirs(orders_dir, exist_ok=True)
+    for key, order in zip(species_keys, orders):
+        with open(os.path.join(orders_dir, f"{key}.order"), "w") as f:
+            f.write(",".join(order) + "\n")
 
 
 def generate_layouts_file(
@@ -472,6 +502,11 @@ def run(
                 if accession and accession in ref_busco_paths:
                     species_order.append((accession, ref_busco_paths[accession]))
 
+    # Capture the stable per-species keys (assembly name / reference accession)
+    # before any custom renaming, so the ALG dotplots can be matched to their
+    # reference by accession regardless of the display names below.
+    species_keys = [name for name, _ in species_order]
+
     # Apply custom names if provided
     if custom_names:
         names_list = [n.strip() for n in custom_names.split(",")]
@@ -601,9 +636,13 @@ def run(
         links_files.append(links_path)
 
     seqids_path = os.path.join(output_dir, "seqids")
-    generate_seqids_file(
+    axis_orders = generate_seqids_file(
         species_busco, seqids_path, use_gravity_ordering, assembly_fasta_sizes
     )
+
+    # Per-species axis-order files keyed by stable accession, reused by the ALG
+    # dotplots so their axes match the karyotype exactly.
+    save_dotplot_axis_orders(species_keys, axis_orders, output_dir)
 
     layouts_path = os.path.join(output_dir, "layouts")
     generate_layouts_file(bed_files, links_files, layouts_path)

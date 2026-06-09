@@ -54,6 +54,8 @@ rule jcvi_synteny:
     output:
         seqids="aln/jcvi_karyotype/seqids",
         layouts="aln/jcvi_karyotype/layouts",
+        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
+        orders=directory("aln/jcvi_karyotype/dotplot_orders"),
     benchmark:
         "benchmarks/jcvi_synteny.txt"
     resources:
@@ -119,4 +121,88 @@ rule jcvi_karyotype:
         cd aln/jcvi_karyotype
         python -m jcvi.graphics.karyotype seqids layouts \
             --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
+        """
+
+
+rule jcvi_alg_dotplot:
+    """Per-reference dotplot of shared BUSCO genes, colored by ALG identity.
+
+    Positions come from the BUSCO PAF; colors from the karyotype's
+    gene_chains.tsv via each line's co:Z: tag; axis order matches the
+    karyotype's seqids (off-list chromosomes dropped, for parity with the
+    ribbon plot).
+
+    The shared aln_busco.paf has the assembly as query (which dotplotrs draws
+    on the Y axis). For these plots specifically we want the assembly on the X
+    axis as the common reference, so we transpose the PAF (swap the query and
+    target column groups, keeping the co:Z: tag) and feed the order files to the
+    swapped axes. The shared PAF and the existing dotplot_busco.png are left
+    untouched.
+
+    dotplotrs places the first query (Y) sequence at the top, so we reverse the
+    reference order for the Y axis: the reference chromosome aligning with the
+    first assembly chromosome sits at the bottom, giving the conventional
+    bottom-left -> top-right diagonal.
+    """
+    input:
+        paf="aln/busco_{accession}/aln_busco.paf",
+        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
+        orders="aln/jcvi_karyotype/dotplot_orders",
+    output:
+        light="aln/jcvi_karyotype/dotplots/{accession}.png",
+        dark="aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+    benchmark:
+        "benchmarks/jcvi_alg_dotplot_{accession}.txt"
+    container:
+        HOBRAC_TOOLS
+    resources:
+        mem_mb=8000,
+        runtime=30,
+    params:
+        assembly_key=config["scientific_name"].replace(" ", "_"),
+        hide_non_significant=config.get("hide_non_significant", False),
+    shell:
+        """
+        outdir=aln/jcvi_karyotype/dotplots
+        mkdir -p $outdir
+
+        # gene -> hex color map (gene_chains.tsv: col3=gene, col4=color).
+        id2hex=$(mktemp)
+        awk -F'\\t' 'NR>1 && $3!="" {{print $3"\\t"$4}}' {input.gene_chains} > $id2hex
+
+        # Transpose: assembly (query) -> target/X, reference (target) -> query/Y.
+        # Reorders the 12 mandatory fields and keeps the co:Z: tag (field 13).
+        flipped=$(mktemp)
+        awk -F'\\t' 'BEGIN{{OFS="\\t"}} \
+            {{print $6,$7,$8,$9,$5,$1,$2,$3,$4,$10,$11,$12,$13}}' {input.paf} > $flipped
+
+        assembly_order={input.orders}/{params.assembly_key}.order
+
+        # Reverse the reference order for the Y axis (see rule docstring) so the
+        # diagonal runs bottom-left -> top-right.
+        ref_order=$(mktemp)
+        awk -F',' '{{for (i = NF; i > 0; i--) printf "%s%s", $i, (i > 1 ? "," : "\\n")}}' \
+            {input.orders}/{wildcards.accession}.order > $ref_order
+
+        hide_flag=""
+        if [ "{params.hide_non_significant}" = "True" ]; then
+            hide_flag="--hide-unmatched"
+        fi
+
+        for theme in light dark; do
+            if [ "$theme" = "dark" ]; then
+                out={output.dark}
+            else
+                out={output.light}
+            fi
+            dotplotrs -p $flipped -o $out \
+                --colors $id2hex \
+                --query-order $ref_order \
+                --target-order $assembly_order \
+                --theme $theme \
+                --line-thickness 6 \
+                $hide_flag
+        done
+
+        rm -f $id2hex $flipped $ref_order
         """

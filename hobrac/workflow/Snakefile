@@ -21,6 +21,17 @@ def get_pipeline_targets(wildcards):
 
     targets.append("aln/jcvi_karyotype/karyotype.png")
 
+    # Per-reference ALG-colored dotplots (assembly as the common query axis).
+    targets.extend(
+        expand(
+            [
+                "aln/jcvi_karyotype/dotplots/{accession}.png",
+                "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+            ],
+            accession=accessions,
+        )
+    )
+
     return targets
 
 
