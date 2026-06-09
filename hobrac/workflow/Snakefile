@@ -2,6 +2,13 @@
 HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.7"
 
 
+# Constraining the wildcard keeps it from matching greedily across '/'
+# when a rule references a file inside a directory() output
+# (e.g. aln/busco_{accession}/aln_busco.paf).
+wildcard_constraints:
+    accession=r"[^/]+",
+
+
 def get_pipeline_targets(wildcards):
     checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
 

@@ -145,7 +145,7 @@ rule jcvi_alg_dotplot:
     bottom-left -> top-right diagonal.
     """
     input:
-        paf="aln/busco_{accession}/aln_busco.paf",
+        busco_dir="aln/busco_{accession}",
         gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
         orders="aln/jcvi_karyotype/dotplot_orders",
     output:
@@ -174,7 +174,8 @@ rule jcvi_alg_dotplot:
         # Reorders the 12 mandatory fields and keeps the co:Z: tag (field 13).
         flipped=$(mktemp)
         awk -F'\\t' 'BEGIN{{OFS="\\t"}} \
-            {{print $6,$7,$8,$9,$5,$1,$2,$3,$4,$10,$11,$12,$13}}' {input.paf} > $flipped
+            {{print $6,$7,$8,$9,$5,$1,$2,$3,$4,$10,$11,$12,$13}}' \
+            {input.busco_dir}/aln_busco.paf > $flipped
 
         assembly_order={input.orders}/{params.assembly_key}.order
 
