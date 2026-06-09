@@ -138,7 +138,7 @@ def link_busco_dir(src_dir: str, dest_dir: str):
 
 
 def get_base_snakemake_args(args) -> str:
-    cmd = "snakemake --latency-wait 70 --jobs 100 -p --skip-script-cleanup "
+    cmd = "snakemake --latency-wait 70 -p --skip-script-cleanup "
 
     # Fallback to greedy scheduler if CBC solver is not available to avoid PuLP errors
     if shutil.which("cbc") is None:
@@ -153,7 +153,9 @@ def get_base_snakemake_args(args) -> str:
     if args.executor:
         cmd += f"--executor {args.executor} "
         if args.executor != "local":
-            cmd += "--cores 4000 "
+            cmd += "--jobs 100 --cores 4000 "
+        else:
+            cmd += "--cores all "
 
     if args.executor == "slurm":
         cmd += "--slurm-keep-successful-logs "

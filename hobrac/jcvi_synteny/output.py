@@ -248,6 +248,138 @@ def save_chains(
             f.write("\t".join(row) + "\n")
 
 
+def save_gene_chains(
+    species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
+    gene_to_chain: Dict[str, int],
+    gene_colors: Dict[str, str],
+    custom_algs: Dict[str, str],
+    output_path: str,
+) -> None:
+    """
+    Save a per-gene chain table to a TSV file in wide format.
+
+    One row per BUSCO gene present in at least one species. Columns:
+    ``chain_id``, ``custom_alg_id``, ``gene``, ``color`` (the gene's run-wide
+    identity color), one column per species (in *species_busco* order) holding
+    the gene's own chromosome in that species or ``ABSENT`` when the gene is
+    missing there, then one ``<species>_pos`` column per species holding the
+    gene's coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when
+    missing.
+
+    ``chain_id`` is hobrac's own chain index, or ``-`` when the gene is on no
+    chain. ``custom_alg_id`` is the reference ALG label supplied by the user in
+    the custom color file (its third column), or ``-`` when there is no color
+    file or the gene is not listed with an ALG. The two sit side by side so the
+    hobrac-detected chain can be compared against the reference ALG.
+
+    ``gene_colors`` is the run-wide identity color resolved the same way the
+    karyotype renders it (custom override, else chain palette hex, else
+    ``lightgrey``); genes missing from it fall back to ``lightgrey``. Because it
+    is run-wide it cannot encode the plot's per-pair ``chains_covering_pair``
+    gating: a gene whose chain spans only some species pairs keeps its color
+    here but is drawn grey on the pairs its chain does not cover. See
+    ``resolve_gene_identity_colors``.
+
+    Rows are ordered with chain genes first, grouped by ``chain_id`` then gene
+    id, and no-chain (grey) genes last by gene id. The file is always written,
+    even when no genes are present — in that case only the header is emitted.
+    """
+    custom_algs = custom_algs or {}
+    species_names = [name for name, _ in species_busco]
+
+    all_ids = set()
+    for _, busco_data in species_busco:
+        all_ids.update(busco_data.keys())
+
+    def sort_key(gid: str) -> Tuple[bool, int, str]:
+        chain_id = gene_to_chain.get(gid, -1)
+        return (chain_id < 0, chain_id if chain_id >= 0 else 0, gid)
+
+    pos_names = [f"{name}_pos" for name in species_names]
+    header = [
+        "chain_id",
+        "custom_alg_id",
+        "gene",
+        "color",
+        *species_names,
+        *pos_names,
+    ]
+    with open(output_path, "w") as f:
+        f.write("\t".join(header) + "\n")
+        for gid in sorted(all_ids, key=sort_key):
+            chain_id = gene_to_chain.get(gid, -1)
+            chroms = [
+                busco_data[gid].chromosome if gid in busco_data else "ABSENT"
+                for _, busco_data in species_busco
+            ]
+            positions = [
+                (
+                    f"{busco_data[gid].start}:{busco_data[gid].end}"
+                    if gid in busco_data
+                    else "ABSENT"
+                )
+                for _, busco_data in species_busco
+            ]
+            custom_alg = custom_algs.get(gid, "-")
+            color = gene_colors.get(gid, DEFAULT_COLOR)
+            chain_label = str(chain_id) if chain_id >= 0 else "-"
+            row = [chain_label, custom_alg, gid, color, *chroms, *positions]
+            f.write("\t".join(row) + "\n")
+
+
+def resolve_gene_identity_colors(
+    all_gene_ids: set,
+    gene_to_chain: Dict[str, int],
+    chain_colors: Dict[int, str],
+    custom_colors: Dict[str, str],
+    skip_alg: bool,
+) -> Dict[str, str]:
+    """
+    Resolve one run-wide identity color per gene, mirroring the plot.
+
+    This is the run-wide counterpart of ``apply_custom_colors_with_algs``: it
+    resolves a single color per gene using the same fallback rules the
+    karyotype applies, minus the per-pair ``chains_covering_pair`` gating that a
+    one-row-per-gene table cannot represent.
+
+    Rules:
+      * ``custom_colors`` provided + ``skip_alg`` (no chains): custom color, or
+        ``lightgrey`` when the gene is not listed.
+      * gene on no chain (``chain_id < 0``): ``lightgrey``.
+      * gene on a chain, ``custom_colors`` provided: custom color, or
+        ``lightgrey`` when the gene is not listed — matching the plot, which
+        never falls back to the chain palette once a custom file is given.
+      * gene on a chain, no ``custom_colors``: the chain palette hex.
+
+    Note the residual run-wide vs per-pair difference: a gene whose chain covers
+    only some species pairs keeps its custom color here but is drawn grey on the
+    pairs its chain does not span.
+
+    Args:
+        all_gene_ids: Every BUSCO id present in at least one species.
+        gene_to_chain: Dict mapping BUSCO gene id to chain id (-1 = no chain).
+        chain_colors: Dict mapping chain id to hex color.
+        custom_colors: Dictionary mapping BUSCO id to hex color (may be empty).
+        skip_alg: Whether ALG/chain detection was skipped.
+
+    Returns:
+        Dictionary mapping BUSCO id to its run-wide identity color.
+    """
+    gene_identity_colors: Dict[str, str] = {}
+    for gid in all_gene_ids:
+        if custom_colors and skip_alg:
+            gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
+        else:
+            chain_id = gene_to_chain.get(gid, -1)
+            if chain_id < 0:
+                gene_identity_colors[gid] = DEFAULT_COLOR
+            elif custom_colors:
+                gene_identity_colors[gid] = custom_colors.get(gid, DEFAULT_COLOR)
+            else:
+                gene_identity_colors[gid] = chain_colors[chain_id]
+    return gene_identity_colors
+
+
 def run(
     assembly_busco: str,
     assembly_fasta: str,
@@ -418,6 +550,24 @@ def run(
         algs_output,
     )
 
+    # Resolve one run-wide identity color per gene, matching how the karyotype
+    # renders it (see resolve_gene_identity_colors).
+    all_gene_ids = set()
+    for _, busco_data in species_busco:
+        all_gene_ids.update(busco_data.keys())
+    gene_identity_colors = resolve_gene_identity_colors(
+        all_gene_ids, gene_to_chain, chain_colors, custom_colors, skip_alg
+    )
+
+    gene_chains_output = os.path.join(output_dir, "gene_chains.tsv")
+    save_gene_chains(
+        species_busco,
+        gene_to_chain,
+        gene_identity_colors,
+        custom_algs,
+        gene_chains_output,
+    )
+
     # Phase 2: Generate outputs for each pair
     links_files = []
     for i in range(len(species_busco) - 1):
@@ -463,6 +613,7 @@ def run(
         "layouts": layouts_path,
         "chromosome_associations": associations_output,
         "algs": algs_output,
+        "gene_chains": gene_chains_output,
         "rearrangement_index": rearrangement_summary,
         "rearrangement_index_by_alg": rearrangement_by_alg,
         "bed_files": [p for _, p in bed_files],

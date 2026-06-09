@@ -118,9 +118,7 @@ def _longest_paths_per_component(
                 for nbr in sorted(adj.get(cur, set())):
                     if nbr not in path_visited:
                         extended = True
-                        dfs.append(
-                            (nbr, path + (nbr,), path_visited | {nbr})
-                        )
+                        dfs.append((nbr, path + (nbr,), path_visited | {nbr}))
                 if not extended and len(path) >= 2:
                     canon = min(path, path[::-1])
                     if len(canon) > len(best) or (
@@ -131,7 +129,9 @@ def _longest_paths_per_component(
                 logger.warning(
                     "DFS visit limit (%d) reached for component of %d nodes; "
                     "returning best path found (length %d)",
-                    _MAX_DFS_VISITS, len(component), len(best),
+                    _MAX_DFS_VISITS,
+                    len(component),
+                    len(best),
                 )
                 break
 
