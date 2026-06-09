@@ -43,8 +43,11 @@ def generate_paf(busco1_data, busco2_data, len_query, len_target, output_file):
         for busco_id, data in busco1_data.items():
             if busco_id in busco2_data:
                 target = busco2_data[busco_id]["chr"]
+                # The trailing `co:Z:<busco_id>` is a standard SAM-style optional
+                # tag (ignored by tools that don't read it). dotplotrs uses it to
+                # look up the gene's ALG color from gene_chains.tsv.
                 outfile.write(
-                    f"{data['chr']}\t{len_query[data['chr']]}\t{data['start']}\t{data['end']}\t+\t{target}\t{len_target[target]}\t{busco2_data[busco_id]['start']}\t{busco2_data[busco_id]['end']}\t1000\t1000\t60\n"
+                    f"{data['chr']}\t{len_query[data['chr']]}\t{data['start']}\t{data['end']}\t+\t{target}\t{len_target[target]}\t{busco2_data[busco_id]['start']}\t{busco2_data[busco_id]['end']}\t1000\t1000\t60\tco:Z:{busco_id}\n"
                 )
 
 
