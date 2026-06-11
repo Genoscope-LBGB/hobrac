@@ -59,3 +59,6 @@ include: "rules/jcvi.smk"
 rule all:
     input:
         get_targets,
+    resources:
+        runtime=30,
+
