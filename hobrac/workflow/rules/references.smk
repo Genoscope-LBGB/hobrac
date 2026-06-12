@@ -1,6 +1,7 @@
 rule get_reference:
     output:
-        "reference/{accession}.fna",
+        fna="reference/{accession}.fna",
+        report="reference/{accession}_assembly_report.txt",
     benchmark:
         "benchmarks/get_reference_{accession}.txt"
     container:
@@ -11,7 +12,8 @@ rule get_reference:
     shell:
         """
         cd reference
-        find_reference_genomes -d {wildcards.accession} -o {wildcards.accession} 
+        find_reference_genomes -d {wildcards.accession} -o {wildcards.accession} -r
         mv {wildcards.accession}/*.fna {wildcards.accession}.fna
+        mv {wildcards.accession}/*_assembly_report.txt {wildcards.accession}_assembly_report.txt
         rm -r {wildcards.accession}
     """
