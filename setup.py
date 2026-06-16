@@ -33,6 +33,7 @@ setuptools.setup(
             "busco_to_paf=hobrac.busco_to_paf:main",
             "dgenies_fasta_to_index=hobrac.dgenies_fasta_to_index:main",
             "precompute_mash=hobrac.precompute_mash_refseq:main",
+            "dedup_ncbi=hobrac.dedup_ncbi:main",
             "jcvi_synteny=hobrac.jcvi_synteny:main",
             "dotplot_grid=hobrac.jcvi_synteny.grid:main",
         ],
