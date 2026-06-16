@@ -17,14 +17,16 @@ def get_dotplot_grid_inputs(wildcards):
         for line in f:
             if line.strip():
                 accessions.append(line.strip())
-    return expand(
-        [
-            "aln/jcvi_karyotype/dotplots/{accession}.png",
-            "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
-            "reference/{accession}_assembly_report.txt",
-        ],
-        accession=accessions,
-    )
+    patterns = [
+        "aln/jcvi_karyotype/dotplots/{accession}.png",
+        "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+    ]
+    # Manual references have no NCBI assembly report; only get_reference can
+    # produce one (by downloading), so requiring it would re-trigger a download.
+    # grid.py falls back to --jcvi-names / accession when the report is absent.
+    if not config.get("manual_references"):
+        patterns.append("reference/{accession}_assembly_report.txt")
+    return expand(patterns, accession=accessions)
 
 
 rule resolve_jcvi_color_scheme:
