@@ -39,6 +39,10 @@ def get_pipeline_targets(wildcards):
         )
     )
 
+    # Combined grid of all per-reference dotplots, titled by species.
+    targets.append("aln/jcvi_karyotype/dotplots_grid.png")
+    targets.append("aln/jcvi_karyotype/dotplots_grid_dark.png")
+
     return targets
 
 

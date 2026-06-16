@@ -9,6 +9,24 @@ def get_busco_reference_dirs(wildcards):
     return expand("busco/busco_reference_{accession}", accession=accessions)
 
 
+def get_dotplot_grid_inputs(wildcards):
+    """Per-reference dotplots + assembly reports feeding the dotplot grid."""
+    checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
+    accessions = []
+    with open(checkpoint_output) as f:
+        for line in f:
+            if line.strip():
+                accessions.append(line.strip())
+    return expand(
+        [
+            "aln/jcvi_karyotype/dotplots/{accession}.png",
+            "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+            "reference/{accession}_assembly_report.txt",
+        ],
+        accession=accessions,
+    )
+
+
 rule resolve_jcvi_color_scheme:
     input:
         chosen_dataset="busco/chosen_dataset.txt",
@@ -206,4 +224,45 @@ rule jcvi_alg_dotplot:
         done
 
         rm -f $id2hex $flipped $ref_order
+        """
+
+
+rule jcvi_alg_dotplot_grid:
+    """Tile every per-reference ALG dotplot into one titled, high-res grid.
+
+    One image per theme, sized to native resolution so the global view stays
+    zoomable. Titles resolve from --jcvi-names (full list), else each reference's
+    assembly-report organism name, else the accession.
+    """
+    input:
+        dotplots=get_dotplot_grid_inputs,
+        order="mash/selected_accessions.txt",
+    output:
+        light="aln/jcvi_karyotype/dotplots_grid.png",
+        dark="aln/jcvi_karyotype/dotplots_grid_dark.png",
+    benchmark:
+        "benchmarks/jcvi_alg_dotplot_grid.txt"
+    container:
+        HOBRAC_TOOLS
+    resources:
+        mem_mb=8000,
+        runtime=30,
+    params:
+        jcvi_names=config.get("jcvi_names", ""),
+    shell:
+        """
+        for theme in light dark; do
+            if [ "$theme" = "dark" ]; then
+                out={output.dark}
+            else
+                out={output.light}
+            fi
+            dotplot_grid \
+                --dotplots-dir aln/jcvi_karyotype/dotplots \
+                --accession-order {input.order} \
+                --reference-dir reference \
+                --theme $theme \
+                -o $out \
+                --jcvi-names "{params.jcvi_names}"
+        done
         """
