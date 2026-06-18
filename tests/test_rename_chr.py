@@ -10,10 +10,32 @@ def test_find_chr_name_matches_common_tokens():
     assert find_chr_name("chrMT mitochondrion") == "chrMT"
 
 
-def test_find_chr_name_ignores_chromosome_word():
-    # "chromosome" must not be mistaken for a chr<token>.
-    assert find_chr_name("NC_000001.11 Homo sapiens chromosome 1") is None
+def test_find_chr_name_matches_descriptive_chromosome():
+    # GenBank / ENA style descriptions are normalized to chr<token>.
+    assert (
+        find_chr_name(
+            "CM090417.1 Ctenoides ales isolate KM-2024 chromosome 1,"
+            " whole genome shotgun sequence"
+        )
+        == "chr1"
+    )
+    assert (
+        find_chr_name("LR736838.1 Pecten maximus genome assembly, chromosome: 1")
+        == "chr1"
+    )
+    assert (
+        find_chr_name("OZ121646.1 Venus verrucosa genome assembly, chromosome: 4")
+        == "chr4"
+    )
+    assert find_chr_name("AC1 genome assembly, chromosome: 2L") == "chr2L"
+    assert find_chr_name("AC1 genome assembly, chromosome X") == "chrX"
+
+
+def test_find_chr_name_ignores_assembly_name_and_plurals():
+    # The Ensembl "chromosome:ASSEMBLY:NAME" form must not be misread, and
+    # plurals must be ignored.
     assert find_chr_name("1 dna:chromosome chromosome:GRCh38:1") is None
+    assert find_chr_name("scaffold spanning 3 chromosomes") is None
 
 
 def test_find_chr_name_no_match():
