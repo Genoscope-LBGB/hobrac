@@ -12,18 +12,45 @@ new ids is written so the renaming stays traceable.
 import re
 import sys
 
-# Match a ``chr`` token such as chr1, chrX, chr2L, chrMT, chrUn... anywhere in a
-# header. The character right after ``chr`` must be a digit or one of the usual
-# chromosome letters; this deliberately excludes the word "chromosome" (chr + o).
-# The token must not be glued to a preceding word character so we pick up whole
-# tokens only.
-CHR_PATTERN = re.compile(r"(?<![A-Za-z0-9_])chr[0-9XYZWMU][A-Za-z0-9_]*", re.IGNORECASE)
+# A chromosome-like token: a number (optionally with a trailing arm letter such
+# as 2L), a single sex/special letter (X, Y, Z, W, U), or MT/Un. This excludes
+# assembly names like "GRCh38" so the Ensembl "chromosome:GRCh38:1" form is not
+# misread.
+CHR_TOKEN = r"(?:[0-9]+[A-Za-z]?|MT|Un|[XYZWU])"
+
+# Match a literal ``chr`` token such as chr1, chrX, chr2L, chrMT, chrUn...
+# anywhere in a header. The token must not be glued to a preceding word
+# character so we pick up whole tokens only.
+CHR_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])chr" + CHR_TOKEN + r"[A-Za-z0-9_]*", re.IGNORECASE
+)
+
+# Match the descriptive form "chromosome 1", "chromosome: 1", "chromosome 2L"...
+# A single separator (colon or whitespace) must follow "chromosome" so plurals
+# ("chromosomes") are ignored, and the token must be chromosome-like so the
+# Ensembl "chromosome:GRCh38:1" form (assembly name right after the colon) does
+# not match.
+CHROMOSOME_PATTERN = re.compile(
+    r"chromosome[:\s]\s*(" + CHR_TOKEN + r")", re.IGNORECASE
+)
 
 
 def find_chr_name(header: str):
-    """Return the first ``chr<token>`` found in a FASTA header, or None."""
+    """Return a ``chr<token>`` name derived from a FASTA header, or None.
+
+    A literal ``chr<token>`` already present in the header is returned as-is.
+    Otherwise a descriptive ``chromosome <token>`` is normalized to
+    ``chr<token>``.
+    """
     match = CHR_PATTERN.search(header)
-    return match.group(0) if match else None
+    if match:
+        return match.group(0)
+
+    match = CHROMOSOME_PATTERN.search(header)
+    if match:
+        return "chr" + match.group(1)
+
+    return None
 
 
 def rename_reference(src_path: str, dest_fasta: str, mapping_path: str):
