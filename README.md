@@ -73,7 +73,7 @@ Multiple references can be specified by repeating the flag:
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -r reference_1.fa -r reference_2.fa
 ```
 
-When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so HoBRAC instead makes a best-effort pass over each FASTA header: when a header contains a `chr<token>` pattern (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`), the sequence is renamed to that token. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable `chr<token>` are left unchanged.
+When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so HoBRAC instead makes a best-effort pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
 
 ## Pre-computed BUSCO Results
 
