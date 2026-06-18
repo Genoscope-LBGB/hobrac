@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from hobrac.command_line import get_args
+from hobrac.rename_chr import rename_reference
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
@@ -315,10 +316,12 @@ def main():
             # ID is basename without extension
             base_name = os.path.splitext(os.path.basename(ref_path))[0]
             dest_path = os.path.join("reference", f"{base_name}.fna")
+            mapping_path = os.path.join("reference", f"{base_name}.chr_rename.tsv")
 
-            # Simple copy to ensure container visibility
-            # Logic: If it's a manual ref, we put it where the pipeline expects it
-            shutil.copy(ref_path, dest_path)
+            # Manual references skip find_reference_genomes, so do a best-effort
+            # chr<name> renaming here and copy the result where the pipeline
+            # expects it. The mapping file keeps the renaming traceable.
+            rename_reference(ref_path, dest_path, mapping_path)
 
     # Validate JCVI names count if provided
     ref_count = len(args.reference) if args.reference else args.ref_count

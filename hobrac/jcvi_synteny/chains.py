@@ -110,6 +110,8 @@ def _longest_paths_per_component(
                 ]
             ] = [(start, (start,), frozenset((start,)))]
             while dfs:
+                if len(best) == len(component):
+                    break
                 total_visits += 1
                 if total_visits > _MAX_DFS_VISITS:
                     break

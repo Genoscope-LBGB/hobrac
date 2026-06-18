@@ -115,19 +115,29 @@ rule busco_reference:
     params:
         method=config["busco_method"],
         fna_path=lambda wildcards, input: (
-            input.fna if os.path.isabs(input.fna) else f"../{input.fna}"
+            input.fna if os.path.isabs(input.fna) else f"../../{input.fna}"
         ),
     shell:
         """
         dataset=$(cat {input.dataset} | cut -f 1)
 
-        cd busco/
+        # Run in an isolated working directory so concurrent BUSCO jobs don't
+        # clobber each other's logs in the shared busco/ folder.
+        workdir=busco/tmp_busco_reference_{wildcards.accession}
+        rm -rf $workdir
+        mkdir -p $workdir
+        cd $workdir
 
         busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
             -o busco_reference_{wildcards.accession} -l $dataset \
-            --offline --download_path busco_downloads --datasets_version odb12
+            --offline --download_path ../busco_downloads --datasets_version odb12
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
+
+        cd ..
+        rm -rf busco_reference_{wildcards.accession}
+        mv tmp_busco_reference_{wildcards.accession}/busco_reference_{wildcards.accession} busco_reference_{wildcards.accession}
+        rm -rf tmp_busco_reference_{wildcards.accession}
     """
 
 
@@ -149,19 +159,29 @@ rule busco_assembly:
     params:
         method=config["busco_method"],
         assembly_path=lambda wildcards, input: (
-            input.assembly if os.path.isabs(input.assembly) else f"../{input.assembly}"
+            input.assembly if os.path.isabs(input.assembly) else f"../../{input.assembly}"
         ),
     shell:
         """
         dataset=$(cat {input.dataset} | cut -f 1)
 
-        cd busco/
+        # Run in an isolated working directory so concurrent BUSCO jobs don't
+        # clobber each other's logs in the shared busco/ folder.
+        workdir=busco/tmp_busco_assembly
+        rm -rf $workdir
+        mkdir -p $workdir
+        cd $workdir
 
         busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
             -o busco_assembly -l $dataset \
-            --offline --download_path busco_downloads --datasets_version odb12
+            --offline --download_path ../busco_downloads --datasets_version odb12
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
+
+        cd ..
+        rm -rf busco_assembly
+        mv tmp_busco_assembly/busco_assembly busco_assembly
+        rm -rf tmp_busco_assembly
     """
 
 
