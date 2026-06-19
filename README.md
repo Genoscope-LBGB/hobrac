@@ -95,6 +95,15 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --ref-count 3
 ```
 
 
+## Skip Genomic Alignment
+
+The genome-to-genome alignment (Minimap2) can be the most time-consuming part of the pipeline and its dotplots are sometimes too noisy to be useful. The `--skip-genomic` flag disables this step entirely, so only the BUSCO side runs (BUSCO, the JCVI karyotype, and the ALG-colored dotplots, which are derived from BUSCO gene positions rather than from the Minimap2 alignment).
+
+```
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --skip-genomic
+```
+
+
 ## JCVI Karyotype Visualization
 
 In addition to dotplots, HoBRAC can produce JCVI karyotype plots that display synteny relationships between chromosomes. Shared BUSCO genes are drawn as colored links between the assembly and each reference genome, which makes it possible to identify large-scale rearrangements at a glance. A karyotype PNG is generated automatically as part of the pipeline output.
