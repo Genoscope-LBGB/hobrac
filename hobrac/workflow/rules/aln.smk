@@ -69,10 +69,10 @@ def get_all_ranking_targets(wildcards):
         for line in f:
             if line.strip():
                 accessions.append(line.strip())
-    return expand(
-        ["aln/vs_{accession}/dgenies.done", "aln/busco_{accession}"],
-        accession=accessions,
-    )
+    patterns = ["aln/busco_{accession}"]
+    if not config.get("skip_genomic", False):
+        patterns.append("aln/vs_{accession}/dgenies.done")
+    return expand(patterns, accession=accessions)
 
 
 rule rank_symlinks:

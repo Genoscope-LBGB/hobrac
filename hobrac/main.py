@@ -217,6 +217,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     cmd += f"stop_after_mash={args.stop_after_mash} "
+    cmd += f"skip_genomic={args.skip_genomic} "
     cmd += f"ref_count={args.ref_count} "
 
     if args.metaeuk:

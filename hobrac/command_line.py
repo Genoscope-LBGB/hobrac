@@ -186,6 +186,17 @@ def get_args():
         required=False,
     )
     optional_args.add_argument(
+        "--skip-genomic",
+        action="store_true",
+        dest="skip_genomic",
+        help=(
+            "Skip the genome-to-genome (minimap2) alignment and its dotplots."
+            " Only the BUSCO side (BUSCO, JCVI karyotype, ALG dotplots) runs."
+        ),
+        default=False,
+        required=False,
+    )
+    optional_args.add_argument(
         "--ref-count",
         action="store",
         dest="ref_count",

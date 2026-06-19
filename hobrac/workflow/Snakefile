@@ -18,10 +18,11 @@ def get_pipeline_targets(wildcards):
             if line.strip():
                 accessions.append(line.strip())
 
-    targets = expand(
-        ["aln/busco_{accession}", "aln/vs_{accession}/dgenies.done"],
-        accession=accessions,
-    )
+    target_patterns = ["aln/busco_{accession}"]
+    if not config.get("skip_genomic", False):
+        target_patterns.append("aln/vs_{accession}/dgenies.done")
+
+    targets = expand(target_patterns, accession=accessions)
 
     if not config.get("manual_references"):
         targets.append("aln/ranking_symlinks.done")
