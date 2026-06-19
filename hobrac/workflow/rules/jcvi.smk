@@ -153,16 +153,13 @@ rule jcvi_alg_dotplot:
     ribbon plot).
 
     The shared aln_busco.paf has the assembly as query (which dotplotrs draws
-    on the Y axis). For these plots specifically we want the assembly on the X
-    axis as the common reference, so we transpose the PAF (swap the query and
-    target column groups, keeping the co:Z: tag) and feed the order files to the
-    swapped axes. The shared PAF and the existing dotplot_busco.png are left
-    untouched.
+    on the Y axis) and each reference as target (X axis). We feed the
+    PAF straight through and point the order files at their native axes.
 
     dotplotrs places the first query (Y) sequence at the top, so we reverse the
-    reference order for the Y axis: the reference chromosome aligning with the
-    first assembly chromosome sits at the bottom, giving the conventional
-    bottom-left -> top-right diagonal.
+    assembly order for the Y axis: the first assembly chromosome sits at the
+    bottom, aligning with its matching reference chromosome on the left, giving
+    the conventional bottom-left -> top-right diagonal.
     """
     input:
         busco_dir="aln/busco_{accession}",
@@ -190,20 +187,14 @@ rule jcvi_alg_dotplot:
         id2hex=$(mktemp)
         awk -F'\\t' 'NR>1 && $3!="" {{print $3"\\t"$4}}' {input.gene_chains} > $id2hex
 
-        # Transpose: assembly (query) -> target/X, reference (target) -> query/Y.
-        # Reorders the 12 mandatory fields and keeps the co:Z: tag (field 13).
-        flipped=$(mktemp)
-        awk -F'\\t' 'BEGIN{{OFS="\\t"}} \
-            {{print $6,$7,$8,$9,$5,$1,$2,$3,$4,$10,$11,$12,$13}}' \
-            {input.busco_dir}/aln_busco.paf > $flipped
+        # Native PAF orientation: assembly = query/Y, reference = target/X.
+        ref_order={input.orders}/{wildcards.accession}.order
 
-        assembly_order={input.orders}/{params.assembly_key}.order
-
-        # Reverse the reference order for the Y axis (see rule docstring) so the
+        # Reverse the assembly order for the Y axis (see rule docstring) so the
         # diagonal runs bottom-left -> top-right.
-        ref_order=$(mktemp)
+        assembly_order=$(mktemp)
         awk -F',' '{{for (i = NF; i > 0; i--) printf "%s%s", $i, (i > 1 ? "," : "\\n")}}' \
-            {input.orders}/{wildcards.accession}.order > $ref_order
+            {input.orders}/{params.assembly_key}.order > $assembly_order
 
         hide_flag=""
         if [ "{params.hide_non_significant}" = "True" ]; then
@@ -216,16 +207,16 @@ rule jcvi_alg_dotplot:
             else
                 out={output.light}
             fi
-            dotplotrs -p $flipped -o $out \
+            dotplotrs -p {input.busco_dir}/aln_busco.paf -o $out \
                 --colors $id2hex \
-                --query-order $ref_order \
-                --target-order $assembly_order \
+                --query-order $assembly_order \
+                --target-order $ref_order \
                 --theme $theme \
                 --line-thickness 6 \
                 $hide_flag
         done
 
-        rm -f $id2hex $flipped $ref_order
+        rm -f $id2hex $assembly_order
         """
 
 
