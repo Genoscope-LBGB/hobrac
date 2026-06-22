@@ -175,12 +175,12 @@ hobrac_analysis/
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
 │   ├── jcvi_karyotype/
 │   │   ├── karyotype.png            # JCVI karyotype plot
-│   ├── rank1_busco -> busco_<accession>/   # Ranked symlinks (closest first)
-│   └── rank1_geno  -> vs_<accession>/
+│   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
+│   └── rank1_<Species_name>_geno  -> vs_<accession>/
 ├── benchmarks/                      # Runtime and resource usage per step
 ```
 
-When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_*`, `rank2_*`, ...) sorted by MASH distance.
+When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_<Species_name>_*`, `rank2_<Species_name>_*`, ...) sorted by MASH distance. The `rank<i>` prefix keeps each symlink unique even when two references belong to the same species; references without an NCBI assembly report (e.g. manual references) fall back to the accession in place of the species name.
 
 The PAF alignment files can be loaded directly into the [online viewer](https://www.genoscope.cns.fr/lbgb/hobrac/) for interactive exploration.
 
