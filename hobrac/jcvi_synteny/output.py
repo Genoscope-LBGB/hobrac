@@ -8,6 +8,7 @@ from .coloring import apply_custom_colors, apply_custom_colors_with_algs
 from .io import (
     parse_custom_algs,
     parse_custom_colors,
+    parse_organism_name,
     read_busco_tsv,
     read_fasta_sizes,
 )
@@ -181,8 +182,54 @@ def save_dotplot_axis_orders(
             f.write(",".join(order) + "\n")
 
 
+def resolve_layout_labels(
+    species_keys: List[str],
+    assembly_display_name: str,
+    custom_names: str,
+    reference_dir: str,
+) -> List[str]:
+    """Resolve one karyotype track label per species, mirroring the dotplot grid.
+
+    Kept in lockstep with ``grid.resolve_titles`` / ``grid.resolve_assembly_title``
+    so the karyotype and the dotplot grid show the same names. Priority per
+    species (first hit wins):
+
+      1. ``custom_names`` (``--jcvi-names``): a full ordered list
+         (1 assembly + N references) names every track; a single name targets the
+         assembly only, leaving references to fall through.
+      2. assembly -> ``assembly_display_name`` (hobrac's ``-n/--name``, spaces
+         preserved); references -> the NCBI ``# Organism name:`` from
+         ``reference/<accession>_assembly_report.txt``.
+      3. references -> the accession itself.
+
+    ``species_keys`` are the stable, underscore-free keys (underscored assembly
+    name, then reference accessions). Labels are display-only: they never feed the
+    bed/links gene-id prefixes, so the assembly label can carry spaces while its
+    key stays underscored.
+    """
+    names_list = [n.strip() for n in custom_names.split(",")] if custom_names else []
+    full_list = len(names_list) == len(species_keys)
+
+    labels: List[str] = []
+    for i, key in enumerate(species_keys):
+        if full_list and names_list[i]:
+            labels.append(names_list[i])
+        elif i == 0:
+            # Assembly: a single --jcvi-names entry targets it; else spaced name.
+            labels.append(
+                names_list[0] if names_list and names_list[0] else assembly_display_name
+            )
+        else:
+            report = os.path.join(reference_dir, f"{key}_assembly_report.txt")
+            labels.append(parse_organism_name(report) or key)
+    return labels
+
+
 def generate_layouts_file(
-    species_beds: List[Tuple[str, str]], links_files: List[str], output_path: str
+    species_beds: List[Tuple[str, str]],
+    links_files: List[str],
+    output_path: str,
+    labels: List[str] = None,
 ) -> None:
     """
     Generate JCVI layouts file.
@@ -191,6 +238,10 @@ def generate_layouts_file(
         species_beds: List of (species_name, bed_file_path) tuples
         links_files: List of links file paths
         output_path: Output layouts file path
+        labels: Display label per track, in ``species_beds`` order. These are
+                cosmetic (the karyotype's ``label`` column only); the internal
+                ``species_name`` still keys the bed/links files. Falls back to
+                ``species_name`` when omitted.
     """
     num_species = len(species_beds)
 
@@ -205,10 +256,11 @@ def generate_layouts_file(
 
         for i, (species_name, bed_path) in enumerate(species_beds):
             bed_basename = os.path.basename(bed_path)
+            label = labels[i] if labels else species_name
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
             f.write(
-                f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{species_name},\t{va},\t{bed_basename}\n"
+                f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{label},\t{va},\t{bed_basename}\n"
             )
 
         f.write("\n# edges\n")
@@ -418,6 +470,8 @@ def run(
     manual_refs: str,
     output_dir: str,
     assembly_name: str = "assembly",
+    assembly_display_name: str = "",
+    reference_dir: str = "reference",
     use_gravity_ordering: bool = True,
     min_busco_genes: int = 0,
     custom_color_file: str = "",
@@ -438,7 +492,14 @@ def run(
         accession_order: Path to MASH-ordered accessions file
         manual_refs: Semicolon-separated manual reference paths
         output_dir: Output directory path
-        assembly_name: Name for the assembly in plots
+        assembly_name: Stable, underscore-free key for the assembly. Used as the
+                       gene-id prefix in bed/links files and as the dotplot-order
+                       key, so it must not contain whitespace.
+        assembly_display_name: Human-facing assembly label for the karyotype
+                       (hobrac's ``-n/--name``, spaces preserved). Falls back to
+                       ``assembly_name`` when empty. Display-only.
+        reference_dir: Directory holding ``<accession>_assembly_report.txt`` NCBI
+                       reports, used to label references by organism name.
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
         min_busco_genes: Minimum complete BUSCO genes required per sequence
@@ -644,8 +705,20 @@ def run(
     # dotplots so their axes match the karyotype exactly.
     save_dotplot_axis_orders(species_keys, axis_orders, output_dir)
 
+    # Resolve display labels for the karyotype tracks the same way the dotplot
+    # grid does (see resolve_layout_labels), so the two figures agree. These feed
+    # only the layouts `label` column; the stable species_keys still key the
+    # bed/links files, so the assembly label may carry spaces while its key stays
+    # underscored.
+    layout_labels = resolve_layout_labels(
+        species_keys,
+        assembly_display_name or assembly_name,
+        custom_names,
+        reference_dir,
+    )
+
     layouts_path = os.path.join(output_dir, "layouts")
-    generate_layouts_file(bed_files, links_files, layouts_path)
+    generate_layouts_file(bed_files, links_files, layouts_path, labels=layout_labels)
 
     return {
         "seqids": seqids_path,
@@ -687,7 +760,22 @@ def main():
     )
     parser.add_argument("--output_dir", required=True, help="Output directory")
     parser.add_argument(
-        "--assembly_name", default="assembly", help="Name for assembly in plots"
+        "--assembly_name",
+        default="assembly",
+        help="Stable, underscore-free assembly key (gene-id prefix / dotplot-order "
+        "key). Must not contain whitespace.",
+    )
+    parser.add_argument(
+        "--assembly-display-name",
+        default="",
+        help="Human-facing assembly label for the karyotype (spaces allowed). "
+        "Falls back to --assembly_name when omitted.",
+    )
+    parser.add_argument(
+        "--reference-dir",
+        default="reference",
+        help="Directory holding <accession>_assembly_report.txt NCBI reports, used "
+        "to label references by organism name (default: reference).",
     )
     parser.add_argument(
         "--min-busco-genes",
@@ -761,6 +849,8 @@ def main():
         manual_refs=args.manual_refs,
         output_dir=args.output_dir,
         assembly_name=args.assembly_name,
+        assembly_display_name=args.assembly_display_name,
+        reference_dir=args.reference_dir,
         min_busco_genes=args.min_busco_genes,
         custom_color_file=args.jcvi_custom_colors,
         custom_names=args.jcvi_names,

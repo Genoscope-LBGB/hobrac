@@ -9,6 +9,28 @@ def get_busco_reference_dirs(wildcards):
     return expand("busco/busco_reference_{accession}", accession=accessions)
 
 
+def get_reference_report_inputs(wildcards):
+    """NCBI assembly reports, so the karyotype can label references by organism.
+
+    Each report is co-produced with its reference .fna by get_reference, so it
+    already exists once BUSCO has run; declaring it here lets output.py read the
+    ``# Organism name:`` for each reference's karyotype label. Manual references
+    have no NCBI report, so request none (requiring one would force a download) —
+    output.py then falls back to the accession, matching the dotplot grid.
+    """
+    if config.get("manual_references"):
+        return []
+    checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
+    accessions = []
+    with open(checkpoint_output) as f:
+        for line in f:
+            if line.strip():
+                accessions.append(line.strip())
+    return expand(
+        "reference/{accession}_assembly_report.txt", accession=accessions
+    )
+
+
 def get_dotplot_grid_inputs(wildcards):
     """Per-reference dotplots + assembly reports feeding the dotplot grid."""
     checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
@@ -71,6 +93,7 @@ rule jcvi_synteny:
         accession_order="mash/selected_accessions.txt",
         assembly=config["assembly"],
         resolved_colors="aln/jcvi_karyotype/resolved_colors.txt",
+        reference_reports=get_reference_report_inputs,
     output:
         seqids="aln/jcvi_karyotype/seqids",
         layouts="aln/jcvi_karyotype/layouts",
@@ -84,6 +107,7 @@ rule jcvi_synteny:
     params:
         manual_refs=config.get("manual_references", ""),
         assembly_name=config["scientific_name"].replace(" ", "_"),
+        assembly_display_name=config["scientific_name"],
         outdir="aln/jcvi_karyotype",
         min_busco_genes=config.get("min_busco_genes", 0),
         jcvi_custom_colors=config.get("jcvi_custom_colors", ""),
@@ -111,6 +135,8 @@ rule jcvi_synteny:
             --accession_order {input.accession_order} \
             --manual_refs "{params.manual_refs}" \
             --assembly_name "{params.assembly_name}" \
+            --assembly-display-name "{params.assembly_display_name}" \
+            --reference-dir reference \
             --output_dir {params.outdir} \
             --min-busco-genes {params.min_busco_genes} \
             --jcvi-pvalue {params.jcvi_pvalue} \
