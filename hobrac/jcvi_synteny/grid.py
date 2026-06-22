@@ -27,29 +27,13 @@ matplotlib.use("Agg")
 import matplotlib.image as mpimg  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
+from .io import parse_organism_name  # noqa: E402,F401  (re-exported)
+
 
 def read_accession_order(path):
     """Read accessions (one per line) in ranking order."""
     with open(path) as f:
         return [line.strip() for line in f if line.strip()]
-
-
-def parse_organism_name(report_path):
-    """Return the ``# Organism name:`` value from an NCBI assembly report.
-
-    Strips the trailing common-name parenthetical (e.g. "Homo sapiens (human)"
-    -> "Homo sapiens"). Returns "" if the file is missing or has no such line.
-    """
-    if not os.path.isfile(report_path):
-        return ""
-    with open(report_path) as f:
-        for line in f:
-            if line.startswith("# Organism name:"):
-                name = line.split(":", 1)[1].strip()
-                if "(" in name:
-                    name = name.split("(", 1)[0].strip()
-                return name
-    return ""
 
 
 def resolve_titles(accessions, jcvi_names, reference_dir):
