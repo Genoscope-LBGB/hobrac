@@ -97,7 +97,8 @@ def test_render_grid_writes_png(tmp_path, theme):
     np = pytest.importorskip("numpy")
     from hobrac.jcvi_synteny.grid import render_grid
 
-    images = [np.zeros((40, 60, 3), dtype=float) for _ in range(3)]
+    # Bigger than the baked-in dotplot margins so the plot box has positive size.
+    images = [np.zeros((480, 520, 3), dtype=float) for _ in range(3)]
     out = tmp_path / f"grid_{theme}.png"
     render_grid(
         images, ["Ref A", "Ref B", "Ref C"], "My Assembly", str(out), theme=theme
