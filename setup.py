@@ -36,6 +36,7 @@ setuptools.setup(
             "dedup_ncbi=hobrac.dedup_ncbi:main",
             "jcvi_synteny=hobrac.jcvi_synteny:main",
             "dotplot_grid=hobrac.jcvi_synteny.grid:main",
+            "karyotype_legend=hobrac.jcvi_synteny.legend:main",
         ],
     },
     python_requires=">=3.11",
