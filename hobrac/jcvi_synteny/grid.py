@@ -1,15 +1,20 @@
 """Tile the per-reference ALG dotplots into a single high-resolution grid.
 
 Each cell embeds one reference's finished dotplot PNG (axes already baked in by
-dotplotrs) at native resolution, with a species title on top. The grid lets the
-user see every reference at once while staying zoomable for exploration.
+dotplotrs) at native resolution. Every cell carries a pale-blue header strip with
+the reference (X-axis) name, and each grid row carries a pale-blue vertical panel
+on its left with the assembly (Y-axis) name. The grid lets the user see every
+reference at once while staying zoomable for exploration.
 
-Title resolution per reference (first hit wins):
+Reference title resolution (first hit wins):
   1. --jcvi-names, when a full ordered list is given (1 assembly + N references,
      matching the karyotype labels). A single name applies only to the assembly,
      so references fall through.
   2. ``# Organism name:`` from reference/<accession>_assembly_report.txt.
   3. the accession itself.
+
+Assembly title: the first --jcvi-names entry when any names are given, else the
+``--assembly-name`` value (hobrac's ``-n/--name``).
 """
 
 import argparse
@@ -74,32 +79,100 @@ def grid_dims(n):
     return rows, cols
 
 
-def render_grid(images, titles, output_path, dpi=100, title_fontsize=14):
-    """Tile *images* with *titles* into one PNG sized to native resolution."""
+def resolve_assembly_title(jcvi_names, assembly_name):
+    """Return the assembly (Y-axis) display name for the left panels.
+
+    The first ``--jcvi-names`` entry is always the assembly, so it wins whenever
+    any names are given; otherwise fall back to ``--assembly-name`` (hobrac's
+    ``-n/--name`` scientific name).
+    """
+    names_list = [n.strip() for n in jcvi_names.split(",")] if jcvi_names else []
+    if names_list and names_list[0]:
+        return names_list[0]
+    return assembly_name
+
+
+# Header (reference) strip height and left (assembly) panel width, as fractions
+# of a single cell's native image size.
+HEADER_FRAC = 0.09
+LEFT_FRAC = 0.05
+
+# Panel fill + text colours per theme.
+PANEL_COLORS = {
+    "light": {"panel": "#d6e6f4", "text": "#1a1a1a", "bg": "white"},
+    "dark": {"panel": "#2b3a55", "text": "#e8eef7", "bg": "#111111"},
+}
+
+
+def render_grid(
+    images, titles, assembly_title, output_path, theme="light", dpi=100, title_fontsize=14
+):
+    """Tile *images* into one PNG sized to native resolution.
+
+    Each cell gets a pale-blue header strip carrying its reference *title*; each
+    grid row gets a pale-blue vertical panel on the left carrying *assembly_title*.
+    """
     n = len(images)
     rows, cols = grid_dims(n)
+    colors = PANEL_COLORS.get(theme, PANEL_COLORS["light"])
 
     # Size each cell to the largest source image so no cell is downsampled.
     cell_h = max(img.shape[0] for img in images)
     cell_w = max(img.shape[1] for img in images)
+    header_h = max(1, round(cell_h * HEADER_FRAC))
+    left_w = max(1, round(cell_w * LEFT_FRAC))
 
-    fig, axes = plt.subplots(
-        rows,
-        cols,
-        figsize=(cols * cell_w / dpi, rows * cell_h / dpi),
-        dpi=dpi,
-    )
-    axes = list(axes.flat) if n > 1 else [axes]
+    block_h = header_h + cell_h  # one grid row = header strip + dotplot
+    total_w = left_w + cols * cell_w
+    total_h = rows * block_h
 
-    for ax, img, title in zip(axes, images, titles):
-        ax.imshow(img, interpolation="none")
-        ax.set_title(title, fontsize=title_fontsize)
-        ax.axis("off")
-    for ax in axes[n:]:
-        ax.axis("off")
+    fig = plt.figure(figsize=(total_w / dpi, total_h / dpi), dpi=dpi)
+    fig.patch.set_facecolor(colors["bg"])
 
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=dpi)
+    def rect(x_px, top_px, w_px, h_px):
+        """A pixel box measured from the top-left -> figure-fraction rect."""
+        return [
+            x_px / total_w,
+            1 - (top_px + h_px) / total_h,
+            w_px / total_w,
+            h_px / total_h,
+        ]
+
+    def panel(box, text, rotation=0):
+        ax = fig.add_axes(box)
+        ax.set_facecolor(colors["panel"])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_edgecolor(colors["panel"])
+        ax.text(
+            0.5,
+            0.5,
+            text,
+            ha="center",
+            va="center",
+            rotation=rotation,
+            fontsize=title_fontsize,
+            color=colors["text"],
+            transform=ax.transAxes,
+        )
+
+    for i, (img, title) in enumerate(zip(images, titles)):
+        r, c = divmod(i, cols)
+        block_top = r * block_h
+        x_left = left_w + c * cell_w
+
+        panel(rect(x_left, block_top, cell_w, header_h), title)
+
+        iax = fig.add_axes(rect(x_left, block_top + header_h, cell_w, cell_h))
+        iax.imshow(img, interpolation="none")
+        iax.axis("off")
+
+    # Assembly panel: one per grid row, down the far left, spanning the row.
+    for r in range(rows):
+        panel(rect(0, r * block_h, left_w, block_h), assembly_title, rotation=90)
+
+    fig.savefig(output_path, dpi=dpi, facecolor=fig.get_facecolor())
     plt.close(fig)
 
 
@@ -112,6 +185,7 @@ def main():
     parser.add_argument("--theme", choices=["light", "dark"], default="light")
     parser.add_argument("--reference-dir", default="reference", help="Directory holding *_assembly_report.txt files")
     parser.add_argument("--jcvi-names", default="", help="Comma-separated track names (1 assembly + N references)")
+    parser.add_argument("--assembly-name", default="assembly", help="Assembly name for the left panels (hobrac -n/--name)")
     parser.add_argument("-o", "--output", required=True, help="Output grid PNG path")
     args = parser.parse_args()
 
@@ -119,6 +193,7 @@ def main():
 
     accessions = read_accession_order(args.accession_order)
     titles_all = resolve_titles(accessions, args.jcvi_names, args.reference_dir)
+    assembly_title = resolve_assembly_title(args.jcvi_names, args.assembly_name)
 
     images, titles = [], []
     for accession, title in zip(accessions, titles_all):
@@ -131,7 +206,7 @@ def main():
     if not images:
         raise SystemExit(f"No dotplot PNGs found in {args.dotplots_dir} for theme {args.theme}")
 
-    render_grid(images, titles, args.output)
+    render_grid(images, titles, assembly_title, args.output, theme=args.theme)
 
 
 if __name__ == "__main__":
