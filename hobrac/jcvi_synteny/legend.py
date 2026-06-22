@@ -17,9 +17,11 @@ Legend contents come straight from ``gene_chains.tsv`` (columns ``chain_id``,
     palette reuses a colour across chains, so the brick count stays faithful to
     the chain count.
 
-Bricks are stacked top-to-bottom in natural-sorted label order (``A1``, ``A2``,
-``B1`` ... / numeric chain ids). If nothing is coloured, the karyotype is left
-untouched and no panel is drawn.
+Bricks are laid out in two columns, filled column-major in natural-sorted label
+order (``A1``, ``A2``, ``B1`` ... / numeric chain ids) so entries read top-to-
+bottom down the left column then down the right, and the whole block is centred
+vertically on the page. If nothing is coloured, the karyotype is left untouched
+and no panel is drawn.
 """
 
 import argparse
@@ -38,7 +40,7 @@ from .models import DEFAULT_COLOR  # noqa: E402
 # Legend panel width as a fraction of the karyotype image width, and the largest
 # a single brick is allowed to grow to (as a fraction of image height) so a
 # short legend keeps tidy bricks instead of a few giant blocks.
-PANEL_WIDTH_FRAC = 0.16
+PANEL_WIDTH_FRAC = 0.22
 MAX_BRICK_FRAC = 0.055
 
 # Brick label height as a fraction of the brick height, and the title strip
@@ -50,6 +52,9 @@ TITLE_FRAC = 0.035
 # inside the panel on either side of a brick.
 GAP_FRAC = 0.012
 BRICK_INSET_FRAC = 0.18
+
+# Gap between the two brick columns, as a fraction of the panel width.
+COLUMN_GAP_FRAC = 0.10
 
 
 def _natural_key(label):
@@ -137,29 +142,47 @@ def render_legend(karyotype_path, entries, output_path, title="ALGs", dpi=100):
 
     n = len(entries)
     title_h = TITLE_FRAC  # in axes-fraction units (panel spans full height)
-    max_brick = MAX_BRICK_FRAC
-    avail = 1.0 - title_h
-    brick_h = min(max_brick, avail / n)
     inset = BRICK_INSET_FRAC
+
+    # Two columns, filled column-major so natural-sorted entries read top-to-
+    # bottom down the left column, then down the right. Bricks keep the size they
+    # would have as one full-height column of *n* entries, so splitting into two
+    # columns leaves the stack about half as tall -- which we then centre.
+    rows_per_col = (n + 1) // 2
+    avail = 1.0 - title_h
+    brick_h = min(MAX_BRICK_FRAC, avail / n)
+
+    # Two equal columns with a gap between them (x runs 0..1 across the panel).
+    col_gap = COLUMN_GAP_FRAC
+    col_w = (1.0 - col_gap) / 2
+    col_x = [0.0, col_w + col_gap]  # left edge of each column
+
+    # Centre the whole block (title + bricks) vertically in the panel.
+    block_h = title_h + rows_per_col * brick_h
+    top0 = (1.0 - block_h) / 2
+
+    label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
 
     lax.text(
         0.5,
-        title_h / 2,
+        top0 + title_h / 2,
         title,
         ha="center",
         va="center",
         fontweight="bold",
-        fontsize=round(brick_h * total_h * LABEL_FRAC) * 72 / dpi,
+        fontsize=label_fs,
         color="#000000",
     )
 
-    label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
+    bricks_top = top0 + title_h
     for idx, (label, color) in enumerate(entries):
-        top = title_h + idx * brick_h
+        col, row = divmod(idx, rows_per_col)
+        x0 = col_x[col]
+        top = bricks_top + row * brick_h
         lax.add_patch(
             mpatches.Rectangle(
-                (inset, top),
-                1 - 2 * inset,
+                (x0 + inset * col_w, top),
+                col_w * (1 - 2 * inset),
                 brick_h,
                 facecolor=color,
                 edgecolor="#000000",
@@ -167,7 +190,7 @@ def render_legend(karyotype_path, entries, output_path, title="ALGs", dpi=100):
             )
         )
         lax.text(
-            0.5,
+            x0 + col_w / 2,
             top + brick_h / 2,
             label,
             ha="center",
