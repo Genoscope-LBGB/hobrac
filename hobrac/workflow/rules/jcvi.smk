@@ -127,6 +127,7 @@ rule jcvi_karyotype:
     input:
         seqids="aln/jcvi_karyotype/seqids",
         layouts="aln/jcvi_karyotype/layouts",
+        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
     output:
         "aln/jcvi_karyotype/karyotype.png",
     benchmark:
@@ -141,6 +142,13 @@ rule jcvi_karyotype:
         cd aln/jcvi_karyotype
         python -m jcvi.graphics.karyotype seqids layouts \
             --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
+
+        # Composite the ALG colour legend (one brick per shown ALG) onto the
+        # right margin, derived from gene_chains.tsv. A no-op if nothing is
+        # coloured.
+        karyotype_legend \
+            --gene-chains gene_chains.tsv \
+            --karyotype karyotype.png
         """
 
 
