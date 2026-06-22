@@ -242,6 +242,7 @@ rule jcvi_alg_dotplot_grid:
         runtime=30,
     params:
         jcvi_names=config.get("jcvi_names", ""),
+        assembly_name=config["scientific_name"],
     shell:
         """
         for theme in light dark; do
@@ -256,6 +257,7 @@ rule jcvi_alg_dotplot_grid:
                 --reference-dir reference \
                 --theme $theme \
                 -o $out \
+                --assembly-name "{params.assembly_name}" \
                 --jcvi-names "{params.jcvi_names}"
         done
         """
