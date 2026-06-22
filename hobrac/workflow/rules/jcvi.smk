@@ -221,7 +221,7 @@ rule jcvi_alg_dotplot:
                 --query-order $assembly_order \
                 --target-order $ref_order \
                 --theme $theme \
-                --line-thickness 12 \
+                --line-thickness 10 \
                 --font-size 30 \
 
                 $hide_flag
