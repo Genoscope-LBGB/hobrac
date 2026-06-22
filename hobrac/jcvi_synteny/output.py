@@ -814,7 +814,7 @@ def main():
         "with --jcvi-custom-colors.",
     )
     parser.add_argument(
-        "--jcvi-pvalue",
+        "--alg-pvalue",
         type=float,
         default=0.01,
         help="Significance threshold (alpha) for Fisher's exact test in ALG "
@@ -856,7 +856,7 @@ def main():
         custom_names=args.jcvi_names,
         hide_non_significant=args.hide_non_significant,
         skip_alg=args.skip_alg,
-        alpha=args.jcvi_pvalue,
+        alpha=args.alg_pvalue,
         min_chain_genes=args.jcvi_min_chain_genes,
         permissive_alg=args.jcvi_permissive_alg,
     )

@@ -307,9 +307,9 @@ def get_args():
         default=False,
     )
     optional_args.add_argument(
-        "--jcvi-pvalue",
+        "--alg-pvalue",
         action="store",
-        dest="jcvi_pvalue",
+        dest="alg_pvalue",
         help="Base significance threshold (alpha) for ALG detection via Fisher's "
         "exact test. Bonferroni correction is applied on top of this value.",
         default=0.01,

@@ -40,8 +40,8 @@ def get_dotplot_grid_inputs(wildcards):
             if line.strip():
                 accessions.append(line.strip())
     patterns = [
-        "aln/jcvi_karyotype/dotplots/{accession}.png",
-        "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+        "aln/synteny_plots/dotplots/{accession}.png",
+        "aln/synteny_plots/dotplots/{accession}_dark.png",
     ]
     # Manual references have no NCBI assembly report; only get_reference can
     # produce one (by downloading), so requiring it would re-trigger a download.
@@ -55,7 +55,7 @@ rule resolve_jcvi_color_scheme:
     input:
         chosen_dataset="busco/chosen_dataset.txt",
     output:
-        resolved="aln/jcvi_karyotype/resolved_colors.txt",
+        resolved="aln/synteny_plots/resolved_colors.txt",
     params:
         scheme=config.get("jcvi_color_scheme", ""),
     run:
@@ -92,13 +92,13 @@ rule jcvi_synteny:
         busco_references=get_busco_reference_dirs,
         accession_order="mash/selected_accessions.txt",
         assembly=config["assembly"],
-        resolved_colors="aln/jcvi_karyotype/resolved_colors.txt",
+        resolved_colors="aln/synteny_plots/resolved_colors.txt",
         reference_reports=get_reference_report_inputs,
     output:
-        seqids="aln/jcvi_karyotype/seqids",
-        layouts="aln/jcvi_karyotype/layouts",
-        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
-        orders=directory("aln/jcvi_karyotype/dotplot_orders"),
+        seqids="aln/synteny_plots/seqids",
+        layouts="aln/synteny_plots/layouts",
+        gene_chains="aln/synteny_plots/gene_chains.tsv",
+        orders=directory("aln/synteny_plots/dotplot_orders"),
     benchmark:
         "benchmarks/jcvi_synteny.txt"
     resources:
@@ -108,13 +108,13 @@ rule jcvi_synteny:
         manual_refs=config.get("manual_references", ""),
         assembly_name=config["scientific_name"].replace(" ", "_"),
         assembly_display_name=config["scientific_name"],
-        outdir="aln/jcvi_karyotype",
+        outdir="aln/synteny_plots",
         min_busco_genes=config.get("min_busco_genes", 0),
         jcvi_custom_colors=config.get("jcvi_custom_colors", ""),
         jcvi_names=config.get("jcvi_names", ""),
         hide_non_significant=config.get("hide_non_significant", False),
         skip_alg=config.get("skip_alg", False),
-        jcvi_pvalue=config.get("jcvi_pvalue", 0.01),
+        alg_pvalue=config.get("alg_pvalue", 0.01),
         jcvi_min_chain_genes=config.get("jcvi_min_chain_genes", 5),
         jcvi_permissive_alg=config.get("jcvi_permissive_alg", False),
     shell:
@@ -139,7 +139,7 @@ rule jcvi_synteny:
             --reference-dir reference \
             --output_dir {params.outdir} \
             --min-busco-genes {params.min_busco_genes} \
-            --jcvi-pvalue {params.jcvi_pvalue} \
+            --alg-pvalue {params.alg_pvalue} \
             --jcvi-min-chain-genes {params.jcvi_min_chain_genes} \
             $([ -n "$COLOR_ARG" ] && echo "--jcvi-custom-colors $COLOR_ARG") \
             $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}") \
@@ -151,11 +151,11 @@ rule jcvi_synteny:
 
 rule jcvi_karyotype:
     input:
-        seqids="aln/jcvi_karyotype/seqids",
-        layouts="aln/jcvi_karyotype/layouts",
-        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
+        seqids="aln/synteny_plots/seqids",
+        layouts="aln/synteny_plots/layouts",
+        gene_chains="aln/synteny_plots/gene_chains.tsv",
     output:
-        "aln/jcvi_karyotype/karyotype.png",
+        "aln/synteny_plots/karyotype.png",
     benchmark:
         "benchmarks/jcvi_karyotype.txt"
     container:
@@ -165,7 +165,7 @@ rule jcvi_karyotype:
         runtime=10,
     shell:
         """
-        cd aln/jcvi_karyotype
+        cd aln/synteny_plots
         python -m jcvi.graphics.karyotype seqids layouts \
             --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
 
@@ -198,11 +198,11 @@ rule jcvi_alg_dotplot:
     """
     input:
         busco_dir="aln/busco_{accession}",
-        gene_chains="aln/jcvi_karyotype/gene_chains.tsv",
-        orders="aln/jcvi_karyotype/dotplot_orders",
+        gene_chains="aln/synteny_plots/gene_chains.tsv",
+        orders="aln/synteny_plots/dotplot_orders",
     output:
-        light="aln/jcvi_karyotype/dotplots/{accession}.png",
-        dark="aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+        light="aln/synteny_plots/dotplots/{accession}.png",
+        dark="aln/synteny_plots/dotplots/{accession}_dark.png",
     benchmark:
         "benchmarks/jcvi_alg_dotplot_{accession}.txt"
     container:
@@ -215,7 +215,7 @@ rule jcvi_alg_dotplot:
         hide_non_significant=config.get("hide_non_significant", False),
     shell:
         """
-        outdir=aln/jcvi_karyotype/dotplots
+        outdir=aln/synteny_plots/dotplots
         mkdir -p $outdir
 
         # gene -> hex color map (gene_chains.tsv: col3=gene, col4=color).
@@ -268,8 +268,8 @@ rule jcvi_alg_dotplot_grid:
         dotplots=get_dotplot_grid_inputs,
         order="mash/selected_accessions.txt",
     output:
-        light="aln/jcvi_karyotype/dotplots_grid.png",
-        dark="aln/jcvi_karyotype/dotplots_grid_dark.png",
+        light="aln/synteny_plots/dotplots_grid.png",
+        dark="aln/synteny_plots/dotplots_grid_dark.png",
     benchmark:
         "benchmarks/jcvi_alg_dotplot_grid.txt"
     container:
@@ -289,7 +289,7 @@ rule jcvi_alg_dotplot_grid:
                 out={output.light}
             fi
             dotplot_grid \
-                --dotplots-dir aln/jcvi_karyotype/dotplots \
+                --dotplots-dir aln/synteny_plots/dotplots \
                 --accession-order {input.order} \
                 --reference-dir reference \
                 --theme $theme \

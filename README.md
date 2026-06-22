@@ -139,7 +139,7 @@ When using custom colors, ALG statistical testing still runs by default in order
 
 HoBRAC detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
-  - `--jcvi-pvalue`: base significance threshold (default: 0.01)
+  - `--alg-pvalue`: base significance threshold (default: 0.01)
   - `--jcvi-min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
   - `--jcvi-permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
   - `--jcvi-hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
@@ -173,7 +173,7 @@ hobrac_analysis/
 │   │   ├── aln_busco.paf            # BUSCO-based alignment in PAF format
 │   │   ├── dotplot_busco.png        # BUSCO dotplot (color)
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
-│   ├── jcvi_karyotype/
+│   ├── synteny_plots/
 │   │   ├── karyotype.png            # JCVI karyotype plot
 │   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/

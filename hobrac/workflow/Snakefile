@@ -27,22 +27,22 @@ def get_pipeline_targets(wildcards):
     if not config.get("manual_references"):
         targets.append("aln/ranking_symlinks.done")
 
-    targets.append("aln/jcvi_karyotype/karyotype.png")
+    targets.append("aln/synteny_plots/karyotype.png")
 
     # Per-reference ALG-colored dotplots (assembly on Y, each reference on X).
     targets.extend(
         expand(
             [
-                "aln/jcvi_karyotype/dotplots/{accession}.png",
-                "aln/jcvi_karyotype/dotplots/{accession}_dark.png",
+                "aln/synteny_plots/dotplots/{accession}.png",
+                "aln/synteny_plots/dotplots/{accession}_dark.png",
             ],
             accession=accessions,
         )
     )
 
     # Combined grid of all per-reference dotplots, titled by species.
-    targets.append("aln/jcvi_karyotype/dotplots_grid.png")
-    targets.append("aln/jcvi_karyotype/dotplots_grid_dark.png")
+    targets.append("aln/synteny_plots/dotplots_grid.png")
+    targets.append("aln/synteny_plots/dotplots_grid_dark.png")
 
     return targets
 
