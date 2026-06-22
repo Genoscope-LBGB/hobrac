@@ -103,15 +103,30 @@ PANEL_COLORS = {
     "dark": {"panel": "#2b3a55", "text": "#e8eef7", "bg": "#111111"},
 }
 
+# Margins (px) baked into each dotplot PNG by dotplotrs, i.e. the empty border
+# between the image edge and the plotted area. Used to line the header/left
+# panels up with the plot box rather than the full image.
+DOTPLOT_MARGINS = {"top": 40, "bottom": 170, "left": 120, "right": 10}
+
 
 def render_grid(
-    images, titles, assembly_title, output_path, theme="light", dpi=100, title_fontsize=14
+    images,
+    titles,
+    assembly_title,
+    output_path,
+    theme="light",
+    dpi=100,
+    title_fontsize=14,
+    margins=None,
 ):
     """Tile *images* into one PNG sized to native resolution.
 
     Each cell gets a pale-blue header strip carrying its reference *title*; each
     grid row gets a pale-blue vertical panel on the left carrying *assembly_title*.
+    Both panels are sized to the dotplot's plotted area (inside *margins*) so they
+    line up with the plot box rather than the full image.
     """
+    margins = margins or DOTPLOT_MARGINS
     n = len(images)
     rows, cols = grid_dims(n)
     colors = PANEL_COLORS.get(theme, PANEL_COLORS["light"])
@@ -157,20 +172,27 @@ def render_grid(
             transform=ax.transAxes,
         )
 
+    # Plot-box extents inside a cell (offsets/size relative to the cell image).
+    plot_w = cell_w - margins["left"] - margins["right"]
+    plot_h = cell_h - margins["top"] - margins["bottom"]
+
     for i, (img, title) in enumerate(zip(images, titles)):
         r, c = divmod(i, cols)
         block_top = r * block_h
         x_left = left_w + c * cell_w
 
-        panel(rect(x_left, block_top, cell_w, header_h), title)
+        # Header strip aligned to the plot box's x-range (over the plotted area).
+        panel(rect(x_left + margins["left"], block_top, plot_w, header_h), title)
 
         iax = fig.add_axes(rect(x_left, block_top + header_h, cell_w, cell_h))
-        iax.imshow(img, interpolation="none")
+        iax.imshow(img, interpolation="none", aspect="auto")
         iax.axis("off")
 
-    # Assembly panel: one per grid row, down the far left, spanning the row.
+    # Assembly panel: one per grid row, down the far left, aligned to the plot
+    # box's y-range (the plotted area, inside the top/bottom margins).
     for r in range(rows):
-        panel(rect(0, r * block_h, left_w, block_h), assembly_title, rotation=90)
+        plot_top = r * block_h + header_h + margins["top"]
+        panel(rect(0, plot_top, left_w, plot_h), assembly_title, rotation=90)
 
     fig.savefig(output_path, dpi=dpi, facecolor=fig.get_facecolor())
     plt.close(fig)
