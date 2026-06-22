@@ -5,6 +5,7 @@ import pytest
 from hobrac.jcvi_synteny.grid import (
     grid_dims,
     parse_organism_name,
+    resolve_assembly_title,
     resolve_titles,
 )
 
@@ -77,3 +78,28 @@ def test_resolve_titles_mismatched_count_falls_through(tmp_path):
 )
 def test_grid_dims(n, expected):
     assert grid_dims(n) == expected
+
+
+def test_resolve_assembly_title_prefers_first_jcvi_name():
+    # The first --jcvi-names entry is always the assembly.
+    assert (
+        resolve_assembly_title("MyAssembly,Species One", "Falls back")
+        == "MyAssembly"
+    )
+
+
+def test_resolve_assembly_title_falls_back_to_assembly_name():
+    assert resolve_assembly_title("", "Brassica rapa") == "Brassica rapa"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_render_grid_writes_png(tmp_path, theme):
+    np = pytest.importorskip("numpy")
+    from hobrac.jcvi_synteny.grid import render_grid
+
+    images = [np.zeros((40, 60, 3), dtype=float) for _ in range(3)]
+    out = tmp_path / f"grid_{theme}.png"
+    render_grid(
+        images, ["Ref A", "Ref B", "Ref C"], "My Assembly", str(out), theme=theme
+    )
+    assert out.is_file() and out.stat().st_size > 0
