@@ -97,6 +97,9 @@ def resolve_assembly_title(jcvi_names, assembly_name):
 HEADER_FRAC = 0.09
 LEFT_FRAC = 0.05
 
+# Panel text height as a fraction of the header strip, when auto-sizing the font.
+FONT_FRAC = 0.55
+
 # Panel fill + text colours per theme.
 PANEL_COLORS = {
     "light": {"panel": "#d6e6f4", "text": "#1a1a1a", "bg": "white"},
@@ -116,7 +119,7 @@ def render_grid(
     output_path,
     theme="light",
     dpi=100,
-    title_fontsize=14,
+    title_fontsize=None,
     margins=None,
 ):
     """Tile *images* into one PNG sized to native resolution.
@@ -136,6 +139,14 @@ def render_grid(
     cell_w = max(img.shape[1] for img in images)
     header_h = max(1, round(cell_h * HEADER_FRAC))
     left_w = max(1, round(cell_w * LEFT_FRAC))
+
+    # Auto-size the panel font to a readable fraction of the header strip (in
+    # points: px * 72 / dpi). Widen the narrow left panel if needed so the
+    # rotated assembly text still fits inside its blue strip.
+    if title_fontsize is None:
+        fs_px = round(header_h * FONT_FRAC)
+        title_fontsize = fs_px * 72 / dpi
+        left_w = max(left_w, round(fs_px * 1.6))
 
     block_h = header_h + cell_h  # one grid row = header strip + dotplot
     total_w = left_w + cols * cell_w
