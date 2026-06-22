@@ -260,7 +260,7 @@ def generate_layouts_file(
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
             f.write(
-                f"{y:.2f},\t0.1,\t0.9,\t0,\tblack,\t{label},\t{va},\t{bed_basename}\n"
+                f"{y:.2f},\t0.1,\t0.96,\t0,\tblack,\t{label},\t{va},\t{bed_basename}\n"
             )
 
         f.write("\n# edges\n")
