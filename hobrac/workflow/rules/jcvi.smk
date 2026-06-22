@@ -148,7 +148,8 @@ rule jcvi_karyotype:
         # coloured.
         karyotype_legend \
             --gene-chains gene_chains.tsv \
-            --karyotype karyotype.png
+            --karyotype karyotype.png \
+            --layouts layouts
         """
 
 
