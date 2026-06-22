@@ -100,6 +100,10 @@ LEFT_FRAC = 0.05
 # Panel text height as a fraction of the header strip, when auto-sizing the font.
 FONT_FRAC = 0.55
 
+# Gap (as a fraction of a cell's width) between the left assembly panel and the
+# dotplots, so the panel doesn't sit flush against the plots.
+LEFT_PAD_FRAC = 0.02
+
 # Panel fill + text colours per theme.
 PANEL_COLORS = {
     "light": {"panel": "#d6e6f4", "text": "#1a1a1a", "bg": "white"},
@@ -148,8 +152,13 @@ def render_grid(
         title_fontsize = fs_px * 72 / dpi
         left_w = max(left_w, round(fs_px * 1.6))
 
+    # Padding between the left panel and the dotplots; content (headers + images)
+    # starts at content_x, so headers and images shift together and stay aligned.
+    left_pad = round(cell_w * LEFT_PAD_FRAC)
+    content_x = left_w + left_pad
+
     block_h = header_h + cell_h  # one grid row = header strip + dotplot
-    total_w = left_w + cols * cell_w
+    total_w = content_x + cols * cell_w
     total_h = rows * block_h
 
     fig = plt.figure(figsize=(total_w / dpi, total_h / dpi), dpi=dpi)
@@ -190,7 +199,7 @@ def render_grid(
     for i, (img, title) in enumerate(zip(images, titles)):
         r, c = divmod(i, cols)
         block_top = r * block_h
-        x_left = left_w + c * cell_w
+        x_left = content_x + c * cell_w
 
         # Header strip aligned to the plot box's x-range (over the plotted area).
         panel(rect(x_left + margins["left"], block_top, plot_w, header_h), title)
