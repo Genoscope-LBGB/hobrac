@@ -18,8 +18,10 @@ Legend contents come straight from ``gene_chains.tsv`` (columns ``chain_id``,
     the chain count.
 
 Bricks are stacked top-to-bottom in natural-sorted label order (``A1``, ``A2``,
-``B1`` ... / numeric chain ids). If nothing is coloured, the karyotype is left
-untouched and no panel is drawn.
+``B1`` ... / numeric chain ids), confined to the vertical band of the plotted
+tracks (top track's labels down to the bottom track's chromosomes, read from the
+``layouts`` file) rather than the full image height. If nothing is coloured, the
+karyotype is left untouched and no panel is drawn.
 """
 
 import argparse
@@ -50,6 +52,13 @@ TITLE_FRAC = 0.035
 # inside the panel on either side of a brick.
 GAP_FRAC = 0.012
 BRICK_INSET_FRAC = 0.18
+
+# The legend is confined to the vertical band of the actual tracks: from a little
+# above the top track's bar (to reach its labels) down to the bottom track's bar
+# (its chromosomes). These pads, in fractions of image height, set how far above
+# the top bar and below the bottom bar the band reaches.
+TOP_BAND_PAD_FRAC = 0.04
+BOTTOM_BAND_PAD_FRAC = 0.0
 
 
 def _natural_key(label):
@@ -94,6 +103,35 @@ def collect_legend_entries(gene_chains_path):
     return sorted(entries.items(), key=lambda item: _natural_key(item[0]))
 
 
+def read_track_band(layouts_path):
+    """Return ``(band_top, band_bottom)`` as fractions of image height (top=0).
+
+    Reads the karyotype ``layouts`` file, whose track rows start with the track's
+    ``y`` coordinate in jcvi axes space (1 = top of figure). The top track has the
+    largest ``y`` and the bottom track the smallest; jcvi draws a track's bar at
+    pixel fraction ``1 - y`` from the top. The band runs from a little above the
+    top bar (to include the top track's labels) down to the bottom bar. Returns
+    ``None`` if no track rows are found (caller falls back to the full height).
+    """
+    ys = []
+    with open(layouts_path) as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            first = stripped.split(",")[0].strip()
+            try:
+                ys.append(float(first))
+            except ValueError:
+                continue  # edge rows ("e, 0, 1, links.simple") have no leading y
+    if not ys:
+        return None
+    top_y, bottom_y = max(ys), min(ys)
+    band_top = max(0.0, (1.0 - top_y) - TOP_BAND_PAD_FRAC)
+    band_bottom = min(1.0, (1.0 - bottom_y) + BOTTOM_BAND_PAD_FRAC)
+    return band_top, band_bottom
+
+
 def _text_color(face_color):
     """Black or white, whichever reads better on *face_color* (sRGB luminance)."""
     r, g, b = mcolors.to_rgb(face_color)
@@ -101,8 +139,15 @@ def _text_color(face_color):
     return "#000000" if luminance > 0.55 else "#ffffff"
 
 
-def render_legend(karyotype_path, entries, output_path, title="ALGs", dpi=100):
-    """Composite *entries* as a brick legend onto the right of the karyotype PNG."""
+def render_legend(
+    karyotype_path, entries, output_path, title="ALGs", dpi=100, band=(0.0, 1.0)
+):
+    """Composite *entries* as a brick legend onto the right of the karyotype PNG.
+
+    *band* is ``(top, bottom)`` in fractions of image height (top = 0); the title
+    and bricks are confined to it so the legend lines up with the plotted tracks
+    rather than spanning the whole image. The default spans the full height.
+    """
     base = mpimg.imread(karyotype_path)
     img_h, img_w = base.shape[0], base.shape[1]
 
@@ -136,26 +181,28 @@ def render_legend(karyotype_path, entries, output_path, title="ALGs", dpi=100):
     lax.axis("off")
 
     n = len(entries)
-    title_h = TITLE_FRAC  # in axes-fraction units (panel spans full height)
-    max_brick = MAX_BRICK_FRAC
-    avail = 1.0 - title_h
-    brick_h = min(max_brick, avail / n)
+    band_top, band_bottom = band
+    title_h = TITLE_FRAC  # in axes-fraction units (1.0 == full image height)
+    avail = (band_bottom - band_top) - title_h
+    brick_h = min(MAX_BRICK_FRAC, avail / n)
     inset = BRICK_INSET_FRAC
+
+    label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
 
     lax.text(
         0.5,
-        title_h / 2,
+        band_top + title_h / 2,
         title,
         ha="center",
         va="center",
         fontweight="bold",
-        fontsize=round(brick_h * total_h * LABEL_FRAC) * 72 / dpi,
+        fontsize=label_fs,
         color="#000000",
     )
 
-    label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
+    bricks_top = band_top + title_h
     for idx, (label, color) in enumerate(entries):
-        top = title_h + idx * brick_h
+        top = bricks_top + idx * brick_h
         lax.add_patch(
             mpatches.Rectangle(
                 (inset, top),
@@ -191,6 +238,11 @@ def main():
         "--karyotype", required=True, help="Karyotype PNG to annotate (overwritten)"
     )
     parser.add_argument(
+        "--layouts",
+        default=None,
+        help="jcvi layouts file; confines the legend to the track band",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         default=None,
@@ -204,8 +256,14 @@ def main():
         print("No coloured ALGs in gene_chains.tsv; leaving karyotype unchanged.")
         return
 
+    band = (0.0, 1.0)
+    if args.layouts:
+        track_band = read_track_band(args.layouts)
+        if track_band:
+            band = track_band
+
     output_path = args.output or args.karyotype
-    render_legend(args.karyotype, entries, output_path, title=args.title)
+    render_legend(args.karyotype, entries, output_path, title=args.title, band=band)
 
 
 if __name__ == "__main__":
