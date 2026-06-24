@@ -142,7 +142,7 @@ rule jcvi_synteny:
             --alg-pvalue {params.alg_pvalue} \
             --jcvi-min-chain-genes {params.jcvi_min_chain_genes} \
             $([ -n "$COLOR_ARG" ] && echo "--jcvi-custom-colors $COLOR_ARG") \
-            $([ -n "{params.jcvi_names}" ] && echo "--jcvi-names {params.jcvi_names}") \
+            --jcvi-names "{params.jcvi_names}" \
             $([ "{params.hide_non_significant}" = "True" ] && echo "--hide-non-significant") \
             $([ "{params.skip_alg}" = "True" ] && echo "--skip-alg") \
             $([ "{params.jcvi_permissive_alg}" = "True" ] && echo "--jcvi-permissive-alg")
