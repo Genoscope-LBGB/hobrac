@@ -568,29 +568,12 @@ def run(
                 if accession and accession in ref_busco_paths:
                     species_order.append((accession, ref_busco_paths[accession]))
 
-    # Capture the stable per-species keys (assembly name / reference accession)
-    # before any custom renaming, so the ALG dotplots can be matched to their
-    # reference by accession regardless of the display names below.
+    # Stable, underscore-free per-species keys (assembly name / reference
+    # accession). These key every generated file and gene-id prefix; custom
+    # --jcvi-names are display-only and applied later as karyotype/dotplot
+    # labels, so names with spaces never leak into jcvi's whitespace-delimited
+    # bed/links parsers (which would crash with "too many values to unpack").
     species_keys = [name for name, _ in species_order]
-
-    # Apply custom names if provided
-    if custom_names:
-        names_list = [n.strip() for n in custom_names.split(",")]
-        if len(names_list) == 1:
-            # Single name: apply only to assembly
-            if species_order:
-                species_order[0] = (names_list[0], species_order[0][1])
-        else:
-            # Multiple names: must match species count
-            if len(names_list) != len(species_order):
-                raise ValueError(
-                    f"Number of custom names ({len(names_list)}) must equal "
-                    f"number of species ({len(species_order)}): 1 assembly + "
-                    f"{len(species_order) - 1} references"
-                )
-            species_order = [
-                (names_list[i], species_order[i][1]) for i in range(len(species_order))
-            ]
 
     # Load all BUSCO data
     species_busco = []
