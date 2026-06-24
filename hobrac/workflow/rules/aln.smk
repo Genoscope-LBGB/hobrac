@@ -3,7 +3,7 @@ import os
 
 rule aln:
     input:
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
     output:
         "aln/vs_{accession}/aln.paf",
@@ -24,7 +24,7 @@ rule aln:
 rule gen_dgenies_index:
     input:
         aln="aln/vs_{accession}/aln.paf",
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
     output:
         touch("aln/vs_{accession}/dgenies.done"),
