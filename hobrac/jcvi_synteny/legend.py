@@ -40,7 +40,7 @@ from .models import DEFAULT_COLOR  # noqa: E402
 # Legend panel width as a fraction of the karyotype image width, and the largest
 # a single brick is allowed to grow to (as a fraction of image height) so a
 # short legend keeps tidy bricks instead of a few giant blocks.
-PANEL_WIDTH_FRAC = 0.16
+PANEL_WIDTH_FRAC = 0.10
 MAX_BRICK_FRAC = 0.055
 
 # Brick label height as a fraction of the brick height, and the title strip
