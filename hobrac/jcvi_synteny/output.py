@@ -238,16 +238,21 @@ def generate_layouts_file(
         species_beds: List of (species_name, bed_file_path) tuples
         links_files: List of links file paths
         output_path: Output layouts file path
-        labels: Display label per track, in ``species_beds`` order. These are
-                cosmetic (the karyotype's ``label`` column only); the internal
-                ``species_name`` still keys the bed/links files. Falls back to
-                ``species_name`` when omitted.
+        labels: Display label per track, in ``species_beds`` order. Falls back to
+                ``species_name`` when omitted. jcvi's own ``label`` column is left
+                blank so long names cannot overlap the chromosome tracks; the
+                labels are stashed in a jcvi-ignored ``# track_labels`` comment
+                instead, and ``karyotype_legend`` draws them right-aligned (wrapped
+                to two lines when needed) as a post-processing step.
     """
     num_species = len(species_beds)
+    track_labels = labels if labels else [name for name, _ in species_beds]
 
     with open(output_path, "w") as f:
         f.write("# y, xstart, xend, rotation, color, label, va, bed\n")
         f.write(f"#{'-' * 60}\n")
+        # jcvi ignores '#' lines; the post-processor reads the labels from here.
+        f.write("# track_labels\t" + "\t".join(track_labels) + "\n")
 
         # Calculate y positions (evenly spaced from 0.9 to 0.1)
         y_positions = [
@@ -256,11 +261,11 @@ def generate_layouts_file(
 
         for i, (species_name, bed_path) in enumerate(species_beds):
             bed_basename = os.path.basename(bed_path)
-            label = labels[i] if labels else species_name
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
+            # Empty label column: labels are drawn by karyotype_legend instead.
             f.write(
-                f"{y:.2f},\t0.1,\t0.96,\t0,\tblack,\t{label},\t{va},\t{bed_basename}\n"
+                f"{y:.2f},\t0.1,\t0.96,\t0,\tblack,\t,\t{va},\t{bed_basename}\n"
             )
 
         f.write("\n# edges\n")

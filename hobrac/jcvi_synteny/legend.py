@@ -1,8 +1,11 @@
-"""Composite an ALG colour legend onto the right margin of the karyotype PNG.
+"""Composite track labels and an ALG colour legend onto the karyotype PNG.
 
-The karyotype image is rendered upstream by ``jcvi.graphics.karyotype``; this
-step reads the finished ``karyotype.png`` and draws a legend panel of stacked
-colour bricks beside it, one brick per ALG actually shown in the plot.
+The karyotype image is rendered upstream by ``jcvi.graphics.karyotype`` with its
+own label column left blank (long species names would otherwise overlap the
+tracks); this step reads the finished ``karyotype.png`` and draws the species
+labels right-aligned in the left margin (from the ``# track_labels`` comment in
+the layouts file), plus a legend panel of stacked colour bricks on the right, one
+brick per ALG actually shown in the plot.
 
 Legend contents come straight from ``gene_chains.tsv`` (columns ``chain_id``,
 ``custom_alg_id``, ``gene``, ``color``):
@@ -59,6 +62,15 @@ BRICK_INSET_FRAC = 0.18
 # the top bar and below the bottom bar the band reaches.
 TOP_BAND_PAD_FRAC = 0.04
 BOTTOM_BAND_PAD_FRAC = 0.0
+
+# Track labels (drawn here instead of by jcvi so long names cannot overlap the
+# tracks): base font height as a fraction of the image height (so it does not
+# balloon when there are few tracks), capped at a fraction of the inter-track
+# spacing so two wrapped lines still fit between adjacent tracks. LABEL_GAP_FRAC
+# is the gap (fraction of image width) between a label's right edge and its track.
+LABEL_FONT_FRAC = 0.018
+LABEL_MAX_SPACING_FRAC = 0.34
+LABEL_GAP_FRAC = 0.008
 
 
 def _natural_key(label):
@@ -132,6 +144,103 @@ def read_track_band(layouts_path):
     return band_top, band_bottom
 
 
+def read_track_labels(layouts_path):
+    """Return the per-track display labels from the ``# track_labels`` comment.
+
+    ``generate_layouts_file`` stashes the labels there (tab-separated, in track
+    order) because jcvi's own label column is left blank. Returns ``[]`` when the
+    comment is absent.
+    """
+    with open(layouts_path) as f:
+        for line in f:
+            if line.startswith("# track_labels"):
+                return line.rstrip("\n").split("\t")[1:]
+    return []
+
+
+def read_track_positions(layouts_path):
+    """Return ``[(y, xstart)]`` per track row, in file order.
+
+    ``y`` is the jcvi axes y (1 = top of figure) and ``xstart`` the track's left
+    edge (fraction of image width). Comment and edge rows are skipped.
+    """
+    rows = []
+    with open(layouts_path) as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            cols = [c.strip() for c in stripped.split(",")]
+            try:
+                rows.append((float(cols[0]), float(cols[1])))
+            except (ValueError, IndexError):
+                continue  # edge rows ("e, 0, 1, links.simple")
+    return rows
+
+
+def _wrap_two_lines(text):
+    """Split a multi-word *text* into two balanced lines on whitespace.
+
+    Returns ``None`` for a single token (e.g. an accession ``CA_96446885``): a
+    mid-token split reads worse than shrinking it onto one line, which the caller
+    does instead.
+    """
+    words = text.split()
+    if len(words) < 2:
+        return None
+    k = min(
+        range(1, len(words)),
+        key=lambda i: abs(len(" ".join(words[:i])) - len(" ".join(words[i:]))),
+    )
+    return " ".join(words[:k]) + "\n" + " ".join(words[k:])
+
+
+def draw_track_labels(ax, labels, positions, img_w, img_h, dpi, renderer):
+    """Draw right-aligned track labels in the left margin of the karyotype.
+
+    *ax* spans the karyotype image with ``xlim(0, 1)`` / ``ylim(1, 0)`` so jcvi's
+    coordinates map straight through: a track at jcvi-y ``y`` has its bar at axes
+    ``1 - y`` and starts at axes-x ``xstart``. Each label is right-aligned just
+    left of its track; if a single line is wider than the available margin it is
+    wrapped to two lines, then shrunk to fit. ponytail: font auto-shrink guarantees
+    the label always fits rather than running off the image edge.
+    """
+    n = len(positions)
+    spacing = (0.8 / max(n - 1, 1)) * img_h  # px between adjacent tracks
+    base_fs_px = min(LABEL_FONT_FRAC * img_h, LABEL_MAX_SPACING_FRAC * spacing)
+    base_fs = base_fs_px * 72 / dpi  # px -> points
+
+    def width_pt(text, fs):
+        t = ax.text(0, 0, text, fontsize=fs)
+        w = t.get_window_extent(renderer).width
+        t.remove()
+        return w
+
+    for (y, xstart), text in zip(positions, labels):
+        if not text:
+            continue
+        x_right = xstart - LABEL_GAP_FRAC
+        max_w = x_right * img_w  # display px available to the left edge
+        rendered, fs = text, base_fs
+        if width_pt(rendered, fs) > max_w:
+            wrapped = _wrap_two_lines(text)  # None for single-token names
+            if wrapped is not None:
+                rendered = wrapped
+            w = width_pt(rendered, fs)
+            if w > max_w:
+                fs *= max_w / w  # shrink (wrapped or single line) to fit the margin
+        ax.text(
+            x_right,
+            1 - y,
+            rendered,
+            ha="right",
+            va="center",
+            fontsize=fs,
+            color="#000000",
+            linespacing=0.95,
+        )
+
+
 def _text_color(face_color):
     """Black or white, whichever reads better on *face_color* (sRGB luminance)."""
     r, g, b = mcolors.to_rgb(face_color)
@@ -140,19 +249,29 @@ def _text_color(face_color):
 
 
 def render_legend(
-    karyotype_path, entries, output_path, title="ALGs", dpi=100, band=(0.0, 1.0)
+    karyotype_path,
+    entries,
+    output_path,
+    title="ALGs",
+    dpi=100,
+    band=(0.0, 1.0),
+    labels=None,
+    positions=None,
 ):
-    """Composite *entries* as a brick legend onto the right of the karyotype PNG.
+    """Composite track labels (left) and an ALG brick legend (right) onto the PNG.
 
-    *band* is ``(top, bottom)`` in fractions of image height (top = 0); the title
-    and bricks are confined to it so the legend lines up with the plotted tracks
-    rather than spanning the whole image. The default spans the full height.
+    Track *labels* are drawn right-aligned in the karyotype's left margin at the
+    positions read from the layouts file (see ``draw_track_labels``). The ALG
+    legend is only added when *entries* is non-empty; *band* is ``(top, bottom)``
+    in fractions of image height (top = 0), confining the bricks to the plotted
+    tracks. With no entries the figure keeps the karyotype's own width.
     """
     base = mpimg.imread(karyotype_path)
     img_h, img_w = base.shape[0], base.shape[1]
 
-    panel_w = max(1, round(img_w * PANEL_WIDTH_FRAC))
-    gap = round(img_w * GAP_FRAC)
+    has_panel = bool(entries)
+    panel_w = max(1, round(img_w * PANEL_WIDTH_FRAC)) if has_panel else 0
+    gap = round(img_w * GAP_FRAC) if has_panel else 0
     total_w = img_w + gap + panel_w
     total_h = img_h
 
@@ -173,55 +292,67 @@ def render_legend(
     kax.imshow(base, interpolation="none", aspect="auto")
     kax.axis("off")
 
-    # Legend panel occupies the right column; one axes spanning it, drawn in its
-    # own 0..1 coordinate space with y inverted so the first entry sits on top.
-    lax = fig.add_axes(rect(img_w + gap, 0, panel_w, img_h))
-    lax.set_xlim(0, 1)
-    lax.set_ylim(1, 0)
-    lax.axis("off")
-
-    n = len(entries)
-    band_top, band_bottom = band
-    title_h = TITLE_FRAC  # in axes-fraction units (1.0 == full image height)
-    avail = (band_bottom - band_top) - title_h
-    brick_h = min(MAX_BRICK_FRAC, avail / n)
-    inset = BRICK_INSET_FRAC
-
-    label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
-
-    lax.text(
-        0.5,
-        band_top + title_h / 2,
-        title,
-        ha="center",
-        va="center",
-        fontweight="bold",
-        fontsize=label_fs,
-        color="#000000",
-    )
-
-    bricks_top = band_top + title_h
-    for idx, (label, color) in enumerate(entries):
-        top = bricks_top + idx * brick_h
-        lax.add_patch(
-            mpatches.Rectangle(
-                (inset, top),
-                1 - 2 * inset,
-                brick_h,
-                facecolor=color,
-                edgecolor="#000000",
-                linewidth=0.8,
-            )
+    # Track labels overlay: an axes spanning the karyotype image, in jcvi's own
+    # 0..1 coordinate space (y inverted) so labels land on the bars jcvi drew.
+    if labels and positions:
+        tax = fig.add_axes(rect(0, 0, img_w, img_h))
+        tax.set_xlim(0, 1)
+        tax.set_ylim(1, 0)
+        tax.axis("off")
+        draw_track_labels(
+            tax, labels, positions, img_w, img_h, dpi, fig.canvas.get_renderer()
         )
+
+    if has_panel:
+        # Legend panel occupies the right column; one axes spanning it, drawn in
+        # its own 0..1 coordinate space with y inverted so the first entry is on top.
+        lax = fig.add_axes(rect(img_w + gap, 0, panel_w, img_h))
+        lax.set_xlim(0, 1)
+        lax.set_ylim(1, 0)
+        lax.axis("off")
+
+        n = len(entries)
+        band_top, band_bottom = band
+        title_h = TITLE_FRAC  # in axes-fraction units (1.0 == full image height)
+        avail = (band_bottom - band_top) - title_h
+        brick_h = min(MAX_BRICK_FRAC, avail / n)
+        inset = BRICK_INSET_FRAC
+
+        label_fs = round(brick_h * total_h * LABEL_FRAC) * 72 / dpi
+
         lax.text(
             0.5,
-            top + brick_h / 2,
-            label,
+            band_top + title_h / 2,
+            title,
             ha="center",
             va="center",
+            fontweight="bold",
             fontsize=label_fs,
-            color=_text_color(color),
+            color="#000000",
         )
+
+        bricks_top = band_top + title_h
+        for idx, (label, color) in enumerate(entries):
+            top = bricks_top + idx * brick_h
+            lax.add_patch(
+                mpatches.Rectangle(
+                    (inset, top),
+                    1 - 2 * inset,
+                    brick_h,
+                    facecolor=color,
+                    edgecolor="#000000",
+                    linewidth=0.8,
+                )
+            )
+            lax.text(
+                0.5,
+                top + brick_h / 2,
+                label,
+                ha="center",
+                va="center",
+                fontsize=label_fs,
+                color=_text_color(color),
+            )
 
     fig.savefig(output_path, dpi=dpi, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -240,7 +371,8 @@ def main():
     parser.add_argument(
         "--layouts",
         default=None,
-        help="jcvi layouts file; confines the legend to the track band",
+        help="jcvi layouts file; supplies the track labels (drawn in the left "
+        "margin) and confines the ALG legend to the track band",
     )
     parser.add_argument(
         "-o",
@@ -252,18 +384,30 @@ def main():
     args = parser.parse_args()
 
     entries = collect_legend_entries(args.gene_chains)
-    if not entries:
-        print("No coloured ALGs in gene_chains.tsv; leaving karyotype unchanged.")
-        return
 
     band = (0.0, 1.0)
+    labels, positions = [], []
     if args.layouts:
         track_band = read_track_band(args.layouts)
         if track_band:
             band = track_band
+        labels = read_track_labels(args.layouts)
+        positions = read_track_positions(args.layouts)
+
+    if not entries and not (labels and positions):
+        print("Nothing to composite; leaving karyotype unchanged.")
+        return
 
     output_path = args.output or args.karyotype
-    render_legend(args.karyotype, entries, output_path, title=args.title, band=band)
+    render_legend(
+        args.karyotype,
+        entries,
+        output_path,
+        title=args.title,
+        band=band,
+        labels=labels,
+        positions=positions,
+    )
 
 
 if __name__ == "__main__":
