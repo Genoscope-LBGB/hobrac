@@ -99,7 +99,13 @@ rule download_busco_dataset:
 
 rule busco_reference:
     input:
-        fna="reference/{accession}.fna",
+        # ancient(): manual references (-r) are rewritten by main.py on every
+        # invocation, bumping the .fna mtime and otherwise re-triggering BUSCO
+        # (and a fresh busco_downloads re-download) even when content is
+        # unchanged. Ignoring mtime here keeps cached BUSCO results valid. Trade-
+        # off: replacing a reference in place no longer auto-reruns BUSCO; delete
+        # busco/busco_reference_{accession} to force it.
+        fna=ancient("reference/{accession}.fna"),
         dataset="busco/chosen_dataset.txt",
         busco_db="busco/busco_downloads",
     output:
@@ -195,13 +201,13 @@ rule cleanup_busco_downloads:
         runtime=5,
     shell:
         """
-        rm -rf busco/busco_downloads
+        rm -rf busco/busco_downloads reference/*.fna
     """
 
 
 rule busco_to_paf:
     input:
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
         busco_reference=lambda wildcards: config.get(
             "busco_reference_override", f"busco/busco_reference_{wildcards.accession}"

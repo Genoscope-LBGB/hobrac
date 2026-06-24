@@ -139,7 +139,7 @@ When using custom colors, ALG statistical testing still runs by default in order
 
 HoBRAC detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
-  - `--jcvi-pvalue`: base significance threshold (default: 0.01)
+  - `--alg-pvalue`: base significance threshold (default: 0.01)
   - `--jcvi-min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
   - `--jcvi-permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
   - `--jcvi-hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
@@ -173,14 +173,14 @@ hobrac_analysis/
 │   │   ├── aln_busco.paf            # BUSCO-based alignment in PAF format
 │   │   ├── dotplot_busco.png        # BUSCO dotplot (color)
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
-│   ├── jcvi_karyotype/
+│   ├── synteny_plots/
 │   │   ├── karyotype.png            # JCVI karyotype plot
-│   ├── rank1_busco -> busco_<accession>/   # Ranked symlinks (closest first)
-│   └── rank1_geno  -> vs_<accession>/
+│   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
+│   └── rank1_<Species_name>_geno  -> vs_<accession>/
 ├── benchmarks/                      # Runtime and resource usage per step
 ```
 
-When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_*`, `rank2_*`, ...) sorted by MASH distance.
+When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_<Species_name>_*`, `rank2_<Species_name>_*`, ...) sorted by MASH distance. The `rank<i>` prefix keeps each symlink unique even when two references belong to the same species; references without an NCBI assembly report (e.g. manual references) fall back to the accession in place of the species name.
 
 The PAF alignment files can be loaded directly into the [online viewer](https://www.genoscope.cns.fr/lbgb/hobrac/) for interactive exploration.
 
