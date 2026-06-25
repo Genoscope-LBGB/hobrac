@@ -56,6 +56,9 @@ rule resolve_jcvi_color_scheme:
         chosen_dataset="busco/chosen_dataset.txt",
     output:
         resolved="aln/synteny_plots/resolved_colors.txt",
+    resources:
+        mem_mb=8000,
+        runtime=30,
     params:
         scheme=config.get("jcvi_color_scheme", ""),
     run:
