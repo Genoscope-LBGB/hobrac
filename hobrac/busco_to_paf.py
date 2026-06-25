@@ -4,6 +4,7 @@ import os
 import uuid
 
 from Bio import SeqIO
+from xopen import xopen
 
 
 def read_busco_tsv(file_path):
@@ -25,7 +26,7 @@ def read_busco_tsv(file_path):
 
 def calculate_fasta_lengths(file_path):
     lengths = {}
-    with open(file_path, "r") as file:
+    with xopen(file_path) as file:
         for record in SeqIO.parse(file, "fasta"):
             lengths[record.id] = len(record.seq)
     return lengths

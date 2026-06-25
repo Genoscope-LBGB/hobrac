@@ -9,8 +9,11 @@ found, rename the sequence to that token. A per-reference TSV mapping old ids to
 new ids is written so the renaming stays traceable.
 """
 
+import os
 import re
 import sys
+
+from xopen import xopen
 
 # A chromosome-like token: a number (optionally with a trailing arm letter such
 # as 2L), a single sex/special letter (X, Y, Z, W, U), or MT/Un. This excludes
@@ -33,6 +36,19 @@ CHR_PATTERN = re.compile(
 CHROMOSOME_PATTERN = re.compile(
     r"chromosome[:\s]\s*(" + CHR_TOKEN + r")", re.IGNORECASE
 )
+
+
+def fasta_basename(path: str) -> str:
+    """Basename of a FASTA path without its extension.
+
+    A trailing ``.gz`` is stripped first so ``ref.fasta.gz`` and ``ref.fasta``
+    both yield ``ref``. Used to derive stable reference ids; main.py and the
+    select_references checkpoint must agree, so both call this.
+    """
+    name = os.path.basename(path)
+    if name.endswith(".gz"):
+        name = name[:-3]
+    return os.path.splitext(name)[0]
 
 
 def find_chr_name(header: str):
@@ -65,7 +81,7 @@ def rename_reference(src_path: str, dest_fasta: str, mapping_path: str):
     mapping = []
     used = set()
 
-    with open(src_path) as src, open(dest_fasta, "w") as dst:
+    with xopen(src_path) as src, open(dest_fasta, "w") as dst:
         for line in src:
             if not line.startswith(">"):
                 dst.write(line)

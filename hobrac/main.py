@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 from hobrac.command_line import get_args
-from hobrac.rename_chr import rename_reference
+from hobrac.rename_chr import fasta_basename, rename_reference
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
@@ -51,7 +51,7 @@ def validate_manual_references(paths):
 
     seen = {}
     for path in paths:
-        name = os.path.splitext(os.path.basename(path))[0]
+        name = fasta_basename(path)
         if name in seen:
             print(
                 f"Error: Duplicate reference name '{name}' detected.\n"
@@ -314,8 +314,8 @@ def main():
         # Copy manual references to reference directory
         create_dir("reference")
         for ref_path in args.reference:
-            # ID is basename without extension
-            base_name = os.path.splitext(os.path.basename(ref_path))[0]
+            # ID is basename without extension (also strips a .gz suffix)
+            base_name = fasta_basename(ref_path)
             dest_path = os.path.join("reference", f"{base_name}.fna")
             mapping_path = os.path.join("reference", f"{base_name}.chr_rename.tsv")
 

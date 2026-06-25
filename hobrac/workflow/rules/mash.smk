@@ -62,15 +62,15 @@ checkpoint select_references:
     run:
         manual_refs_str = config.get("manual_references")
         if manual_refs_str:
-            import os
+            from hobrac.rename_chr import fasta_basename
 
             # Manual mode: skip mash filtering, use provided files
             paths = manual_refs_str.split(";")
             with open(output[0], "w") as out:
                 for path in paths:
-                    # IDs are basenames without extension
+                    # IDs are basenames without extension; must match main.py
                     # (Collision check already done in main.py)
-                    accession = os.path.splitext(os.path.basename(path))[0]
+                    accession = fasta_basename(path)
                     print(accession, file=out)
             return
         candidates = []
