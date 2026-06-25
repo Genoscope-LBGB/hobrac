@@ -10,9 +10,10 @@ from .coloring import apply_custom_colors, apply_custom_colors_with_algs
 from .io import (
     parse_custom_algs,
     parse_custom_colors,
-    parse_organism_name,
     read_busco_tsv,
     read_fasta_sizes,
+    resolve_assembly_title,
+    resolve_titles,
 )
 from .models import (
     DEFAULT_COLOR,
@@ -192,39 +193,14 @@ def resolve_layout_labels(
 ) -> List[str]:
     """Resolve one karyotype track label per species, mirroring the dotplot grid.
 
-    Kept in lockstep with ``grid.resolve_titles`` / ``grid.resolve_assembly_title``
-    so the karyotype and the dotplot grid show the same names. Priority per
-    species (first hit wins):
-
-      1. ``custom_names`` (``--jcvi-names``): a full ordered list
-         (1 assembly + N references) names every track; a single name targets the
-         assembly only, leaving references to fall through.
-      2. assembly -> ``assembly_display_name`` (hobrac's ``-n/--name``, spaces
-         preserved); references -> the NCBI ``# Organism name:`` from
-         ``reference/<accession>_assembly_report.txt``.
-      3. references -> the accession itself.
-
-    ``species_keys`` are the stable, underscore-free keys (underscored assembly
-    name, then reference accessions). Labels are display-only: they never feed the
-    bed/links gene-id prefixes, so the assembly label can carry spaces while its
-    key stays underscored.
+    Delegates to the shared resolvers in ``io.py`` so the karyotype and the
+    dotplot grid show identical names. ``species_keys`` is the assembly key
+    followed by the reference accessions; labels are display-only and never feed
+    the bed/links gene-id prefixes.
     """
-    names_list = [n.strip() for n in custom_names.split(",")] if custom_names else []
-    full_list = len(names_list) == len(species_keys)
-
-    labels: List[str] = []
-    for i, key in enumerate(species_keys):
-        if full_list and names_list[i]:
-            labels.append(names_list[i])
-        elif i == 0:
-            # Assembly: a single --jcvi-names entry targets it; else spaced name.
-            labels.append(
-                names_list[0] if names_list and names_list[0] else assembly_display_name
-            )
-        else:
-            report = os.path.join(reference_dir, f"{key}_assembly_report.txt")
-            labels.append(parse_organism_name(report) or key)
-    return labels
+    assembly = resolve_assembly_title(custom_names, assembly_display_name)
+    references = resolve_titles(species_keys[1:], custom_names, reference_dir)
+    return [assembly] + references
 
 
 def generate_layouts_file(
