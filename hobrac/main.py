@@ -232,18 +232,18 @@ def generate_snakemake_command(args) -> str:
     cmd += f"busco_runtime={args.busco_runtime * 60} "
     cmd += f"min_busco_genes={args.min_busco_genes} "
     cmd += f"alg_pvalue={args.alg_pvalue} "
-    cmd += f"jcvi_min_chain_genes={args.jcvi_min_chain_genes} "
+    cmd += f"jcvi_min_chain_genes={args.min_chain_genes} "
 
-    if args.jcvi_custom_colors:
-        cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
+    if args.custom_colors:
+        cmd += f"jcvi_custom_colors='{args.custom_colors}' "
 
-    if args.jcvi_color_metazoan_alg:
+    if args.color_metazoan_alg:
         cmd += "jcvi_color_scheme='29ALG' "
-    elif args.jcvi_color_bilaterian_alg:
+    elif args.color_bilaterian_alg:
         cmd += "jcvi_color_scheme='24BILAT' "
 
-    if args.jcvi_names:
-        cmd += f"jcvi_names='{args.jcvi_names}' "
+    if args.names:
+        cmd += f"jcvi_names='{args.names}' "
 
     if args.hide_non_significant:
         cmd += "hide_non_significant=True "
@@ -251,7 +251,7 @@ def generate_snakemake_command(args) -> str:
     if args.skip_alg:
         cmd += "skip_alg=True "
 
-    if args.jcvi_permissive_alg:
+    if args.permissive_alg:
         cmd += "jcvi_permissive_alg=True "
 
     if getattr(args, "busco_assembly_override_path", None):
@@ -326,7 +326,7 @@ def main():
 
     # Validate JCVI names count if provided
     ref_count = len(args.reference) if args.reference else args.ref_count
-    validate_jcvi_names(args.jcvi_names, ref_count)
+    validate_jcvi_names(args.names, ref_count)
 
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
