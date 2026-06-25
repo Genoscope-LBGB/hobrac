@@ -3,6 +3,8 @@ import warnings
 from collections import defaultdict
 from typing import Dict
 
+from xopen import xopen
+
 from .models import BuscoGene
 
 
@@ -38,7 +40,7 @@ def read_fasta_sizes(fasta_path: str) -> Dict[str, int]:
     current_name = None
     current_length = 0
 
-    with open(fasta_path, "r") as f:
+    with xopen(fasta_path) as f:
         for line in f:
             line = line.strip()
             if line.startswith(">"):

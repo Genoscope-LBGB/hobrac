@@ -4,6 +4,8 @@ import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
+from hobrac.rename_chr import fasta_basename
+
 from .coloring import apply_custom_colors, apply_custom_colors_with_algs
 from .io import (
     parse_custom_algs,
@@ -558,7 +560,7 @@ def run(
     if manual_refs:
         for ref_path in manual_refs.split(";"):
             if ref_path.strip():
-                name = os.path.splitext(os.path.basename(ref_path))[0]
+                name = fasta_basename(ref_path)
                 if name in ref_busco_paths:
                     species_order.append((name, ref_busco_paths[name]))
     else:
