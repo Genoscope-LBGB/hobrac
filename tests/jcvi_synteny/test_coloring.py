@@ -633,7 +633,10 @@ class TestEnumerateChains:
             ("C", {"g1": _gene("C1"), "g2": _gene("C1")}),
         ]
         chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C1")]]
+        # Within-chain order is not significant (consumers index by species),
+        # so assert on the node set rather than the DFS canonicalization order.
+        assert len(chains) == 1
+        assert set(chains[0]) == {("A", "A1"), ("B", "B1"), ("C", "C1")}
 
     def test_order_independence(self):
         """Same species set, different input order → same chains."""
