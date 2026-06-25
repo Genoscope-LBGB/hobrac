@@ -173,10 +173,13 @@ hobrac_analysis/
 │   │   ├── aln_busco.paf            # BUSCO-based alignment in PAF format
 │   │   ├── dotplot_busco.png        # BUSCO dotplot (color)
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
-│   ├── synteny_plots/
-│   │   ├── karyotype.png            # JCVI karyotype plot
 │   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/
+├── synteny_plots/
+│   ├── karyotype.png                # JCVI karyotype plot
+│   ├── dotplots/                    # Per-reference ALG dotplots
+│   ├── dotplots_grid.png            # All per-reference dotplots tiled
+│   └── dotplots_grid_dark.png
 ├── benchmarks/                      # Runtime and resource usage per step
 ```
 
