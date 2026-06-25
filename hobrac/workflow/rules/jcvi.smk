@@ -40,8 +40,8 @@ def get_dotplot_grid_inputs(wildcards):
             if line.strip():
                 accessions.append(line.strip())
     patterns = [
-        "aln/synteny_plots/dotplots/{accession}.png",
-        "aln/synteny_plots/dotplots/{accession}_dark.png",
+        "synteny_plots/dotplots/{accession}.png",
+        "synteny_plots/dotplots/{accession}_dark.png",
     ]
     # Manual references have no NCBI assembly report; only get_reference can
     # produce one (by downloading), so requiring it would re-trigger a download.
@@ -55,7 +55,7 @@ rule resolve_jcvi_color_scheme:
     input:
         chosen_dataset="busco/chosen_dataset.txt",
     output:
-        resolved="aln/synteny_plots/resolved_colors.txt",
+        resolved="synteny_plots/resolved_colors.txt",
     resources:
         mem_mb=8000,
         runtime=30,
@@ -95,13 +95,13 @@ rule jcvi_synteny:
         busco_references=get_busco_reference_dirs,
         accession_order="mash/selected_accessions.txt",
         assembly=config["assembly"],
-        resolved_colors="aln/synteny_plots/resolved_colors.txt",
+        resolved_colors="synteny_plots/resolved_colors.txt",
         reference_reports=get_reference_report_inputs,
     output:
-        seqids="aln/synteny_plots/seqids",
-        layouts="aln/synteny_plots/layouts",
-        gene_chains="aln/synteny_plots/gene_chains.tsv",
-        orders=directory("aln/synteny_plots/dotplot_orders"),
+        seqids="synteny_plots/seqids",
+        layouts="synteny_plots/layouts",
+        gene_chains="synteny_plots/gene_chains.tsv",
+        orders=directory("synteny_plots/dotplot_orders"),
     benchmark:
         "benchmarks/jcvi_synteny.txt"
     resources:
@@ -111,7 +111,7 @@ rule jcvi_synteny:
         manual_refs=config.get("manual_references", ""),
         assembly_name=config["scientific_name"].replace(" ", "_"),
         assembly_display_name=config["scientific_name"],
-        outdir="aln/synteny_plots",
+        outdir="synteny_plots",
         min_busco_genes=config.get("min_busco_genes", 0),
         jcvi_custom_colors=config.get("jcvi_custom_colors", ""),
         jcvi_names=config.get("jcvi_names", ""),
@@ -154,11 +154,11 @@ rule jcvi_synteny:
 
 rule jcvi_karyotype:
     input:
-        seqids="aln/synteny_plots/seqids",
-        layouts="aln/synteny_plots/layouts",
-        gene_chains="aln/synteny_plots/gene_chains.tsv",
+        seqids="synteny_plots/seqids",
+        layouts="synteny_plots/layouts",
+        gene_chains="synteny_plots/gene_chains.tsv",
     output:
-        "aln/synteny_plots/karyotype.png",
+        "synteny_plots/karyotype.png",
     benchmark:
         "benchmarks/jcvi_karyotype.txt"
     container:
@@ -168,7 +168,7 @@ rule jcvi_karyotype:
         runtime=10,
     shell:
         """
-        cd aln/synteny_plots
+        cd synteny_plots
         python -m jcvi.graphics.karyotype seqids layouts \
             --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
 
@@ -201,11 +201,11 @@ rule jcvi_alg_dotplot:
     """
     input:
         busco_dir="aln/busco_{accession}",
-        gene_chains="aln/synteny_plots/gene_chains.tsv",
-        orders="aln/synteny_plots/dotplot_orders",
+        gene_chains="synteny_plots/gene_chains.tsv",
+        orders="synteny_plots/dotplot_orders",
     output:
-        light="aln/synteny_plots/dotplots/{accession}.png",
-        dark="aln/synteny_plots/dotplots/{accession}_dark.png",
+        light="synteny_plots/dotplots/{accession}.png",
+        dark="synteny_plots/dotplots/{accession}_dark.png",
     benchmark:
         "benchmarks/jcvi_alg_dotplot_{accession}.txt"
     container:
@@ -218,7 +218,7 @@ rule jcvi_alg_dotplot:
         hide_non_significant=config.get("hide_non_significant", False),
     shell:
         """
-        outdir=aln/synteny_plots/dotplots
+        outdir=synteny_plots/dotplots
         mkdir -p $outdir
 
         # gene -> hex color map (gene_chains.tsv: col3=gene, col4=color).
@@ -271,8 +271,8 @@ rule jcvi_alg_dotplot_grid:
         dotplots=get_dotplot_grid_inputs,
         order="mash/selected_accessions.txt",
     output:
-        light="aln/synteny_plots/dotplots_grid.png",
-        dark="aln/synteny_plots/dotplots_grid_dark.png",
+        light="synteny_plots/dotplots_grid.png",
+        dark="synteny_plots/dotplots_grid_dark.png",
     benchmark:
         "benchmarks/jcvi_alg_dotplot_grid.txt"
     container:
@@ -292,7 +292,7 @@ rule jcvi_alg_dotplot_grid:
                 out={output.light}
             fi
             dotplot_grid \
-                --dotplots-dir aln/synteny_plots/dotplots \
+                --dotplots-dir synteny_plots/dotplots \
                 --accession-order {input.order} \
                 --reference-dir reference \
                 --theme $theme \
