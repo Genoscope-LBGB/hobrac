@@ -202,8 +202,7 @@ def draw_track_labels(ax, labels, positions, img_w, img_h, dpi, renderer):
     coordinates map straight through: a track at jcvi-y ``y`` has its bar at axes
     ``1 - y`` and starts at axes-x ``xstart``. Each label is right-aligned just
     left of its track; if a single line is wider than the available margin it is
-    wrapped to two lines, then shrunk to fit. ponytail: font auto-shrink guarantees
-    the label always fits rather than running off the image edge.
+    wrapped to two lines, then shrunk to fit.
     """
     n = len(positions)
     spacing = (0.8 / max(n - 1, 1)) * img_h  # px between adjacent tracks

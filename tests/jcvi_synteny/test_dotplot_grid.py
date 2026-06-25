@@ -103,4 +103,12 @@ def test_render_grid_writes_png(tmp_path, theme):
     render_grid(
         images, ["Ref A", "Ref B", "Ref C"], "My Assembly", str(out), theme=theme
     )
-    assert out.is_file() and out.stat().st_size > 0
+    assert out.is_file()
+
+    # The PNG must carry actual content: header strips, left panel and the three
+    # dotplots make it non-uniform, so a blank canvas (max == min) would fail.
+    import matplotlib.image as mpimg
+
+    rendered = mpimg.imread(str(out))
+    assert rendered.shape[0] > 0 and rendered.shape[1] > 0
+    assert rendered.max() != rendered.min()

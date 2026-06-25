@@ -27,7 +27,13 @@ matplotlib.use("Agg")
 import matplotlib.image as mpimg  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
-from .io import parse_organism_name  # noqa: E402,F401  (re-exported)
+# resolve_titles / resolve_assembly_title live in io.py (no matplotlib) and are
+# re-exported here for the grid CLI and the karyotype labels in output.py.
+from .io import (  # noqa: E402,F401
+    parse_organism_name,
+    resolve_assembly_title,
+    resolve_titles,
+)
 
 
 def read_accession_order(path):
@@ -36,44 +42,11 @@ def read_accession_order(path):
         return [line.strip() for line in f if line.strip()]
 
 
-def resolve_titles(accessions, jcvi_names, reference_dir):
-    """Resolve one display title per reference accession (see module docstring)."""
-    names_list = [n.strip() for n in jcvi_names.split(",")] if jcvi_names else []
-    # A full list is 1 assembly + N references; names_list[1:] maps to references
-    # in accession order. Anything else (empty / assembly-only / mismatched) falls
-    # through to the report/accession tiers.
-    ref_names = (
-        names_list[1:] if len(names_list) == len(accessions) + 1 else [""] * len(accessions)
-    )
-
-    titles = []
-    for accession, name in zip(accessions, ref_names):
-        if name:
-            titles.append(name)
-            continue
-        report = os.path.join(reference_dir, f"{accession}_assembly_report.txt")
-        titles.append(parse_organism_name(report) or accession)
-    return titles
-
-
 def grid_dims(n):
     """Square-ish grid: cols = ceil(sqrt(n)), rows = ceil(n / cols)."""
     cols = math.ceil(math.sqrt(n))
     rows = math.ceil(n / cols)
     return rows, cols
-
-
-def resolve_assembly_title(jcvi_names, assembly_name):
-    """Return the assembly (Y-axis) display name for the left panels.
-
-    The first ``--jcvi-names`` entry is always the assembly, so it wins whenever
-    any names are given; otherwise fall back to ``--assembly-name`` (hobrac's
-    ``-n/--name`` scientific name).
-    """
-    names_list = [n.strip() for n in jcvi_names.split(",")] if jcvi_names else []
-    if names_list and names_list[0]:
-        return names_list[0]
-    return assembly_name
 
 
 # Header (reference) strip height and left (assembly) panel width, as fractions

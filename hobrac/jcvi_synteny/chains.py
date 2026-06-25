@@ -306,6 +306,44 @@ def _count_sig_links(
     return sum(1 for other in nodes if other is not node and (node, other) in sig_pairs)
 
 
+def _split_into_contiguous_segments(
+    chain: List[Tuple[str, str]], surviving: List[Tuple[str, str]]
+) -> List[List[Tuple[str, str]]]:
+    """Split surviving nodes into runs that were contiguous in the original chain.
+
+    Pruning can leave gaps; only segments of length >= 2 are kept.
+    """
+    original_indices = [chain.index(node) for node in surviving]
+    segments: List[List[Tuple[str, str]]] = []
+    segment: List[Tuple[str, str]] = []
+    prev = -2
+    for node, idx in zip(surviving, original_indices):
+        if idx == prev + 1:
+            segment.append(node)
+        else:
+            if len(segment) >= 2:
+                segments.append(segment)
+            segment = [node]
+        prev = idx
+    if len(segment) >= 2:
+        segments.append(segment)
+    return segments
+
+
+def _dedup_segments(
+    segments: List[List[Tuple[str, str]]],
+) -> List[List[Tuple[str, str]]]:
+    """Drop segments with the same node set, keeping first occurrence."""
+    seen: Set[frozenset] = set()
+    deduped: List[List[Tuple[str, str]]] = []
+    for seg in segments:
+        key = frozenset(seg)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(seg)
+    return deduped
+
+
 def validate_chains(
     chains: List[List[Tuple[str, str]]],
     all_chromosome_associations: List[ChromosomeAssociation],
@@ -360,28 +398,9 @@ def validate_chains(
         if len(surviving) < 2:
             continue
 
-        original_indices = [chain.index(node) for node in surviving]
-        segment: List[Tuple[str, str]] = []
-        prev = -2
-        for k, idx in enumerate(original_indices):
-            if idx == prev + 1:
-                segment.append(surviving[k])
-            else:
-                if len(segment) >= 2:
-                    validated.append(segment)
-                segment = [surviving[k]]
-            prev = idx
-        if len(segment) >= 2:
-            validated.append(segment)
+        validated.extend(_split_into_contiguous_segments(chain, surviving))
 
-    seen: Set[frozenset] = set()
-    deduped: List[List[Tuple[str, str]]] = []
-    for seg in validated:
-        key = frozenset(seg)
-        if key not in seen:
-            seen.add(key)
-            deduped.append(seg)
-    validated = deduped
+    validated = _dedup_segments(validated)
 
     if min_chain_genes > 0 and species_busco:
         species_index = {name: i for i, (name, _) in enumerate(species_busco)}

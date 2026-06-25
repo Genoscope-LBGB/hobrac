@@ -114,13 +114,13 @@ By default, links are colored uniformly. To color genes according to Ancestral L
 
 ```
 # Use the pre-computed 29-metazoan-ALG color scheme
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-color-metazoan-alg
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-metazoan-alg
 
 # Use the pre-computed 24-bilaterian-ALG color scheme
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-color-bilaterian-alg
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-bilaterian-alg
 
 # Use a custom color file
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-custom-colors colors.tsv
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --custom-colors colors.tsv
 ```
 
 Pre-computed color schemes are available for the following BUSCO datasets: actinopterygii, anthozoa, arthropoda, cnidaria, crustacea, lophotrochozoa, metazoa, mollusca and vertebrata. If the BUSCO dataset selected by the pipeline is not part of this set, HoBRAC falls back to default coloring.
@@ -133,21 +133,21 @@ The custom color file is a tab-separated file with three columns: a BUSCO gene I
 4283313at33208	#aa7e27	Ea
 ```
 
-When using custom colors, ALG statistical testing still runs by default in order to determine which chromosome associations are significant. Genes that are not in the color file or that are not part of a significant association are shown in grey. The `--jcvi-skip-alg` flag disables statistical testing entirely, so that all genes listed in the color file receive their custom color regardless of significance.
+When using custom colors, ALG statistical testing still runs by default in order to determine which chromosome associations are significant. Genes that are not in the color file or that are not part of a significant association are shown in grey. The `--skip-alg` flag disables statistical testing entirely, so that all genes listed in the color file receive their custom color regardless of significance.
 
 ### ALG Detection Parameters
 
 HoBRAC detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
   - `--alg-pvalue`: base significance threshold (default: 0.01)
-  - `--jcvi-min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
-  - `--jcvi-permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
-  - `--jcvi-hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
+  - `--min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
+  - `--permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
+  - `--hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
 
-### Other JCVI Options
+### Other Synteny Options
 
   - `--min-busco-genes`: minimum number of complete BUSCO genes required per sequence for a chromosome to appear in the plot (default: 30)
-  - `--jcvi-names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
+  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
 
 ## Output
 
@@ -173,10 +173,13 @@ hobrac_analysis/
 │   │   ├── aln_busco.paf            # BUSCO-based alignment in PAF format
 │   │   ├── dotplot_busco.png        # BUSCO dotplot (color)
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
-│   ├── synteny_plots/
-│   │   ├── karyotype.png            # JCVI karyotype plot
 │   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/
+├── synteny_plots/
+│   ├── karyotype.png                # JCVI karyotype plot
+│   ├── dotplots/                    # Per-reference ALG dotplots
+│   ├── dotplots_grid.png            # All per-reference dotplots tiled
+│   └── dotplots_grid_dark.png
 ├── benchmarks/                      # Runtime and resource usage per step
 ```
 

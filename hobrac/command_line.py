@@ -1,5 +1,15 @@
 import argparse
 import os
+import re
+
+
+def scientific_name(value: str) -> str:
+    """Reject names with shell metacharacters (interpolated unquoted in rules)."""
+    if not re.fullmatch(r"[A-Za-z0-9 ._-]+", value):
+        raise argparse.ArgumentTypeError(
+            "must contain only letters, digits, spaces, '.', '_' or '-'"
+        )
+    return value
 
 
 def get_args():
@@ -28,6 +38,7 @@ def get_args():
         help="Scientific name of the organism given in --assembly",
         required=True,
         default=None,
+        type=scientific_name,
     )
     parser.add_argument(
         "-t",
@@ -37,6 +48,7 @@ def get_args():
         help="Taxid of the organism given in --assembly",
         required=True,
         default=None,
+        type=int,
     )
     parser.add_argument(
         "--metaeuk",
@@ -225,7 +237,8 @@ def get_args():
         help="Use docker to run the pipeline",
         default=False,
     )
-    optional_args.add_argument(
+    synteny_args = parser.add_argument_group("Synteny and ALG arguments")
+    synteny_args.add_argument(
         "--min-busco-genes",
         action="store",
         dest="min_busco_genes",
@@ -233,20 +246,20 @@ def get_args():
         default=30,
         type=int,
     )
-    color_group = optional_args.add_mutually_exclusive_group()
+    color_group = synteny_args.add_mutually_exclusive_group()
     color_group.add_argument(
-        "--jcvi-custom-colors",
+        "--custom-colors",
         action="store",
-        dest="jcvi_custom_colors",
+        dest="custom_colors",
         help=(
             "Path to custom color file for JCVI synteny plot"
             " (tab-separated: BUSCO_ID, COLOR, ALG_NAME;"
             " COLOR may be R,G,B, #rrggbb, or rrggbb)."
             " By default, ALG statistical testing still runs"
             " to determine significance;"
-            " use --jcvi-skip-alg to disable it."
+            " use --skip-alg to disable it."
             " Genes not in the file and genes not significantly associated"
-            " (unless --jcvi-skip-alg is used)"
+            " (unless --skip-alg is used)"
             " will be shown in grey."
             " The ALG_NAME column is also used for"
             " rearrangement index calculation."
@@ -255,9 +268,9 @@ def get_args():
         type=os.path.abspath,
     )
     color_group.add_argument(
-        "--jcvi-color-metazoan-alg",
+        "--color-metazoan-alg",
         action="store_true",
-        dest="jcvi_color_metazoan_alg",
+        dest="color_metazoan_alg",
         help=(
             "Use pre-computed 29-ALG color scheme for JCVI synteny plot."
             " The color file is automatically selected based on the BUSCO"
@@ -267,9 +280,9 @@ def get_args():
         default=False,
     )
     color_group.add_argument(
-        "--jcvi-color-bilaterian-alg",
+        "--color-bilaterian-alg",
         action="store_true",
-        dest="jcvi_color_bilaterian_alg",
+        dest="color_bilaterian_alg",
         help=(
             "Use pre-computed 24-bilaterian-ALG color scheme for JCVI"
             " synteny plot. The color file is automatically selected"
@@ -279,17 +292,17 @@ def get_args():
         ),
         default=False,
     )
-    optional_args.add_argument(
-        "--jcvi-names",
+    synteny_args.add_argument(
+        "--names",
         action="store",
-        dest="jcvi_names",
+        dest="names",
         help="Comma-separated custom names for JCVI tracks. If one name is provided, "
         "it applies only to the assembly. If multiple names are provided, the count "
         "must equal 1 (assembly) + number of references, in order.",
         default="",
     )
-    optional_args.add_argument(
-        "--jcvi-hide-non-significant",
+    synteny_args.add_argument(
+        "--hide-non-significant",
         action="store_true",
         dest="hide_non_significant",
         help="Hide links between chromosome pairs without significant associations "
@@ -297,16 +310,16 @@ def get_args():
         "ALG-related synteny.",
         default=False,
     )
-    optional_args.add_argument(
-        "--jcvi-skip-alg",
+    synteny_args.add_argument(
+        "--skip-alg",
         action="store_true",
         dest="skip_alg",
         help="Skip ALG statistical testing when using custom colors. All genes in the "
         "color file get their custom color; unlisted genes are grey. Only effective "
-        "with --jcvi-custom-colors.",
+        "with --custom-colors.",
         default=False,
     )
-    optional_args.add_argument(
+    synteny_args.add_argument(
         "--alg-pvalue",
         action="store",
         dest="alg_pvalue",
@@ -315,10 +328,10 @@ def get_args():
         default=0.01,
         type=float,
     )
-    optional_args.add_argument(
-        "--jcvi-min-chain-genes",
+    synteny_args.add_argument(
+        "--min-chain-genes",
         action="store",
-        dest="jcvi_min_chain_genes",
+        dest="min_chain_genes",
         help=(
             "Minimum BUSCO genes a chromosome chain must be supported by to"
             " appear in the final output. Chains with fewer genes are dropped"
@@ -328,10 +341,10 @@ def get_args():
         default=5,
         type=int,
     )
-    optional_args.add_argument(
-        "--jcvi-permissive-alg",
+    synteny_args.add_argument(
+        "--permissive-alg",
         action="store_true",
-        dest="jcvi_permissive_alg",
+        dest="permissive_alg",
         help=(
             "Use a permissive threshold for chain validation. By default each"
             " node in a chain of length n must have significant associations"

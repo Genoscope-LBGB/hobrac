@@ -26,6 +26,46 @@ def parse_organism_name(report_path: str) -> str:
     return ""
 
 
+def resolve_titles(accessions, jcvi_names, reference_dir):
+    """Resolve one display title per reference accession (first hit wins).
+
+    Priority: a full ``--jcvi-names`` list (1 assembly + N references) names each
+    reference; otherwise the NCBI ``# Organism name:`` from the assembly report;
+    otherwise the accession itself.
+    """
+    names_list = [n.strip() for n in jcvi_names.split(",")] if jcvi_names else []
+    # A full list is 1 assembly + N references; names_list[1:] maps to references
+    # in accession order. Anything else (empty / assembly-only / mismatched) falls
+    # through to the report/accession tiers.
+    ref_names = (
+        names_list[1:]
+        if len(names_list) == len(accessions) + 1
+        else [""] * len(accessions)
+    )
+
+    titles = []
+    for accession, name in zip(accessions, ref_names):
+        if name:
+            titles.append(name)
+            continue
+        report = os.path.join(reference_dir, f"{accession}_assembly_report.txt")
+        titles.append(parse_organism_name(report) or accession)
+    return titles
+
+
+def resolve_assembly_title(jcvi_names, assembly_name):
+    """Return the assembly (Y-axis) display name.
+
+    The first ``--jcvi-names`` entry is always the assembly, so it wins whenever
+    any names are given; otherwise fall back to ``assembly_name`` (hobrac's
+    ``-n/--name`` scientific name).
+    """
+    names_list = [n.strip() for n in jcvi_names.split(",")] if jcvi_names else []
+    if names_list and names_list[0]:
+        return names_list[0]
+    return assembly_name
+
+
 def read_fasta_sizes(fasta_path: str) -> Dict[str, int]:
     """
     Read sequence sizes from a fasta file.
