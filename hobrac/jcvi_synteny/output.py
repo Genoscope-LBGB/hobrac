@@ -527,10 +527,8 @@ def run(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Read assembly fasta sizes for chromosome ordering
     assembly_fasta_sizes = read_fasta_sizes(assembly_fasta)
 
-    # Load custom colors if provided
     custom_colors = {}
     custom_algs = {}
     if custom_color_file:
@@ -577,7 +575,6 @@ def run(
     # bed/links parsers (which would crash with "too many values to unpack").
     species_keys = [name for name, _ in species_order]
 
-    # Load all BUSCO data
     species_busco = []
     for name, path in species_order:
         busco_data = read_busco_tsv(path, min_busco_genes)
@@ -600,7 +597,6 @@ def run(
             rearrangement_by_alg,
         )
 
-    # Generate BED files
     bed_files = []
     for name, busco_data in species_busco:
         bed_path = os.path.join(output_dir, f"{name}.bed")
