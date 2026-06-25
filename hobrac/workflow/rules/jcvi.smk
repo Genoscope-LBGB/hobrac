@@ -232,7 +232,7 @@ rule jcvi_alg_dotplot:
         # diagonal runs bottom-left -> top-right.
         assembly_order=$(mktemp)
         awk -F',' '{{for (i = NF; i > 0; i--) printf "%s%s", $i, (i > 1 ? "," : "\\n")}}' \
-            {input.orders}/{params.assembly_key}.order > $assembly_order
+            "{input.orders}/{params.assembly_key}.order" > $assembly_order
 
         hide_flag=""
         if [ "{params.hide_non_significant}" = "True" ]; then

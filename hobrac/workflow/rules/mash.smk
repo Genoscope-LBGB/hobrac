@@ -12,7 +12,7 @@ rule download_db:
         taxid=config["taxid"],
     shell:
         """
-        phylum=$(echo {params.taxid} | taxonkit reformat -I 1 --format '{{p}}' -r 'no_returned_phylum' | cut -f 2)
+        phylum=$(echo "{params.taxid}" | taxonkit reformat -I 1 --format '{{p}}' -r 'no_returned_phylum' | cut -f 2)
         wget https://www.genoscope.cns.fr/lbgb/mash/${{phylum}}.msh -O {output}
         echo ${{phylum}} > {output}.phylum
     """

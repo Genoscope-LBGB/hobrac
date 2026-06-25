@@ -1,5 +1,15 @@
 import argparse
 import os
+import re
+
+
+def scientific_name(value: str) -> str:
+    """Reject names with shell metacharacters (interpolated unquoted in rules)."""
+    if not re.fullmatch(r"[A-Za-z0-9 ._-]+", value):
+        raise argparse.ArgumentTypeError(
+            "must contain only letters, digits, spaces, '.', '_' or '-'"
+        )
+    return value
 
 
 def get_args():
@@ -28,6 +38,7 @@ def get_args():
         help="Scientific name of the organism given in --assembly",
         required=True,
         default=None,
+        type=scientific_name,
     )
     parser.add_argument(
         "-t",
@@ -37,6 +48,7 @@ def get_args():
         help="Taxid of the organism given in --assembly",
         required=True,
         default=None,
+        type=int,
     )
     parser.add_argument(
         "--metaeuk",

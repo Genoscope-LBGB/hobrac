@@ -15,7 +15,7 @@ rule get_lineage:
         taxid=config["taxid"],
     shell:
         """
-        echo {params.taxid} | taxonkit lineage | cut -f 2 > {output}
+        echo "{params.taxid}" | taxonkit lineage | cut -f 2 > {output}
     """
 
 
@@ -232,7 +232,7 @@ rule busco_to_paf:
             --busco_ref {input.busco_reference}/run*/full_table.tsv \
             --query {input.assembly} --ref {input.reference} --out {output}
 
-        mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
+        mv {output}/query_assembly.idx "{output}/busco_query_{params.prefix_assembly}.idx"
         mv {output}/target_reference.idx {output}/busco_target_{wildcards.accession}.idx
 
         dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco.png --line-thickness 4 --dump-significance {output}/significance_results.txt
