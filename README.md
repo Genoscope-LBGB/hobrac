@@ -25,7 +25,7 @@ HoBRAC relies on several dependencies. You can either install them manually or u
   - [Taxonkit](https://github.com/shenwei356/taxonkit)
   - [NCBI datasets](https://github.com/ncbi/datasets) 
   - [MASH](https://github.com/marbl/Mash)
-  - [bUSCO](https://gitlab.com/ezlab/busco)
+  - [BUSCO](https://gitlab.com/ezlab/busco)
   - [Minimap2](https://github.com/lh3/minimap2)
   - [dotplotrs](https://github.com/Genoscope-LBGB/dotplotrs)
 
