@@ -201,7 +201,7 @@ rule cleanup_busco_downloads:
         runtime=5,
     shell:
         """
-        rm -rf busco/busco_downloads reference/*.fna
+        rm -rf busco/busco_downloads reference/*.fna assembly/*.fna
     """
 
 

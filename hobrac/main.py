@@ -324,6 +324,17 @@ def main():
             # expects it. The mapping file keeps the renaming traceable.
             rename_reference(ref_path, dest_path, mapping_path)
 
+    # Best-effort chr<name> renaming of the assembly too, so the karyotype and
+    # dotplots show pretty names. Non-matching headers (drafts) keep their ids.
+    # Repointing args.assembly here means both the container mount and the
+    # snakemake config pick up the renamed copy. Removed in cleanup_busco_downloads.
+    create_dir("assembly")
+    assembly_base = fasta_basename(args.assembly)
+    assembly_dest = os.path.join("assembly", f"{assembly_base}.fna")
+    assembly_mapping = os.path.join("assembly", f"{assembly_base}.chr_rename.tsv")
+    rename_reference(args.assembly, assembly_dest, assembly_mapping)
+    args.assembly = os.path.abspath(assembly_dest)
+
     # Validate JCVI names count if provided
     ref_count = len(args.reference) if args.reference else args.ref_count
     validate_jcvi_names(args.names, ref_count)
