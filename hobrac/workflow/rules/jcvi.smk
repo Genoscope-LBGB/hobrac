@@ -252,7 +252,6 @@ rule jcvi_alg_dotplot:
                 --theme $theme \
                 --line-thickness 11 \
                 --font-size 30 \
-
                 $hide_flag
         done
 
