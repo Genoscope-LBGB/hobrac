@@ -117,6 +117,15 @@ rule jcvi_karyotype:
     shell:
         """
         cd aln/jcvi_karyotype
-        python -m jcvi.graphics.karyotype seqids layouts \
-            --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
+        if find . -maxdepth 1 -name '*.bed' -empty | grep -q .; then
+            echo "==================================================================" >&2
+            echo "HOBRAC: no syntenic blocks to plot - writing placeholder karyotype." >&2
+            echo "A track has zero BUSCO genes after the min-busco-genes filter; see" >&2
+            echo "the jcvi_synteny log for per-track gene counts and the threshold." >&2
+            echo "==================================================================" >&2
+            python -c "import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt; fig=plt.figure(figsize=(12,10)); fig.text(0.5, 0.5, 'No syntenic blocks to plot (no sequence passed the min-busco-genes filter)', ha='center', va='center', fontsize=15); fig.savefig('karyotype.png', dpi=100)"
+        else
+            python -m jcvi.graphics.karyotype seqids layouts \
+                --dpi 100 --figsize 12x10 --notex --basepair -o karyotype.png
+        fi
         """
