@@ -105,8 +105,8 @@ rule jcvi_synteny:
     benchmark:
         "benchmarks/jcvi_synteny.txt"
     resources:
-        mem_mb=8000,
-        runtime=30,
+        mem_mb=12000,
+        runtime=600,
     params:
         manual_refs=config.get("manual_references", ""),
         assembly_name=config["scientific_name"].replace(" ", "_"),
