@@ -24,13 +24,13 @@ reconstruction: Bf (*Branchiostoma floridae*), Hl (*Holothuria leucospilota*), P
 
 ## Table 1 - ALGs detected by HoBRAC
 
-Detected with `--jcvi-pvalue 0.05` and `--jcvi-permissive-alg` (27 ALGs):
+Detected with `--alg-pvalue 0.05` and `--permissive-alg` (27 ALGs):
 
 ![ALGs detected with --jcvi-pvalue 0.05 and --jcvi-permissive-alg](images/table1_pvalue0.05_permissive.png)
 
-With less stringent thresholds (`--jcvi-pvalue 1`, lower `--jcvi-min-chain-genes`), the additional groups **Qb** (recovered at *P = 1*) and **Qd** (recovered at *n = 4*) can also be detected:
+With less stringent thresholds (`--alg-pvalue 1`, lower `--min-chain-genes`), the additional groups **Qb** (recovered at *P = 1*) and **Qd** (recovered at *n = 4*) can also be detected:
 
-![Additional ALGs recovered with --jcvi-pvalue 1 and a lower --jcvi-min-chain-genes](images/table1_pvalue1_min_chain_genes.png)
+![Additional ALGs recovered with --alg-pvalue 1 and a lower --min-chain-genes](images/table1_pvalue1_min_chain_genes.png)
 
 ## Assigning BUSCO genes to ALGs
 
@@ -71,6 +71,6 @@ When the BUSCO dataset selected for the taxon passed to HoBRAC is available, the
 
 ## References
 
-- Simakov, O., *et al.* (2022). Deeply conserved synteny and the evolution of metazoan chromosomes.
-- Lewin, H. A., Liao, J. & Luo, J. (2025).
-- Schultz, D. T., *et al.* (2023).
+- Simakov, O., *et al.* (2022). Deeply conserved synteny and the evolution of metazoan chromosomes
+- Lewin, H. A., Liao, J. & Luo, J. (2025). Fusion, fission, and scrambling of the bilaterian genome in Bryozoa
+- Schultz, D. T., *et al.* (2023). Ancient gene linkages support ctenophores as sister to other animals
