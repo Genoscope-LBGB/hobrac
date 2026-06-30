@@ -49,7 +49,7 @@ The assignment rules are:
 
 ## Coloring BUSCO datasets
 
-We then performed BUSCO searches using various BUSCO genesets on the 6 genome assemblies and followed the rules defined in Table 2 to assign the BUSCO genes to metazoan and bilaterian ALGs. For each BUSCO dataset, the number of BUSCO genes to which an ALG could be assigned is shown in Table 3. We used the colors from Schultz *et al.* (2023) to color these ALGs. The color files are available (here)[https://github.com/Genoscope-LBGB/hobrac/tree/master/hobrac/colors].
+We then performed BUSCO searches using various BUSCO genesets on the 6 genome assemblies and followed the rules defined in Table 2 to assign the BUSCO genes to metazoan and bilaterian ALGs. For each BUSCO dataset, the number of BUSCO genes to which an ALG could be assigned is shown in Table 3. We used the colors from Schultz *et al.* (2023) to color these ALGs. The color files are available [here](https://github.com/Genoscope-LBGB/hobrac/tree/master/hobrac/colors).
 
 ### Table 3 — BUSCO genes assigned to ALGs per dataset
 
