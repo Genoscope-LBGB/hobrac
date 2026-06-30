@@ -13,16 +13,16 @@ reconstruction (Simakov *et al.*, 2022; Lewin, Liao & Luo, 2025). HoBRAC was run
 ```
 
 27 ALGs were detected (Table 1), corresponding to the "BCS" (Bilaterian,
-Cnidarian, Sponge) groups described in Simakov *et al.* (2022) — which we will call **metazoan ALGs** for simplicity, except for Qb and Qd, which could only be recovered with less stringent thresholds.
+Cnidarian, Sponge) groups described in Simakov *et al.* (2022), which we will call **metazoan ALGs** for simplicity, except for Qb and Qd, which could only be recovered with less stringent thresholds.
 
-## Figure 1 — Synteny ribbon-plot of the 6 genome assemblies
+## Figure 1 - Synteny ribbon-plot of the 6 genome assemblies
 
 ![Synteny ribbon-plot between the 6 genome assemblies (Bf, Hl, Pm, Dv, Nv, Re)](images/figure1_synteny_ribbon_plot.png)
 
 *Ribbon-plot relating the chromosomes of the 6 assemblies used for ALG
 reconstruction: Bf (*Branchiostoma floridae*), Hl (*Holothuria leucospilota*), Pm (*Pecten maximus*), Dv (*Donax variegatus*), Nv (*Nematostella vectensis*) and Re (*Rhopilema esculentum*).*
 
-## Table 1 — ALGs detected by HoBRAC
+## Table 1 - ALGs detected by HoBRAC
 
 Detected with `--jcvi-pvalue 0.05` and `--jcvi-permissive-alg` (27 ALGs):
 
@@ -39,11 +39,11 @@ metazoan ALGs and the 24 bilaterian ALGs, based on their chromosomal locations (
 
 The assignment rules are:
 
-- **A** — BUSCO gene found in at least 3 of the 6 genomes, and all chromosomes correspond to the ALG (or all but one if the BUSCO gene is found in ≥ 5 genomes).
-- **B** — BUSCO gene found in at least 3 of the 6 genomes, including at least one cnidaria, and all chromosomes correspond to the ALG (or all but one if the BUSCO gene is found in ≥ 5 genomes).
-- **C** — BUSCO gene found in at least 3 genomes, and all chromosomes correspond to the ALG except *Branchiostoma floridae* → group "R" (or all but one if the BUSCO gene is found in ≥ 4 genomes).
+- **A** - BUSCO gene found in at least 3 of the 6 genomes, and all chromosomes correspond to the ALG (or all but one if the BUSCO gene is found in ≥ 5 genomes).
+- **B** - BUSCO gene found in at least 3 of the 6 genomes, including at least one cnidaria, and all chromosomes correspond to the ALG (or all but one if the BUSCO gene is found in ≥ 5 genomes).
+- **C** - BUSCO gene found in at least 3 genomes, and all chromosomes correspond to the ALG except *Branchiostoma floridae* → group "R" (or all but one if the BUSCO gene is found in ≥ 4 genomes).
 
-### Table 2 — ALG colors and assignment rules
+### Table 2 - ALG colors and assignment rules
 
 ![ALG color codes and assignment rules for the 29 metazoan and 24 bilaterian ALGs](images/table2_alg_colors_rules.png)
 
