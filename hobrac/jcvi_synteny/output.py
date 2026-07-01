@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+import sys
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
@@ -555,6 +556,40 @@ def run(
     for name, path in species_order:
         busco_data = read_busco_tsv(path, min_busco_genes)
         species_busco.append((name, busco_data))
+
+    # jcvi karyotype cannot render a track whose BED is empty. A track goes
+    # empty when no sequence reaches --min-busco-genes complete BUSCO genes
+    # (common with small lineages such as eukaryota_odb12). We still emit the
+    # (empty) files so the rule succeeds; jcvi_karyotype detects the empty BED
+    # and draws a placeholder instead of crashing. Warn loudly with per-track
+    # counts so the user can pick a workable threshold.
+    empty_species = [name for name, data in species_busco if not data]
+    if empty_species:
+        detail_lines = []
+        for name, path in species_order:
+            counts = defaultdict(int)
+            for gene in read_busco_tsv(path).values():
+                counts[gene.chromosome] += 1
+            best = max(counts.values()) if counts else 0
+            detail_lines.append(
+                f"    {name}: best sequence holds {best} complete BUSCO genes"
+            )
+        banner = (
+            "\n" + "=" * 72 + "\n"
+            "HOBRAC WARNING: no syntenic blocks to plot — the karyotype will "
+            "be a placeholder image.\n"
+            + "-" * 72 + "\n"
+            f"No sequence passed the --min-busco-genes={min_busco_genes} "
+            "filter for these tracks:\n"
+            f"    {', '.join(empty_species)}\n\n"
+            "Complete BUSCO genes on the best sequence of each track:\n"
+            + "\n".join(detail_lines) + "\n\n"
+            "Lower min_busco_genes (config key, currently "
+            f"{min_busco_genes}) below the smallest value above and re-run "
+            "for a real karyotype.\n"
+            + "=" * 72 + "\n"
+        )
+        print(banner, file=sys.stderr)
 
     rearrangement_summary = ""
     rearrangement_by_alg = ""
