@@ -19,8 +19,7 @@ Cnidarian, Sponge) groups described in Simakov *et al.* (2022), which we will ca
 
 ![Synteny ribbon-plot between the 6 genome assemblies (Bf, Hl, Pm, Dv, Nv, Re)](images/figure1_synteny_ribbon_plot.png)
 
-*Ribbon-plot relating the chromosomes of the 6 assemblies used for ALG
-reconstruction: Bf (*Branchiostoma floridae*), Hl (*Holothuria leucospilota*), Pm (*Pecten maximus*), Dv (*Donax variegatus*), Nv (*Nematostella vectensis*) and Re (*Rhopilema esculentum*).*
+*Synteny ribbon plot obtained for 6 bivalve genomes. Colors correspond to the  ALGs identified by HoBRAC with a significance threshold (--alg-pvalue) of P=0.05 for chromosome associations.*
 
 ## Table 1 - ALGs detected by HoBRAC
 
