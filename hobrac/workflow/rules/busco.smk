@@ -15,7 +15,7 @@ rule get_lineage:
         taxid=config["taxid"],
     shell:
         """
-        echo {params.taxid} | taxonkit lineage | cut -f 2 > {output}
+        echo "{params.taxid}" | taxonkit lineage | cut -f 2 > {output}
     """
 
 
@@ -99,7 +99,13 @@ rule download_busco_dataset:
 
 rule busco_reference:
     input:
-        fna="reference/{accession}.fna",
+        # ancient(): manual references (-r) are rewritten by main.py on every
+        # invocation, bumping the .fna mtime and otherwise re-triggering BUSCO
+        # (and a fresh busco_downloads re-download) even when content is
+        # unchanged. Ignoring mtime here keeps cached BUSCO results valid. Trade-
+        # off: replacing a reference in place no longer auto-reruns BUSCO; delete
+        # busco/busco_reference_{accession} to force it.
+        fna=ancient("reference/{accession}.fna"),
         dataset="busco/chosen_dataset.txt",
         busco_db="busco/busco_downloads",
     output:
@@ -115,19 +121,29 @@ rule busco_reference:
     params:
         method=config["busco_method"],
         fna_path=lambda wildcards, input: (
-            input.fna if os.path.isabs(input.fna) else f"../{input.fna}"
+            input.fna if os.path.isabs(input.fna) else f"../../{input.fna}"
         ),
     shell:
         """
         dataset=$(cat {input.dataset} | cut -f 1)
 
-        cd busco/
+        # Run in an isolated working directory so concurrent BUSCO jobs don't
+        # clobber each other's logs in the shared busco/ folder.
+        workdir=busco/tmp_busco_reference_{wildcards.accession}
+        rm -rf $workdir
+        mkdir -p $workdir
+        cd $workdir
 
         busco --skip_bbtools --{params.method} -i {params.fna_path} -c {threads} -m geno \
             -o busco_reference_{wildcards.accession} -l $dataset \
-            --offline --download_path busco_downloads --datasets_version odb12
+            --offline --download_path ../busco_downloads --datasets_version odb12
 
         rm -rf busco_reference_{wildcards.accession}/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
+
+        cd ..
+        rm -rf busco_reference_{wildcards.accession}
+        mv tmp_busco_reference_{wildcards.accession}/busco_reference_{wildcards.accession} busco_reference_{wildcards.accession}
+        rm -rf tmp_busco_reference_{wildcards.accession}
     """
 
 
@@ -149,19 +165,29 @@ rule busco_assembly:
     params:
         method=config["busco_method"],
         assembly_path=lambda wildcards, input: (
-            input.assembly if os.path.isabs(input.assembly) else f"../{input.assembly}"
+            input.assembly if os.path.isabs(input.assembly) else f"../../{input.assembly}"
         ),
     shell:
         """
         dataset=$(cat {input.dataset} | cut -f 1)
 
-        cd busco/
+        # Run in an isolated working directory so concurrent BUSCO jobs don't
+        # clobber each other's logs in the shared busco/ folder.
+        workdir=busco/tmp_busco_assembly
+        rm -rf $workdir
+        mkdir -p $workdir
+        cd $workdir
 
         busco --skip_bbtools --{params.method} -i {params.assembly_path} -c {threads} -m geno \
             -o busco_assembly -l $dataset \
-            --offline --download_path busco_downloads --datasets_version odb12
+            --offline --download_path ../busco_downloads --datasets_version odb12
 
         rm -rf busco_assembly/run*/{{busco_sequences,hmmer_output,metaeuk_output,miniprot_output}}
+
+        cd ..
+        rm -rf busco_assembly
+        mv tmp_busco_assembly/busco_assembly busco_assembly
+        rm -rf tmp_busco_assembly
     """
 
 
@@ -175,13 +201,13 @@ rule cleanup_busco_downloads:
         runtime=5,
     shell:
         """
-        rm -rf busco/busco_downloads
+        rm -rf busco/busco_downloads reference/*.fna assembly/*.fna
     """
 
 
 rule busco_to_paf:
     input:
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
         busco_reference=lambda wildcards: config.get(
             "busco_reference_override", f"busco/busco_reference_{wildcards.accession}"
@@ -206,9 +232,9 @@ rule busco_to_paf:
             --busco_ref {input.busco_reference}/run*/full_table.tsv \
             --query {input.assembly} --ref {input.reference} --out {output}
 
-        mv {output}/query_assembly.idx {output}/busco_query_{params.prefix_assembly}.idx
+        mv {output}/query_assembly.idx "{output}/busco_query_{params.prefix_assembly}.idx"
         mv {output}/target_reference.idx {output}/busco_target_{wildcards.accession}.idx
 
-        dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco.png --line-thickness 4 --dump-significance significance_results.txt
+        dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco.png --line-thickness 4 --dump-significance {output}/significance_results.txt
         dotplotrs -p {output}/aln_busco.paf -o {output}/dotplot_busco_bw.png --line-thickness 4 --no-color
     """

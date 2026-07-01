@@ -1,5 +1,12 @@
 # Container versions
-HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.7"
+HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.8"
+
+
+# Constraining the wildcard keeps it from matching greedily across '/'
+# when a rule references a file inside a directory() output
+# (e.g. aln/busco_{accession}/aln_busco.paf).
+wildcard_constraints:
+    accession=r"[^/]+",
 
 
 def get_pipeline_targets(wildcards):
@@ -11,15 +18,31 @@ def get_pipeline_targets(wildcards):
             if line.strip():
                 accessions.append(line.strip())
 
-    targets = expand(
-        ["aln/busco_{accession}", "aln/vs_{accession}/dgenies.done"],
-        accession=accessions,
-    )
+    target_patterns = ["aln/busco_{accession}"]
+    if not config.get("skip_genomic", False):
+        target_patterns.append("aln/vs_{accession}/dgenies.done")
+
+    targets = expand(target_patterns, accession=accessions)
 
     if not config.get("manual_references"):
         targets.append("aln/ranking_symlinks.done")
 
-    targets.append("aln/jcvi_karyotype/karyotype.png")
+    targets.append("synteny_plots/karyotype.png")
+
+    # Per-reference ALG-colored dotplots (assembly on Y, each reference on X).
+    targets.extend(
+        expand(
+            [
+                "synteny_plots/dotplots/{accession}.png",
+                "synteny_plots/dotplots/{accession}_dark.png",
+            ],
+            accession=accessions,
+        )
+    )
+
+    # Combined grid of all per-reference dotplots, titled by species.
+    targets.append("synteny_plots/dotplots_grid.png")
+    targets.append("synteny_plots/dotplots_grid_dark.png")
 
     return targets
 
@@ -41,3 +64,6 @@ include: "rules/jcvi.smk"
 rule all:
     input:
         get_targets,
+    resources:
+        runtime=30,
+

@@ -10,7 +10,7 @@ The purpose of HoBRAC is to facilitate structural comparison between two genomes
   - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, an alignment viewer is available [here](https://www.genoscope.cns.fr/lbgb/hobrac/)
 
 
-On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyllidia flava (x-axis) and on the right the alignment of busco genes for the same genomes.
+On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyllidia flava (x-axis) and on the right the alignment of BUSCO genes for the same genomes.
 
 |  |  |
 | ------- | ------- |
@@ -25,7 +25,7 @@ HoBRAC relies on several dependencies. You can either install them manually or u
   - [Taxonkit](https://github.com/shenwei356/taxonkit)
   - [NCBI datasets](https://github.com/ncbi/datasets) 
   - [MASH](https://github.com/marbl/Mash)
-  - [Busco](https://gitlab.com/ezlab/busco)
+  - [BUSCO](https://gitlab.com/ezlab/busco)
   - [Minimap2](https://github.com/lh3/minimap2)
   - [dotplotrs](https://github.com/Genoscope-LBGB/dotplotrs)
 
@@ -73,6 +73,10 @@ Multiple references can be specified by repeating the flag:
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -r reference_1.fa -r reference_2.fa
 ```
 
+When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so HoBRAC instead makes a pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
+
+The assembly gets the same pass so its chromosomes appear with pretty names in the karyotype and dotplots, with the mapping written to `assembly/<name>.chr_rename.tsv`. Draft assemblies whose contigs/scaffolds carry no recognizable chromosome name are left untouched.
+
 ## Pre-computed BUSCO Results
 
 BUSCO is among the most time-consuming steps of the pipeline. If BUSCO was already computed for the assembly or the reference, the results can be reused with the `--busco-assembly` and `--busco-reference` flags. Each flag accepts a path to a BUSCO result directory, a `run_*` subdirectory, or a `full_table.tsv` file directly.
@@ -93,6 +97,15 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --ref-count 3
 ```
 
 
+## Skip Genomic Alignment
+
+The genome-to-genome alignment (Minimap2) can be the most time-consuming part of the pipeline and its dotplots are sometimes too noisy to be useful. The `--skip-genomic` flag disables this step entirely, so only the BUSCO side runs (BUSCO, the JCVI karyotype, and the ALG-colored dotplots, which are derived from BUSCO gene positions rather than from the Minimap2 alignment).
+
+```
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --skip-genomic
+```
+
+
 ## JCVI Karyotype Visualization
 
 In addition to dotplots, HoBRAC can produce JCVI karyotype plots that display synteny relationships between chromosomes. Shared BUSCO genes are drawn as colored links between the assembly and each reference genome, which makes it possible to identify large-scale rearrangements at a glance. A karyotype PNG is generated automatically as part of the pipeline output.
@@ -103,13 +116,13 @@ By default, links are colored uniformly. To color genes according to Ancestral L
 
 ```
 # Use the pre-computed 29-metazoan-ALG color scheme
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-color-metazoan-alg
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-metazoan-alg
 
 # Use the pre-computed 24-bilaterian-ALG color scheme
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-color-bilaterian-alg
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-bilaterian-alg
 
 # Use a custom color file
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --jcvi-custom-colors colors.tsv
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --custom-colors colors.tsv
 ```
 
 Pre-computed color schemes are available for the following BUSCO datasets: actinopterygii, anthozoa, arthropoda, cnidaria, crustacea, lophotrochozoa, metazoa, mollusca and vertebrata. If the BUSCO dataset selected by the pipeline is not part of this set, HoBRAC falls back to default coloring.
@@ -122,21 +135,21 @@ The custom color file is a tab-separated file with three columns: a BUSCO gene I
 4283313at33208	#aa7e27	Ea
 ```
 
-When using custom colors, ALG statistical testing still runs by default in order to determine which chromosome associations are significant. Genes that are not in the color file or that are not part of a significant association are shown in grey. The `--jcvi-skip-alg` flag disables statistical testing entirely, so that all genes listed in the color file receive their custom color regardless of significance.
+When using custom colors, ALG statistical testing still runs by default in order to determine which chromosome associations are significant. Genes that are not in the color file or that are not part of a significant association are shown in grey. The `--skip-alg` flag disables statistical testing entirely, so that all genes listed in the color file receive their custom color regardless of significance.
 
 ### ALG Detection Parameters
 
 HoBRAC detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
-  - `--jcvi-pvalue`: base significance threshold (default: 0.01)
-  - `--jcvi-min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
-  - `--jcvi-permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
-  - `--jcvi-hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
+  - `--alg-pvalue`: base significance threshold (default: 0.01)
+  - `--min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
+  - `--permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
+  - `--hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
 
-### Other JCVI Options
+### Other Synteny Options
 
   - `--min-busco-genes`: minimum number of complete BUSCO genes required per sequence for a chromosome to appear in the plot (default: 30)
-  - `--jcvi-names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
+  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
 
 ## Output
 
@@ -162,14 +175,17 @@ hobrac_analysis/
 │   │   ├── aln_busco.paf            # BUSCO-based alignment in PAF format
 │   │   ├── dotplot_busco.png        # BUSCO dotplot (color)
 │   │   ├── dotplot_busco_bw.png     # BUSCO dotplot (black & white)
-│   ├── jcvi_karyotype/
-│   │   ├── karyotype.png            # JCVI karyotype plot
-│   ├── rank1_busco -> busco_<accession>/   # Ranked symlinks (closest first)
-│   └── rank1_geno  -> vs_<accession>/
+│   ├── rank1_<Species_name>_busco -> busco_<accession>/  # Ranked symlinks (closest first)
+│   └── rank1_<Species_name>_geno  -> vs_<accession>/
+├── synteny_plots/
+│   ├── karyotype.png                # JCVI karyotype plot
+│   ├── dotplots/                    # Per-reference ALG dotplots
+│   ├── dotplots_grid.png            # All per-reference dotplots tiled
+│   └── dotplots_grid_dark.png
 ├── benchmarks/                      # Runtime and resource usage per step
 ```
 
-When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_*`, `rank2_*`, ...) sorted by MASH distance.
+When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_<Species_name>_*`, `rank2_<Species_name>_*`, ...) sorted by MASH distance. The `rank<i>` prefix keeps each symlink unique even when two references belong to the same species; references without an NCBI assembly report (e.g. manual references) fall back to the accession in place of the species name.
 
 The PAF alignment files can be loaded directly into the [online viewer](https://www.genoscope.cns.fr/lbgb/hobrac/) for interactive exploration.
 

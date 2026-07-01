@@ -286,42 +286,6 @@ def download_and_process_genomes(
                 continue
 
 
-def download_genomes(phylums: defaultdict[str, List[Genome]], output_dir):
-    """Download genomes only (legacy function, not used in optimized workflow)."""
-    already_downloaded_path = os.path.join(output_dir, "already_downloaded.txt")
-
-    for phylum in phylums:
-        phylums_download_dir = os.path.join(output_dir, phylum)
-        os.makedirs(phylums_download_dir, exist_ok=True)
-
-        for genome in phylums[phylum]:
-            if genome.url is None:
-                continue
-
-            accession = genome.accession
-            taxid = genome.taxid
-            url = genome.url
-            compressed_name = os.path.join(
-                phylums_download_dir, f"{accession}_{taxid}.fna.gz"
-            )
-
-            try:
-                response = requests.get(url, stream=True)
-                response.raise_for_status()
-            except Exception as e:
-                print(e)
-                continue
-
-            with (
-                open(compressed_name, "wb") as f,
-                open(already_downloaded_path, "a") as current_list,
-            ):
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-                print(accession, file=current_list)
-
-
 def decompress_single_file(compressed_path: str) -> str:
     """Decompress a single .gz file and return the path to the decompressed file."""
     print(f"Decompressing {compressed_path}", flush=True, file=sys.stderr)
@@ -346,31 +310,6 @@ def decompress_single_file(compressed_path: str) -> str:
     # Remove compressed file after successful decompression
     os.remove(compressed_path)
     return decompressed_path
-
-
-def decompress(output_dir):
-    """Decompress all .gz files in the output directory.
-
-    Legacy function, not used in optimized workflow.
-    """
-    for f in glob.glob(f"{output_dir}/*/*.gz"):
-        print(f"Decompressing {f}")
-
-        chunk_size = 10 * 1024 * 1024  # 10 MB
-        try:
-            with gzip.open(f, "rb") as f_in:
-                with open(f.replace(".gz", ""), "wb") as f_out:
-                    while True:
-                        chunk = f_in.read(chunk_size)
-                        if not chunk:
-                            break
-                        f_out.write(chunk)
-
-        except Exception as e:
-            print(e)
-            pass
-
-        os.remove(f)
 
 
 def run_mash_single_file(
@@ -402,35 +341,6 @@ def run_mash_single_file(
     print(f"Deleted {fna_path} after mash processing", flush=True, file=sys.stderr)
 
     return f"{output_path}.msh"
-
-
-def run_mash(input_dir, output_dir):
-    """Run mash sketch on all .fna files.
-
-    Legacy function, not used in optimized workflow.
-    """
-    pattern = (
-        r".*/(?P<phylum>[^/]+)/(?P<accession>GC[AF]_\d{9}\.\d+)_(?P<taxid>\d+)\.fna$"
-    )
-
-    for f in glob.glob(f"{input_dir}/*/*.fna"):
-        match = re.search(pattern, f)
-        if match is None:
-            print(f"Could not find a GC[AF] match for {f}", flush=True, file=sys.stderr)
-            continue
-
-        accession = match.group("accession")
-        phylum = match.group("phylum")
-        taxid = match.group("taxid")
-        identifier = f"{accession}:{taxid}"
-        output_path = os.path.join(output_dir, phylum, os.path.basename(f))
-        os.makedirs(output_path, exist_ok=True)
-
-        subprocess.run(
-            ["mash", "sketch", "-s", "10000", "-I", identifier, "-o", output_path, f],
-            check=True,
-        )
-        os.remove(f)
 
 
 def paste_mash(input_dir, output_dir):
@@ -478,5 +388,3 @@ def paste_mash(input_dir, output_dir):
             os.rename(f"{new_global_sketch}.msh", global_sketch)
         else:
             os.rename(f"{input_dir}/{phylum}.msh", global_sketch)
-
-    # shutil.rmtree(input_dir)

@@ -3,7 +3,7 @@ import os
 
 rule aln:
     input:
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
     output:
         "aln/vs_{accession}/aln.paf",
@@ -24,7 +24,7 @@ rule aln:
 rule gen_dgenies_index:
     input:
         aln="aln/vs_{accession}/aln.paf",
-        reference="reference/{accession}.fna",
+        reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
     output:
         touch("aln/vs_{accession}/dgenies.done"),
@@ -54,7 +54,7 @@ rule gen_dgenies_index:
         """
         cd aln/vs_{wildcards.accession}
 
-        dgenies_fasta_to_index -i {params.assembly_path} -n "{params.name}" -o query_{params.assembly_prefix}.idx
+        dgenies_fasta_to_index -i {params.assembly_path} -n "{params.name}" -o "query_{params.assembly_prefix}.idx"
         dgenies_fasta_to_index -i {params.reference_path} -n "{wildcards.accession}" -o target_{wildcards.accession}.idx
 
         dotplotrs -m 2000 -p aln.paf -o dotplot.png --line-thickness 4 --dump-significance significance_results.txt
@@ -69,9 +69,30 @@ def get_all_ranking_targets(wildcards):
         for line in f:
             if line.strip():
                 accessions.append(line.strip())
+    patterns = ["aln/busco_{accession}"]
+    if not config.get("skip_genomic", False):
+        patterns.append("aln/vs_{accession}/dgenies.done")
+    return expand(patterns, accession=accessions)
+
+
+def get_ranking_report_inputs(wildcards):
+    """NCBI assembly reports, so the ranked symlinks can carry organism names.
+
+    Each report is co-produced with its reference .fna by get_reference, so it
+    already exists by ranking time; declaring it makes that dependency explicit.
+    Manual references have no NCBI report, so request none (requiring one would
+    force a download) -- rank_symlinks then falls back to the accession.
+    """
+    if config.get("manual_references"):
+        return []
+    checkpoint_output = checkpoints.select_references.get(**wildcards).output[0]
+    accessions = []
+    with open(checkpoint_output) as f:
+        for line in f:
+            if line.strip():
+                accessions.append(line.strip())
     return expand(
-        ["aln/vs_{accession}/dgenies.done", "aln/busco_{accession}"],
-        accession=accessions,
+        "reference/{accession}_assembly_report.txt", accession=accessions
     )
 
 
@@ -79,28 +100,37 @@ rule rank_symlinks:
     input:
         selected_accessions="mash/selected_accessions.txt",
         targets=get_all_ranking_targets,
+        reports=get_ranking_report_inputs,
     output:
         "aln/ranking_symlinks.done",
-    shell:
-        """
-        # Clean existing symlinks to avoid duplicates or stale links
-        find aln/ -maxdepth 1 -type l -name "rank*_busco" -delete
-        find aln/ -maxdepth 1 -type l -name "rank*_geno" -delete
+    run:
+        import glob
+        import os
 
-        i=1
-        while read -r accession; do
-            # Create symlink for BUSCO
-            if [ -d "aln/busco_${{accession}}" ]; then
-                ln -s "busco_${{accession}}" "aln/rank${{i}}_busco"
-            fi
-            
-            # Create symlink for genome-to-genome alignments
-            if [ -d "aln/vs_${{accession}}" ]; then
-                ln -s "vs_${{accession}}" "aln/rank${{i}}_geno"
-            fi
-            
-            i=$((i+1))
-        done < {input.selected_accessions}
-        
-        touch {output}
-    """
+        from hobrac.jcvi_synteny.io import parse_organism_name
+
+        # Clean existing symlinks (old or new naming) to avoid stale links.
+        # The rank* glob matches both "rank1_busco" and "rank1_<Species>_busco".
+        for pattern in ("aln/rank*_busco", "aln/rank*_geno"):
+            for link in glob.glob(pattern):
+                if os.path.islink(link):
+                    os.unlink(link)
+
+        with open(input.selected_accessions) as f:
+            accessions = [line.strip() for line in f if line.strip()]
+
+        # The rank<i> prefix keeps every symlink unique even when two genomes
+        # share a species, so identical organism labels never collide.
+        for i, accession in enumerate(accessions, start=1):
+            organism = parse_organism_name(
+                f"reference/{accession}_assembly_report.txt"
+            )
+            label = organism.replace(" ", "_") if organism else accession
+            for src, suffix in (
+                (f"busco_{accession}", "busco"),
+                (f"vs_{accession}", "geno"),
+            ):
+                if os.path.isdir(os.path.join("aln", src)):
+                    os.symlink(src, f"aln/rank{i}_{label}_{suffix}")
+
+        open(output[0], "w").close()

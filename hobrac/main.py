@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from hobrac.command_line import get_args
+from hobrac.rename_chr import fasta_basename, rename_reference
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 snakefile_path = os.path.join(thisdir, "workflow", "Snakefile")
@@ -50,7 +51,7 @@ def validate_manual_references(paths):
 
     seen = {}
     for path in paths:
-        name = os.path.splitext(os.path.basename(path))[0]
+        name = fasta_basename(path)
         if name in seen:
             print(
                 f"Error: Duplicate reference name '{name}' detected.\n"
@@ -216,6 +217,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
     cmd += f"allow_zero_distance={args.allow_zero_distance} "
     cmd += f"stop_after_mash={args.stop_after_mash} "
+    cmd += f"skip_genomic={args.skip_genomic} "
     cmd += f"ref_count={args.ref_count} "
 
     if args.metaeuk:
@@ -229,19 +231,19 @@ def generate_snakemake_command(args) -> str:
     cmd += f"minimap2_runtime={args.minimap2_runtime * 60} "
     cmd += f"busco_runtime={args.busco_runtime * 60} "
     cmd += f"min_busco_genes={args.min_busco_genes} "
-    cmd += f"jcvi_pvalue={args.jcvi_pvalue} "
-    cmd += f"jcvi_min_chain_genes={args.jcvi_min_chain_genes} "
+    cmd += f"alg_pvalue={args.alg_pvalue} "
+    cmd += f"jcvi_min_chain_genes={args.min_chain_genes} "
 
-    if args.jcvi_custom_colors:
-        cmd += f"jcvi_custom_colors='{args.jcvi_custom_colors}' "
+    if args.custom_colors:
+        cmd += f"jcvi_custom_colors='{args.custom_colors}' "
 
-    if args.jcvi_color_metazoan_alg:
+    if args.color_metazoan_alg:
         cmd += "jcvi_color_scheme='29ALG' "
-    elif args.jcvi_color_bilaterian_alg:
+    elif args.color_bilaterian_alg:
         cmd += "jcvi_color_scheme='24BILAT' "
 
-    if args.jcvi_names:
-        cmd += f"jcvi_names='{args.jcvi_names}' "
+    if args.names:
+        cmd += f"jcvi_names='{args.names}' "
 
     if args.hide_non_significant:
         cmd += "hide_non_significant=True "
@@ -249,7 +251,7 @@ def generate_snakemake_command(args) -> str:
     if args.skip_alg:
         cmd += "skip_alg=True "
 
-    if args.jcvi_permissive_alg:
+    if args.permissive_alg:
         cmd += "jcvi_permissive_alg=True "
 
     if getattr(args, "busco_assembly_override_path", None):
@@ -312,17 +314,30 @@ def main():
         # Copy manual references to reference directory
         create_dir("reference")
         for ref_path in args.reference:
-            # ID is basename without extension
-            base_name = os.path.splitext(os.path.basename(ref_path))[0]
+            # ID is basename without extension (also strips a .gz suffix)
+            base_name = fasta_basename(ref_path)
             dest_path = os.path.join("reference", f"{base_name}.fna")
+            mapping_path = os.path.join("reference", f"{base_name}.chr_rename.tsv")
 
-            # Simple copy to ensure container visibility
-            # Logic: If it's a manual ref, we put it where the pipeline expects it
-            shutil.copy(ref_path, dest_path)
+            # Manual references skip find_reference_genomes, so do a best-effort
+            # chr<name> renaming here and copy the result where the pipeline
+            # expects it. The mapping file keeps the renaming traceable.
+            rename_reference(ref_path, dest_path, mapping_path)
+
+    # Best-effort chr<name> renaming of the assembly too, so the karyotype and
+    # dotplots show pretty names. Non-matching headers (drafts) keep their ids.
+    # Repointing args.assembly here means both the container mount and the
+    # snakemake config pick up the renamed copy. Removed in cleanup_busco_downloads.
+    create_dir("assembly")
+    assembly_base = fasta_basename(args.assembly)
+    assembly_dest = os.path.join("assembly", f"{assembly_base}.fna")
+    assembly_mapping = os.path.join("assembly", f"{assembly_base}.chr_rename.tsv")
+    rename_reference(args.assembly, assembly_dest, assembly_mapping)
+    args.assembly = os.path.abspath(assembly_dest)
 
     # Validate JCVI names count if provided
     ref_count = len(args.reference) if args.reference else args.ref_count
-    validate_jcvi_names(args.jcvi_names, ref_count)
+    validate_jcvi_names(args.names, ref_count)
 
     cmd = generate_snakemake_command(args)
     print(f"\n{cmd}\n")
