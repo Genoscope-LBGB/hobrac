@@ -28,6 +28,7 @@ karyotype is left untouched and no panel is drawn.
 """
 
 import argparse
+import math
 import re
 
 import matplotlib
@@ -71,6 +72,17 @@ BOTTOM_BAND_PAD_FRAC = 0.0
 LABEL_FONT_FRAC = 0.018
 LABEL_MAX_SPACING_FRAC = 0.34
 LABEL_GAP_FRAC = 0.008
+
+def _positive_finite_float(raw):
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number"
+        ) from exc
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError("must be a finite positive number")
+    return value
 
 
 def _natural_key(label):
@@ -195,19 +207,21 @@ def _wrap_two_lines(text):
     return " ".join(words[:k]) + "\n" + " ".join(words[k:])
 
 
-def draw_track_labels(ax, labels, positions, img_w, img_h, dpi, renderer):
+def draw_track_labels(
+    ax, labels, positions, img_w, img_h, dpi, renderer, min_species_label_font_size=None
+):
     """Draw right-aligned track labels in the left margin of the karyotype.
 
     *ax* spans the karyotype image with ``xlim(0, 1)`` / ``ylim(1, 0)`` so jcvi's
     coordinates map straight through: a track at jcvi-y ``y`` has its bar at axes
     ``1 - y`` and starts at axes-x ``xstart``. Each label is right-aligned just
     left of its track; if a single line is wider than the available margin it is
-    wrapped to two lines, then shrunk to fit.
+    wrapped to two lines, then shrunk to fit unless the selected font-size floor
+    prevents it.
     """
     n = len(positions)
     spacing = (0.8 / max(n - 1, 1)) * img_h  # px between adjacent tracks
-    base_fs_px = min(LABEL_FONT_FRAC * img_h, LABEL_MAX_SPACING_FRAC * spacing)
-    base_fs = base_fs_px * 72 / dpi  # px -> points
+    base_fs = min(LABEL_FONT_FRAC * img_h, LABEL_MAX_SPACING_FRAC * spacing) * 72 / dpi
 
     def width_pt(text, fs):
         t = ax.text(0, 0, text, fontsize=fs)
@@ -220,7 +234,10 @@ def draw_track_labels(ax, labels, positions, img_w, img_h, dpi, renderer):
             continue
         x_right = xstart - LABEL_GAP_FRAC
         max_w = x_right * img_w  # display px available to the left edge
-        rendered, fs = text, base_fs
+        rendered = text
+        fs = base_fs
+        if min_species_label_font_size is not None:
+            fs = max(fs, min_species_label_font_size)
         if width_pt(rendered, fs) > max_w:
             wrapped = _wrap_two_lines(text)  # None for single-token names
             if wrapped is not None:
@@ -228,6 +245,8 @@ def draw_track_labels(ax, labels, positions, img_w, img_h, dpi, renderer):
             w = width_pt(rendered, fs)
             if w > max_w:
                 fs *= max_w / w  # shrink (wrapped or single line) to fit the margin
+                if min_species_label_font_size is not None:
+                    fs = max(fs, min_species_label_font_size)
         ax.text(
             x_right,
             1 - y,
@@ -256,6 +275,7 @@ def render_legend(
     band=(0.0, 1.0),
     labels=None,
     positions=None,
+    min_species_label_font_size=None,
 ):
     """Composite track labels (left) and an ALG brick legend (right) onto the PNG.
 
@@ -299,7 +319,14 @@ def render_legend(
         tax.set_ylim(1, 0)
         tax.axis("off")
         draw_track_labels(
-            tax, labels, positions, img_w, img_h, dpi, fig.canvas.get_renderer()
+            tax,
+            labels,
+            positions,
+            img_w,
+            img_h,
+            dpi,
+            fig.canvas.get_renderer(),
+            min_species_label_font_size=min_species_label_font_size,
         )
 
     if has_panel:
@@ -380,6 +407,16 @@ def main():
         help="Output PNG (defaults to overwriting --karyotype)",
     )
     parser.add_argument("--title", default="ALGs", help="Legend header text")
+    parser.add_argument(
+        "--min-species-label-font-size",
+        type=_positive_finite_float,
+        default=None,
+        metavar="POINTS",
+        help=(
+            "Minimum font size in points for species labels from --layouts; "
+            "enforced even when labels exceed the left margin."
+        ),
+    )
     args = parser.parse_args()
 
     entries = collect_legend_entries(args.gene_chains)
@@ -406,6 +443,7 @@ def main():
         band=band,
         labels=labels,
         positions=positions,
+        min_species_label_font_size=args.min_species_label_font_size,
     )
 
 
