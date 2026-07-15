@@ -1,11 +1,11 @@
-# HoBRAC - Homology-based reference genome acquisition and comparison
+# Hobrac - Homology-based reference genome acquisition and comparison
 
-The purpose of HoBRAC is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes too noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in HoBRAC:
+The purpose of Hobrac is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes too noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in Hobrac:
   - the user provides a genome assembly fasta file, a taxid and the organism name
   - the lineage of the organism is retrieved thanks to Taxonkit
-  - HoBRAC downloads the MASH database corresponding to the phylum of the assembly (we pre-computed a database per phylum and are making it available [here](https://www.genoscope.cns.fr/lbgb/mash/))
+  - Hobrac downloads the MASH database corresponding to the phylum of the assembly (we pre-computed a database per phylum and are making it available [here](https://www.genoscope.cns.fr/lbgb/mash/))
   - MASH is ran on all genomes of the selected phylum to determine which one is the closest to the provided assembly
-  - HoBRAC chooses the closest Busco dataset to use (based on taxonomy) and Busco is ran on the closest reference genome (based on the MASH distance) and on the assembly. A PAF file containing the positions of the Busco genes on the reference and on the assembly is created
+  - Hobrac chooses the closest Busco dataset to use (based on taxonomy) and Busco is ran on the closest reference genome (based on the MASH distance) and on the assembly. A PAF file containing the positions of the Busco genes on the reference and on the assembly is created
   - Minimap2 is launched to align the closest reference (based on the MASH distance) and the assembly
   - Dotplots from the genome-to-genome alignment and the busco positions are generated. For convenience, an alignment viewer is available [here](https://www.genoscope.cns.fr/lbgb/hobrac/)
 
@@ -19,7 +19,7 @@ On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyl
 
 ## Dependencies
 
-HoBRAC relies on several dependencies. You can either install them manually or use containers (see [Using Containers](#using-containers) below).
+Hobrac relies on several dependencies. You can either install them manually or use containers (see [Using Containers](#using-containers) below).
 
   - Python >= 3.11
   - [Taxonkit](https://github.com/shenwei356/taxonkit)
@@ -39,19 +39,19 @@ pip install .
 
 ## Usage 
 
-HoBRAC only needs three mandatory parameters:
+Hobrac only needs three mandatory parameters:
   - `-a`: path to a genome assembly fasta file
   - `-n`: the scientific name of the organism between quotes
   - `-t`: the taxid of the organism
 
-The `-o` argument is optional and is used to indicate the path to an output folder that will be created by HoBRAC.
+The `-o` argument is optional and is used to indicate the path to an output folder that will be created by Hobrac.
 
-A typical HoBRAC command looks like this:
+A typical Hobrac command looks like this:
 ```
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea
 ```
 
-By default, HoBRAC runs computations on the machine it is launched, but being a Snakemake pipeline wrapper it can also submit jobs to a computing grid. HoBRAC is packaged with `snakemake-executor-plugin-slurm` which makes it possible to use a SLURM computing grid, it is the responsibility of the user to install the correct plugin for their computing grid. To launch jobs on a computing grid, you can use the `-e` flag with the correct plugin. As an example, this command will launch HoBRAC jobs on a slurm grid:
+By default, Hobrac runs computations on the machine it is launched, but being a Snakemake pipeline wrapper it can also submit jobs to a computing grid. Hobrac is packaged with `snakemake-executor-plugin-slurm` which makes it possible to use a SLURM computing grid, it is the responsibility of the user to install the correct plugin for their computing grid. To launch jobs on a computing grid, you can use the `-e` flag with the correct plugin. As an example, this command will launch Hobrac jobs on a slurm grid:
 ```
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea -e slurm
 ``` 
@@ -61,7 +61,7 @@ The list of available plugins is available [here](https://snakemake.github.io/sn
 
 ## Manual Reference
 
-By default, HoBRAC selects the closest reference genome automatically via MASH. However, it is possible to provide one or more reference genomes manually using the `-r` flag, which disables the reference searching step entirely.
+By default, Hobrac selects the closest reference genome automatically via MASH. However, it is possible to provide one or more reference genomes manually using the `-r` flag, which disables the reference searching step entirely.
 
 ```
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -r my_reference.fa
@@ -73,7 +73,7 @@ Multiple references can be specified by repeating the flag:
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -r reference_1.fa -r reference_2.fa
 ```
 
-When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so HoBRAC instead makes a pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
+When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so Hobrac instead makes a pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
 
 The assembly gets the same pass so its chromosomes appear with pretty names in the karyotype and dotplots, with the mapping written to `assembly/<name>.chr_rename.tsv`. Draft assemblies whose contigs/scaffolds carry no recognizable chromosome name are left untouched.
 
@@ -89,7 +89,7 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 \
 
 ## Multi-Reference Selection
 
-By default, HoBRAC compares your assembly to the single closest reference genome found via MASH. You can choose to compare against multiple reference genomes using the `--ref-count` flag. This will identify the top N closest genomes and run the full analysis pipeline (Alignments, BUSCO) against each of them in parallel.
+By default, Hobrac compares your assembly to the single closest reference genome found via MASH. You can choose to compare against multiple reference genomes using the `--ref-count` flag. This will identify the top N closest genomes and run the full analysis pipeline (Alignments, BUSCO) against each of them in parallel.
 
 ```
 # Compare against the top 3 closest reference genomes
@@ -108,7 +108,7 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --skip-genomic
 
 ## JCVI Karyotype Visualization
 
-In addition to dotplots, HoBRAC can produce JCVI karyotype plots that display synteny relationships between chromosomes. Shared BUSCO genes are drawn as colored links between the assembly and each reference genome, which makes it possible to identify large-scale rearrangements at a glance. A karyotype PNG is generated automatically as part of the pipeline output.
+In addition to dotplots, Hobrac can produce JCVI karyotype plots that display synteny relationships between chromosomes. Shared BUSCO genes are drawn as colored links between the assembly and each reference genome, which makes it possible to identify large-scale rearrangements at a glance. A karyotype PNG is generated automatically as part of the pipeline output.
 
 ### ALG Coloring
 
@@ -125,7 +125,7 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-bilaterian-a
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --custom-colors colors.tsv
 ```
 
-Pre-computed color schemes are available for the following BUSCO datasets: actinopterygii, anthozoa, arthropoda, cnidaria, crustacea, lophotrochozoa, metazoa, mollusca and vertebrata. If the BUSCO dataset selected by the pipeline is not part of this set, HoBRAC falls back to default coloring.
+Pre-computed color schemes are available for the following BUSCO datasets: actinopterygii, anthozoa, arthropoda, cnidaria, crustacea, lophotrochozoa, metazoa, mollusca and vertebrata. If the BUSCO dataset selected by the pipeline is not part of this set, Hobrac falls back to default coloring.
 
 The custom color file is a tab-separated file with three columns: a BUSCO gene ID, a color (as `R,G,B`, `#RRGGBB`, or `RRGGBB`), and an ALG name. As an example:
 
@@ -139,7 +139,7 @@ When using custom colors, ALG statistical testing still runs by default in order
 
 ### ALG Detection Parameters
 
-HoBRAC detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
+Hobrac detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
   - `--alg-pvalue`: base significance threshold (default: 0.01)
   - `--min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
@@ -191,7 +191,7 @@ The PAF alignment files can be loaded directly into the [online viewer](https://
 
 ## Using Containers
 
-HoBRAC supports running all workflow steps inside containers, which eliminates the need to manually install dependencies. A Docker image containing all required tools is available at `ghcr.io/cea-lbgb/hobrac-tools`.
+Hobrac supports running all workflow steps inside containers, which eliminates the need to manually install dependencies. A Docker image containing all required tools is available at `ghcr.io/cea-lbgb/hobrac-tools`.
 
 ### With Singularity/Apptainer (recommended for HPC)
 
