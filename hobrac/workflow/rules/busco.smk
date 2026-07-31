@@ -33,7 +33,7 @@ rule get_busco_datasets:
         runtime=20,
     shell:
         """
-        busco --list-datasets --datasets_version odb12 > {output}
+        busco --list-datasets odb12 > {output}
     """
 
 
