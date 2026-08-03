@@ -26,6 +26,7 @@ setuptools.setup(
         "xopen",
         "scipy",
         "jcvi",
+        "polars[rtcompat]>=1.35,<2",
     ],
     entry_points={
         "console_scripts": [
