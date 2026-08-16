@@ -48,7 +48,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
 # Install Python packages not available on conda
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 RUN pip install --no-cache-dir \
-    find_reference_genomes \
+    'find_reference_genomes>=1.2.0' \
     snakemake-executor-plugin-slurm
 
 # Install HoBRAC

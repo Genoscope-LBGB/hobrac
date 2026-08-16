@@ -22,7 +22,7 @@ setuptools.setup(
     install_requires=[
         "snakemake",
         "snakemake-executor-plugin-slurm",
-        "find_reference_genomes",
+        "find_reference_genomes>=1.2.0",
         "xopen",
         "scipy",
         "jcvi",
