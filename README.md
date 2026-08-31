@@ -112,7 +112,7 @@ In addition to dotplots, Hobrac can produce JCVI karyotype plots that display sy
 
 ### ALG Coloring
 
-By default, links are colored uniformly. To color genes according to Ancestral Linkage Groups (ALGs), three options are available:
+By default, links are colored uniformly. To color genes according to Ancestral Linkage Groups (ALGs), four options are available:
 
 ```
 # Use the pre-computed 29-metazoan-ALG color scheme
@@ -120,6 +120,9 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-metazoan-alg
 
 # Use the pre-computed 24-bilaterian-ALG color scheme
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-bilaterian-alg
+
+# Use the pre-computed 20-Spiralian-ALG color scheme
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --color-spiralian-alg
 
 # Use a custom color file
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 --custom-colors colors.tsv

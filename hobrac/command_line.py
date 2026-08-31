@@ -292,6 +292,19 @@ def get_args():
         ),
         default=False,
     )
+    color_group.add_argument(
+        "--color-spiralian-alg",
+        action="store_true",
+        dest="color_spiralian_alg",
+        help=(
+            "Use pre-computed 20-spiralian-ALG color scheme for JCVI"
+            " synteny plot. The color file is automatically selected"
+            " based on the BUSCO dataset. If the dataset is not part"
+            " of the pre-computed set, the pipeline falls back to"
+            " default coloring."
+        ),
+        default=False,
+    )
     synteny_args.add_argument(
         "--names",
         action="store",
