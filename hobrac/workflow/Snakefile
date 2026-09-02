@@ -1,5 +1,5 @@
 # Container versions
-HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.10"
+HOBRAC_TOOLS = "docker://ghcr.io/cea-lbgb/hobrac-tools:0.1.11"
 
 
 # Constraining the wildcard keeps it from matching greedily across '/'
