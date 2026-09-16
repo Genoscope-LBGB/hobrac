@@ -7,6 +7,7 @@ sequence ids are kept. As a best effort, we scan each FASTA header for a
 ``chr<token>`` pattern (e.g. ``chr1``, ``chrX``, ``chr2L``, ``chrMT``) and, when
 found, rename the sequence to that token. A per-reference TSV mapping old ids to
 new ids is written so the renaming stays traceable.
+Renaming can be disabled to keep precomputed BUSCO sequence ids valid.
 """
 
 import os
@@ -69,14 +70,21 @@ def find_chr_name(header: str):
     return None
 
 
-def rename_reference(src_path: str, dest_fasta: str, mapping_path: str):
+def rename_reference(
+    src_path: str,
+    dest_fasta: str,
+    mapping_path: str,
+    *,
+    rename_chromosomes: bool = True,
+):
     """Copy ``src_path`` to ``dest_fasta`` renaming chromosome sequences.
 
     For every sequence whose header contains a ``chr<token>`` pattern, the
     sequence is renamed to that token. Sequences without a match, or whose target
     name would collide with one already used, keep their original id. A TSV
     mapping (``old_name<TAB>new_name``) is written to ``mapping_path`` with one
-    row per sequence.
+    row per sequence. When ``rename_chromosomes`` is False, preserve headers
+    verbatim so precomputed BUSCO sequence ids still match the copied FASTA.
     """
     mapping = []
     used = set()
@@ -89,7 +97,7 @@ def rename_reference(src_path: str, dest_fasta: str, mapping_path: str):
 
             header = line[1:].rstrip("\n")
             old_name = header.split()[0] if header.split() else ""
-            candidate = find_chr_name(header)
+            candidate = find_chr_name(header) if rename_chromosomes else None
 
             if candidate and candidate != old_name and candidate in used:
                 print(

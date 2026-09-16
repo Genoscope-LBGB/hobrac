@@ -321,20 +321,28 @@ def main():
             dest_path = os.path.join("reference", f"{base_name}.fna")
             mapping_path = os.path.join("reference", f"{base_name}.chr_rename.tsv")
 
-            # Manual references skip find_reference_genomes, so do a best-effort
-            # chr<name> renaming here and copy the result where the pipeline
-            # expects it. The mapping file keeps the renaming traceable.
-            rename_reference(ref_path, dest_path, mapping_path)
+            # Keep sequence ids when reusing BUSCO results; otherwise apply
+            # best-effort chr<name> renaming for readable plots.
+            rename_reference(
+                ref_path,
+                dest_path,
+                mapping_path,
+                rename_chromosomes=not args.busco_reference_override_path,
+            )
 
-    # Best-effort chr<name> renaming of the assembly too, so the karyotype and
-    # dotplots show pretty names. Non-matching headers (drafts) keep their ids.
-    # Repointing args.assembly here means both the container mount and the
-    # snakemake config pick up the renamed copy. Removed in cleanup_busco_downloads.
+    # Prepare the assembly likewise, preserving ids for precomputed BUSCO.
+    # Repointing args.assembly also updates the container mount and snakemake
+    # config. The prepared copy is removed in cleanup_busco_downloads.
     create_dir("assembly")
     assembly_base = fasta_basename(args.assembly)
     assembly_dest = os.path.join("assembly", f"{assembly_base}.fna")
     assembly_mapping = os.path.join("assembly", f"{assembly_base}.chr_rename.tsv")
-    rename_reference(args.assembly, assembly_dest, assembly_mapping)
+    rename_reference(
+        args.assembly,
+        assembly_dest,
+        assembly_mapping,
+        rename_chromosomes=not args.busco_assembly_override_path,
+    )
     args.assembly = os.path.abspath(assembly_dest)
 
     # Validate JCVI names count if provided

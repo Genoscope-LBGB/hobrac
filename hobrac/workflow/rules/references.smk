@@ -9,10 +9,12 @@ rule get_reference:
     resources:
         mem_mb=5000,
         runtime=2 * 60,
+    params:
+        rename_flag="" if config.get("busco_reference_override") else "-r",
     shell:
         """
         cd reference
-        find_reference_genomes -d {wildcards.accession} -o {wildcards.accession} -r
+        find_reference_genomes -d {wildcards.accession} -o {wildcards.accession} {params.rename_flag}
         mv {wildcards.accession}/*.fna {wildcards.accession}.fna
         mv {wildcards.accession}/*_assembly_report.txt {wildcards.accession}_assembly_report.txt
         rm -r {wildcards.accession}

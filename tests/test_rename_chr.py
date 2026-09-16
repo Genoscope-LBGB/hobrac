@@ -1,5 +1,13 @@
 """Tests for best-effort chromosome renaming of manual references."""
 
+import gzip
+import sys
+from types import SimpleNamespace
+
+import pytest
+
+import hobrac.main as hobrac_main
+from hobrac.busco_to_paf import run as busco_to_paf
 from hobrac.rename_chr import find_chr_name, rename_reference
 
 
@@ -50,10 +58,7 @@ def _write(path, text):
 def test_rename_reference_renames_and_writes_mapping(tmp_path):
     src = _write(
         tmp_path / "ref.fa",
-        ">CM000663.2 Homo sapiens chr1, GRCh38\n"
-        "ACGT\n"
-        ">scaffold_42 unplaced\n"
-        "TTTT\n",
+        ">CM000663.2 Homo sapiens chr1, GRCh38\nACGT\n>scaffold_42 unplaced\nTTTT\n",
     )
     dest = tmp_path / "ref.fna"
     mapping = tmp_path / "ref.chr_rename.tsv"
@@ -64,12 +69,7 @@ def test_rename_reference_renames_and_writes_mapping(tmp_path):
 
     # Renamed header is replaced; unchanged header is kept verbatim, and the
     # sequence data is preserved.
-    assert dest.read_text() == (
-        ">chr1\n"
-        "ACGT\n"
-        ">scaffold_42 unplaced\n"
-        "TTTT\n"
-    )
+    assert dest.read_text() == (">chr1\nACGT\n>scaffold_42 unplaced\nTTTT\n")
 
     assert mapping.read_text().splitlines() == [
         "old_name\tnew_name",
@@ -90,3 +90,72 @@ def test_rename_reference_avoids_collisions(tmp_path):
 
     # First sequence wins the chr1 name; the second keeps its original id.
     assert result == [("a", "chr1"), ("b", "b")]
+
+
+@pytest.mark.parametrize(
+    "reuse_assembly,reuse_reference",
+    [(False, False), (False, True), (True, False), (True, True)],
+)
+def test_busco_reuse_preserves_matching_ids_per_input(
+    tmp_path, monkeypatch, reuse_assembly, reuse_reference
+):
+    output = tmp_path / "output"
+    argv = [
+        "hobrac",
+        "-n",
+        "Test species",
+        "-t",
+        "1",
+        "-e",
+        "local",
+        "-o",
+        str(output),
+    ]
+    tables = {}
+    expected_ids = []
+    for side, option, reuse, original_id, chromosome in [
+        ("assembly", "-a", reuse_assembly, "scaffoldA", "chr1"),
+        ("reference", "-r", reuse_reference, "NC_000002.1", "chr2"),
+    ]:
+        fasta = tmp_path / f"{side}.fa.gz"
+        with gzip.open(fasta, "wt") as handle:
+            handle.write(f">{original_id} {chromosome}\n" + "ACGT" * 100 + "\n")
+        argv.extend([option, str(fasta)])
+
+        # Reused results name the original FASTA; newly computed results name
+        # the prepared FASTA. Both must remain usable by downstream conversion.
+        sequence_id = original_id if reuse else chromosome
+        expected_ids.append(sequence_id)
+        table = tmp_path / f"busco_{side}" / "run_lineage" / "full_table.tsv"
+        table.parent.mkdir(parents=True)
+        table.write_text(f"123at4751\tComplete\t{sequence_id}\t10\t100\n")
+        if reuse:
+            argv.extend([f"--busco-{side}", str(table)])
+            tables[side] = (
+                output / "busco" / f"busco_{side}" / "run_lineage" / "full_table.tsv"
+            )
+        else:
+            tables[side] = table
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(hobrac_main, "check_dependencies", lambda **kwargs: None)
+    monkeypatch.setattr(
+        hobrac_main.subprocess,
+        "Popen",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, wait=lambda: 0),
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        hobrac_main.main()
+    assert exit_info.value.code == 0
+
+    alignment = output / "alignment"
+    busco_to_paf(
+        tables["assembly"],
+        tables["reference"],
+        output / "assembly" / "assembly.fna",
+        output / "reference" / "reference.fna",
+        alignment,
+    )
+    fields = (alignment / "aln_busco.paf").read_text().strip().split("\t")
+    assert [fields[0], fields[5]] == expected_ids

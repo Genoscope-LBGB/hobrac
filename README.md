@@ -101,13 +101,15 @@ Multiple references can be specified by repeating the flag:
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -r reference_1.fa -r reference_2.fa
 ```
 
-When references are downloaded automatically, their sequences are renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so Hobrac instead makes a pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
+Without `--busco-reference`, reference sequence renaming works as follows. Automatically downloaded references have their sequences renamed to `chr<name>` using the NCBI assembly report. Manual references skip that step, so Hobrac instead makes a pass over each FASTA header and renames the sequence to a `chr<token>` name when it recognizes one. Two header styles are handled: a literal `chr<token>` (e.g. `chr1`, `chrX`, `chr2L`, `chrMT`) and the descriptive GenBank/ENA form (e.g. `... chromosome 1, whole genome shotgun sequence` or `... chromosome: 4`), which is normalized to `chr1`, `chr4`, etc. For every manual reference, a `reference/<name>.chr_rename.tsv` mapping file (`old_name<TAB>new_name`, one row per sequence) is written so the renaming stays traceable. Headers without a recognizable chromosome are left unchanged.
 
-The assembly gets the same pass so its chromosomes appear with pretty names in the karyotype and dotplots, with the mapping written to `assembly/<name>.chr_rename.tsv`. Draft assemblies whose contigs/scaffolds carry no recognizable chromosome name are left untouched.
+Unless `--busco-assembly` is supplied, the assembly gets the same pass so its chromosomes appear with pretty names in the karyotype and dotplots, with the mapping written to `assembly/<name>.chr_rename.tsv`. Draft assemblies whose contigs/scaffolds carry no recognizable chromosome name are left untouched.
 
 ## Pre-computed BUSCO Results
 
 BUSCO is among the most time-consuming steps of the pipeline. If BUSCO was already computed for the assembly or the reference, the results can be reused with the `--busco-assembly` and `--busco-reference` flags. Each flag accepts a path to a BUSCO result directory, a `run_*` subdirectory, or a `full_table.tsv` file directly.
+
+Reusing BUSCO results disables sequence renaming independently for the corresponding input: `--busco-assembly` preserves assembly IDs, and `--busco-reference` preserves reference IDs for both manual and automatically downloaded references. Inputs without precomputed BUSCO results keep the usual chromosome renaming. The sequence IDs in the supplied BUSCO tables must already match the corresponding original FASTAs. 
 
 ```
 hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 \
