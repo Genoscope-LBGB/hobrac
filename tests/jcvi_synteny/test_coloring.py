@@ -1,5 +1,6 @@
-"""Tests for coloring functions and run() branching logic."""
+"""Tests for coloring functions and run-wide color exports."""
 
+from csv import DictReader
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +14,6 @@ from hobrac.jcvi_synteny.models import ALG_PALETTE, BuscoGene, PairwiseAssociati
 from hobrac.jcvi_synteny.output import generate_links_file, run
 from hobrac.jcvi_synteny.statistics import detect_algs_transitive
 
-MODULE = "hobrac.jcvi_synteny.output"
 STATS_MODULE = "hobrac.jcvi_synteny.statistics"
 
 
@@ -70,8 +70,14 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
     def test_empty_custom_colors_gives_chain_colors(self, chain_fixture):
         sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            sp1,
+            sp2,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
         assert result["g1"] == chain_colors[0]
 
@@ -83,7 +89,9 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
             gene_to_chain,
             chain_colors,
             {"g1": "#00ff00", "g2": "#0000ff"},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
         # Custom colors are gated by chain membership: g1 is on a chain and
         # listed → custom; g2 is off-chain → lightgrey even though listed.
@@ -93,8 +101,14 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
     def test_no_genes_in_custom(self, chain_fixture):
         sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            sp1,
+            sp2,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
         assert result["g1"] == "#ff0000"
         assert result["g2"] == "lightgrey"
@@ -112,15 +126,27 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
 
         # A-B pair: chain doesn't cover this edge → lightgrey
         colors_ab = apply_custom_colors_with_algs(
-            sp_a, sp_b, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="A", sp2_name="B",
+            sp_a,
+            sp_b,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="A",
+            sp2_name="B",
         )
         assert colors_ab["g1"] == "lightgrey"
 
         # B-C pair: chain covers this edge → colored
         colors_bc = apply_custom_colors_with_algs(
-            sp_b, sp_c, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="B", sp2_name="C",
+            sp_b,
+            sp_c,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="B",
+            sp2_name="C",
         )
         assert colors_bc["g1"] == "#ff0000"
 
@@ -136,8 +162,14 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
 
         # species_busco order is Z, A (non-lex)
         colors = apply_custom_colors_with_algs(
-            sp_z, sp_a, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="Z", sp2_name="A",
+            sp_z,
+            sp_a,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="Z",
+            sp2_name="A",
         )
         assert colors["g1"] == "#ff0000"
 
@@ -184,9 +216,9 @@ def _parse_simple_file(path):
             assert "*" in first, f"missing color prefix in {first!r}"
             color, gene1_start = first.split("*", 1)
             # Format: "{sp}_{busco_id}", and start == end for single-gene lines
-            assert (
-                parts[1] == gene1_start
-            ), "start1 != end1 (blocks must be single-gene)"
+            assert parts[1] == gene1_start, (
+                "start1 != end1 (blocks must be single-gene)"
+            )
             assert parts[2] == parts[3], "start2 != end2 (blocks must be single-gene)"
             assert parts[4] == "1", f"score must be 1, got {parts[4]}"
             assert parts[5] == "+", f"orientation must be +, got {parts[5]}"
@@ -331,84 +363,90 @@ class TestCrossFileGeneColorConsistency:
         assert parsed_bc["g_shared"] == "#00ff00"
 
 
-class TestRunBranching:
+class TestRunColorExports:
     @pytest.fixture
-    def run_mocks(self):
-        busco_data = {
-            "g1": BuscoGene(busco_id="g1", chromosome="chr1", start=0, end=100),
-        }
-        mock_specs = {
-            "read_fasta_sizes": {"return_value": {}},
-            "read_busco_tsv": {"return_value": busco_data},
-            "glob.glob": {"return_value": ["/fake/full_table.tsv"]},
-            "generate_bed_file": {},
-            "generate_links_file": {},
-            "generate_seqids_file": {},
-            "generate_layouts_file": {},
-            "save_chromosome_associations": {},
-            "detect_algs_transitive": {"return_value": ([], [], {}, {}, [])},
-            "apply_custom_colors": {"return_value": {"g1": "lightgrey"}},
-            "apply_custom_colors_with_algs": {"return_value": {"g1": "lightgrey"}},
-            "parse_custom_colors": {"return_value": {"g1": "#00ff00"}},
-            "parse_custom_algs": {"return_value": {"g1": "ALG_A"}},
-            "save_rearrangement_indices": {},
-        }
-        patchers = []
-        mocks = {}
-        for name, kwargs in mock_specs.items():
-            p = patch(f"{MODULE}.{name}", **kwargs)
-            mocks[name] = p.start()
-            patchers.append(p)
-        yield mocks
-        for p in patchers:
-            p.stop()
-
-    def _call_run(self, tmp_path, custom_color_file="", skip_alg=False, **kwargs):
-        run(
-            assembly_busco="/fake/assembly_busco",
-            assembly_fasta="/fake/assembly.fasta",
-            busco_refs=["/fake/busco_reference_ref1"],
-            accession_order="",
-            manual_refs="/fake/ref1.fasta",
-            output_dir=str(tmp_path / "output"),
-            custom_color_file=custom_color_file,
-            skip_alg=skip_alg,
-            **kwargs,
+    def run_inputs(self, tmp_path):
+        # Two significant chains, plus one gene crossing between them.
+        shared_rows = "".join(
+            f"g{i}\tComplete\tchr{i // 10 + 1}\t{i * 100}\t{i * 100 + 90}\n"
+            for i in range(20)
         )
+        assembly_busco = tmp_path / "assembly.tsv"
+        assembly_busco.write_text(
+            shared_rows + "unlinked\tComplete\tchr1\t2000\t2090\n"
+        )
+        ref_dir = tmp_path / "busco_reference_ref1"
+        ref_run = ref_dir / "run_busco"
+        ref_run.mkdir(parents=True)
+        (ref_run / "full_table.tsv").write_text(
+            shared_rows + "unlinked\tComplete\tchr2\t2000\t2090\n"
+        )
+        assembly_fasta = tmp_path / "assembly.fasta"
+        assembly_fasta.write_text(f">chr1\n{'A' * 2200}\n>chr2\n{'A' * 2200}\n")
+        colors = tmp_path / "colors.tsv"
+        colors.write_text(
+            "g0\t#123456\tALG_A\ng1\t#abcdef\tALG_B\nunlinked\t#fedcba\tALG_C\n"
+        )
+        return {
+            "assembly_busco": str(assembly_busco),
+            "assembly_fasta": str(assembly_fasta),
+            "busco_refs": [str(ref_dir)],
+            "accession_order": "",
+            "manual_refs": "ref1.fasta",
+            "output_dir": str(tmp_path / "output"),
+        }, str(colors)
 
-    def test_custom_with_skip_alg(self, tmp_path, run_mocks):
-        self._call_run(tmp_path, custom_color_file="/fake/colors.tsv", skip_alg=True)
+    def _read_tsv(self, path):
+        with open(path) as f:
+            return list(DictReader(f, delimiter="\t"))
 
-        run_mocks["apply_custom_colors"].assert_called()
-        run_mocks["detect_algs_transitive"].assert_not_called()
-        run_mocks["apply_custom_colors_with_algs"].assert_not_called()
-        run_mocks["save_chromosome_associations"].assert_called_once()
-        run_mocks["save_rearrangement_indices"].assert_called_once()
+    def test_custom_colors_do_not_label_inferred_chains(self, run_inputs):
+        inputs, colors = run_inputs
+        output = run(**inputs, custom_color_file=colors)
 
-    def test_custom_without_skip_alg(self, tmp_path, run_mocks):
-        self._call_run(tmp_path, custom_color_file="/fake/colors.tsv", skip_alg=False)
+        algs = self._read_tsv(output["algs"])
+        assert {
+            (row["assembly"], row["ref1"], row["n_genes"], row["color"]) for row in algs
+        } == {("chr1", "chr1", "10", "-"), ("chr2", "chr2", "10", "-")}
 
-        run_mocks["apply_custom_colors_with_algs"].assert_called()
-        run_mocks["detect_algs_transitive"].assert_called()
-        run_mocks["apply_custom_colors"].assert_not_called()
-        run_mocks["save_chromosome_associations"].assert_called_once()
-        run_mocks["save_rearrangement_indices"].assert_called_once()
+        genes = {row["gene"]: row for row in self._read_tsv(output["gene_chains"])}
+        assert genes["g0"]["chain_id"] == genes["g1"]["chain_id"] != "-"
+        assert genes["g0"]["color"] == "#123456"
+        assert genes["g1"]["color"] == "#abcdef"
+        assert genes["g2"]["color"] == "lightgrey"
+        assert genes["unlinked"]["color"] == "lightgrey"
+        assert _parse_simple_file(output["links_files"][0]) == {
+            gene: row["color"] for gene, row in genes.items()
+        }
 
-    def test_no_custom_colors(self, tmp_path, run_mocks):
-        self._call_run(tmp_path, custom_color_file="", skip_alg=False)
+    def test_no_custom_colors_exports_plot_palette(self, run_inputs):
+        inputs, _ = run_inputs
+        output = run(**inputs)
 
-        run_mocks["apply_custom_colors_with_algs"].assert_called()
-        run_mocks["detect_algs_transitive"].assert_called()
-        run_mocks["apply_custom_colors"].assert_not_called()
-        run_mocks["save_chromosome_associations"].assert_called_once()
-        run_mocks["save_rearrangement_indices"].assert_not_called()
+        algs = self._read_tsv(output["algs"])
+        palette = {row["chain_id"]: row["color"] for row in algs}
+        assert set(palette.values()) == set(ALG_PALETTE[:2])
+        genes = self._read_tsv(output["gene_chains"])
+        for row in genes:
+            assert row["color"] == palette.get(row["chain_id"], "lightgrey")
+        assert _parse_simple_file(output["links_files"][0]) == {
+            row["gene"]: row["color"] for row in genes
+        }
 
-    def test_alpha_passed_to_detect_algs_transitive(self, tmp_path, run_mocks):
-        self._call_run(tmp_path, alpha=0.05)
+    def test_skip_alg_keeps_custom_colors_without_inferred_chains(self, run_inputs):
+        inputs, colors = run_inputs
+        output = run(**inputs, custom_color_file=colors, skip_alg=True)
 
-        run_mocks["detect_algs_transitive"].assert_called_once()
-        _, kwargs = run_mocks["detect_algs_transitive"].call_args
-        assert kwargs["alpha"] == 0.05
+        assert self._read_tsv(output["algs"]) == []
+        genes = {row["gene"]: row for row in self._read_tsv(output["gene_chains"])}
+        assert {row["chain_id"] for row in genes.values()} == {"-"}
+        assert genes["g0"]["color"] == "#123456"
+        assert genes["g1"]["color"] == "#abcdef"
+        assert genes["g2"]["color"] == "lightgrey"
+        assert genes["unlinked"]["color"] == "#fedcba"
+        assert _parse_simple_file(output["links_files"][0]) == {
+            gene: row["color"] for gene, row in genes.items()
+        }
 
 
 def _assoc(sp1, sp2, chr1, chr2):
@@ -684,7 +722,7 @@ class TestEnumerateChains:
         assert len(chains1) == 1
 
     def test_order_independence_partial_edges(self):
-        """Order independence with partial pairwise edges (not all pairs significant)."""
+        """Partial pairwise significance must not make chains order-dependent."""
         # A-B and B-C significant, but A-C NOT significant.
         # Gene g1 present in A, B, C → should form chain [A,B,C].
         assocs_order1 = [
@@ -786,13 +824,11 @@ class TestEnumerateChains:
             if mapping1[gene_id] == -1:
                 assert mapping2[gene_id] == -1
             else:
-                chain1_nodes = set(
-                    (sp, ch) for sp, ch in chains1[mapping1[gene_id]]
+                chain1_nodes = set((sp, ch) for sp, ch in chains1[mapping1[gene_id]])
+                chain2_nodes = set((sp, ch) for sp, ch in chains2[mapping2[gene_id]])
+                assert chain1_nodes == chain2_nodes, (
+                    f"gene {gene_id} mapped differently"
                 )
-                chain2_nodes = set(
-                    (sp, ch) for sp, ch in chains2[mapping2[gene_id]]
-                )
-                assert chain1_nodes == chain2_nodes, f"gene {gene_id} mapped differently"
 
 
 class TestBuildGeneChainMapping:
@@ -940,7 +976,9 @@ class TestDetectAlgsTransitive:
             [],
         )
 
-        _, _, _, chain_colors, _ = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)], min_chain_genes=1)
+        _, _, _, chain_colors, _ = detect_algs_transitive(
+            [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
+        )
 
         for chain_id, color in chain_colors.items():
             assert color == ALG_PALETTE[chain_id % len(ALG_PALETTE)]
@@ -1081,8 +1119,14 @@ class TestThreeSpeciesIntegration:
         sp1_busco = branching_species[0][1]
         sp2_busco = branching_species[1][1]
         colors_ab = apply_custom_colors_with_algs(
-            sp1_busco, sp2_busco, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            sp1_busco,
+            sp2_busco,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
         assert colors_ab["g_b1"] != colors_ab["g_b2"]
         assert colors_ab["g_b1"] != "lightgrey"
@@ -1100,12 +1144,24 @@ class TestThreeSpeciesIntegration:
         )
 
         colors_ab = apply_custom_colors_with_algs(
-            linear_species[0][1], linear_species[1][1], gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            linear_species[0][1],
+            linear_species[1][1],
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
         colors_bc = apply_custom_colors_with_algs(
-            linear_species[1][1], linear_species[2][1], gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp2", sp2_name="sp3",
+            linear_species[1][1],
+            linear_species[2][1],
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp2",
+            sp2_name="sp3",
         )
 
         assert colors_ab["g_sig"] == colors_bc["g_sig"]
@@ -1126,8 +1182,14 @@ class TestThreeSpeciesIntegration:
         sp2_busco = linear_species[1][1]
 
         colors = apply_custom_colors_with_algs(
-            sp1_busco, sp2_busco, gene_to_chain, chain_colors, custom,
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            sp1_busco,
+            sp2_busco,
+            gene_to_chain,
+            chain_colors,
+            custom,
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
 
         assert colors["g_sig"] == "#00ff00"
@@ -1164,8 +1226,14 @@ class TestTwoSpeciesBackwardCompat:
         )
 
         colors = apply_custom_colors_with_algs(
-            sp1, sp2, gene_to_chain, chain_colors, {},
-            chains=chains, sp1_name="sp1", sp2_name="sp2",
+            sp1,
+            sp2,
+            gene_to_chain,
+            chain_colors,
+            {},
+            chains=chains,
+            sp1_name="sp1",
+            sp2_name="sp2",
         )
 
         assert colors["g1"] == colors["g3"]

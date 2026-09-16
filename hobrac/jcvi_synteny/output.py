@@ -243,9 +243,7 @@ def generate_layouts_file(
             y = y_positions[i]
             va = "top" if i == 0 else "bottom"
             # Empty label column: labels are drawn by karyotype_legend instead.
-            f.write(
-                f"{y:.2f},\t0.1,\t0.96,\t0,\tblack,\t,\t{va},\t{bed_basename}\n"
-            )
+            f.write(f"{y:.2f},\t0.1,\t0.96,\t0,\tblack,\t,\t{va},\t{bed_basename}\n")
 
         f.write("\n# edges\n")
         for i, links_file in enumerate(links_files):
@@ -279,7 +277,7 @@ def save_chromosome_associations(
 
 def save_chains(
     chains: List[List[Tuple[str, str]]],
-    chain_colors: Dict[int, str],
+    chain_colors: Dict[int, str] | None,
     gene_to_chain: Dict[str, int],
     species_names: List[str],
     output_path: str,
@@ -287,10 +285,12 @@ def save_chains(
     """
     Save chromosome chains to a TSV file in wide format.
 
-    One row per chain. Columns: chain_id, color (palette hex), n_genes,
+    One row per chain. Columns: chain_id, color (palette hex or '-'), n_genes,
     then one column per species containing the chromosome covered by that
     chain, or '-' when the chain does not cover that species. Species
     columns appear in *species_names* order.
+    When *chain_colors* is None, color is '-' because gene-level custom
+    colors do not define a single color for an inferred chain.
 
     The file is always written, even when *chains* is empty — in that case
     only the header row is emitted.
@@ -307,7 +307,7 @@ def save_chains(
             chrom_by_species = {sp: chrom for sp, chrom in chain}
             row = [
                 str(chain_id),
-                chain_colors[chain_id],
+                chain_colors[chain_id] if chain_colors is not None else "-",
                 str(gene_counts[chain_id]),
                 *(chrom_by_species.get(sp, "-") for sp in species_names),
             ]
@@ -577,17 +577,16 @@ def run(
         banner = (
             "\n" + "=" * 72 + "\n"
             "HOBRAC WARNING: no syntenic blocks to plot — the karyotype will "
-            "be a placeholder image.\n"
-            + "-" * 72 + "\n"
+            "be a placeholder image.\n" + "-" * 72 + "\n"
             f"No sequence passed the --min-busco-genes={min_busco_genes} "
             "filter for these tracks:\n"
             f"    {', '.join(empty_species)}\n\n"
             "Complete BUSCO genes on the best sequence of each track:\n"
-            + "\n".join(detail_lines) + "\n\n"
+            + "\n".join(detail_lines)
+            + "\n\n"
             "Lower min_busco_genes (config key, currently "
             f"{min_busco_genes}) below the smallest value above and re-run "
-            "for a real karyotype.\n"
-            + "=" * 72 + "\n"
+            "for a real karyotype.\n" + "=" * 72 + "\n"
         )
         print(banner, file=sys.stderr)
 
@@ -637,7 +636,7 @@ def run(
     algs_output = os.path.join(output_dir, "algs.tsv")
     save_chains(
         chains,
-        chain_colors,
+        None if custom_colors else chain_colors,
         gene_to_chain,
         [name for name, _ in species_busco],
         algs_output,
