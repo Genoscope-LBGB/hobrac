@@ -1,7 +1,10 @@
 """Tests for best-effort chromosome renaming of manual references."""
 
 import gzip
+import shlex
+import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -131,8 +134,11 @@ def test_busco_reuse_preserves_matching_ids_per_input(
         table.write_text(f"123at4751\tComplete\t{sequence_id}\t10\t100\n")
         if reuse:
             argv.extend([f"--busco-{side}", str(table)])
+            result_name = (
+                "busco_assembly" if side == "assembly" else "busco_reference_reference"
+            )
             tables[side] = (
-                output / "busco" / f"busco_{side}" / "run_lineage" / "full_table.tsv"
+                output / "busco" / result_name / "run_lineage" / "full_table.tsv"
             )
         else:
             tables[side] = table
@@ -141,9 +147,11 @@ def test_busco_reuse_preserves_matching_ids_per_input(
     monkeypatch.setattr(sys, "argv", argv)
     monkeypatch.setattr(hobrac_main, "check_dependencies", lambda **kwargs: None)
     monkeypatch.setattr(
-        hobrac_main.subprocess,
-        "Popen",
-        lambda *args, **kwargs: SimpleNamespace(returncode=0, wait=lambda: 0),
+        hobrac_main,
+        "subprocess",
+        SimpleNamespace(
+            Popen=lambda *args, **kwargs: SimpleNamespace(returncode=0, wait=lambda: 0)
+        ),
     )
     with pytest.raises(SystemExit) as exit_info:
         hobrac_main.main()
@@ -161,9 +169,9 @@ def test_busco_reuse_preserves_matching_ids_per_input(
     assert [fields[0], fields[5]] == expected_ids
 
 
-@pytest.mark.parametrize("references", [(), ("reference_1.fa", "reference_2.fa")])
-def test_busco_reference_requires_one_manual_reference_before_preparation(
-    tmp_path, monkeypatch, references
+@pytest.mark.parametrize("reference_count,busco_count", [(0, 1), (1, 2)])
+def test_reference_busco_rejects_unmatched_inputs_before_preparation(
+    tmp_path, monkeypatch, reference_count, busco_count
 ):
     output = tmp_path / "output"
     argv = [
@@ -174,13 +182,13 @@ def test_busco_reference_requires_one_manual_reference_before_preparation(
         "Test species",
         "-t",
         "1",
-        "--busco-reference",
-        str(tmp_path / "busco_reference"),
         "-o",
         str(output),
     ]
-    for reference in references:
-        argv.extend(["-r", str(tmp_path / reference)])
+    for index in range(reference_count):
+        argv.extend(["-r", str(tmp_path / f"reference_{index}.fa")])
+    for index in range(busco_count):
+        argv.extend(["--busco-reference", str(tmp_path / f"busco_{index}")])
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", argv)
 
@@ -189,3 +197,126 @@ def test_busco_reference_requires_one_manual_reference_before_preparation(
         hobrac_main.main()
     assert exit_info.value.code == 2
     assert not output.exists()
+
+
+@pytest.mark.parametrize("reuse_count", [2, 3])
+def test_reference_busco_reuses_ordered_prefix(tmp_path, monkeypatch, reuse_count):
+    output = tmp_path / "output"
+    assembly = tmp_path / "assembly.fa"
+    assembly.write_text(">query\n" + "ACGT" * 100 + "\n")
+    assembly_table = tmp_path / "assembly_results" / "run_lineage" / "full_table.tsv"
+    assembly_table.parent.mkdir(parents=True)
+    assembly_table.write_text("123at4751\tComplete\tquery\t10\t100\n")
+    argv = [
+        "hobrac",
+        "-a",
+        str(assembly),
+        "-n",
+        "Test species",
+        "-t",
+        "1",
+        "-e",
+        "local",
+        "-o",
+        str(output),
+        "--busco-assembly",
+        str(assembly_table),
+    ]
+    references = []
+    # Neither reference names nor BUSCO directory names are alphabetically
+    # ordered or paired by name: only the order of the two option lists matters.
+    for index, (name, results_name) in enumerate(
+        [("zeta", "bundle_two"), ("alpha", "bundle_three"), ("middle", "bundle_one")]
+    ):
+        fasta = tmp_path / f"{name}.fa.gz"
+        with gzip.open(fasta, "wt") as handle:
+            handle.write(f">{name}_original chr{index + 1}\n" + "ACGT" * 100 + "\n")
+        argv.extend(["-r", str(fasta)])
+        sequence_id = f"{name}_original" if index < reuse_count else f"chr{index + 1}"
+        table = tmp_path / results_name / "run_lineage" / "full_table.tsv"
+        table.parent.mkdir(parents=True)
+        table.write_text(f"123at4751\tComplete\t{sequence_id}\t10\t100\n")
+        references.append((name, table, sequence_id))
+
+    for _, table, _ in references[:reuse_count]:
+        argv.extend(["--busco-reference", str(table)])
+    workflow_commands = []
+
+    def defer_workflow(command, **kwargs):
+        workflow_commands.append(shlex.split(command))
+        return SimpleNamespace(returncode=0, wait=lambda: 0)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(hobrac_main, "check_dependencies", lambda **kwargs: None)
+    monkeypatch.setattr(
+        hobrac_main,
+        "subprocess",
+        SimpleNamespace(Popen=defer_workflow),
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        hobrac_main.main()
+    assert exit_info.value.code == 0
+
+    for index, (name, table, sequence_id) in enumerate(references):
+        if index < reuse_count:
+            table = (
+                output
+                / "busco"
+                / f"busco_reference_{name}"
+                / "run_lineage"
+                / "full_table.tsv"
+            )
+        alignment = output / f"alignment_{name}"
+        busco_to_paf(
+            assembly_table,
+            table,
+            output / "assembly" / "assembly.fna",
+            output / "reference" / f"{name}.fna",
+            alignment,
+        )
+        fields = (alignment / "aln_busco.paf").read_text().strip().split("\t")
+        assert [fields[0], fields[5]] == ["query", sequence_id]
+
+    # Inspect the real Snakemake plan for both PAF and JCVI consumers. Supplied
+    # result directories must remain inputs, not become targets to recompute.
+    (output / "mash").mkdir()
+    (output / "mash" / "selected_accessions.txt").write_text("zeta\nalpha\nmiddle\n")
+    (output / "busco" / "lineage.txt").write_text("Eukaryota\n")
+    (output / "busco" / "datasets.txt").write_text("- eukaryota_odb12\n")
+    (output / "busco" / "chosen_dataset.txt").write_text("eukaryota\teukaryota_odb12\n")
+    (output / "busco" / "busco_downloads").mkdir()
+    command = workflow_commands[0]
+    config = command[command.index("--config") + 1 :]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "snakemake",
+            "--snakefile",
+            hobrac_main.snakefile_path,
+            "--dry-run",
+            "--printshellcmds",
+            "--cores",
+            "1",
+            "aln/busco_zeta",
+            "aln/busco_alpha",
+            "aln/busco_middle",
+            "synteny_plots/seqids",
+            "--config",
+            *config,
+        ],
+        cwd=output,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    plan = result.stdout + result.stderr
+    assert result.returncode == 0, plan
+    scheduled_fastas = []
+    for line in plan.splitlines():
+        if line.strip().startswith("busco "):
+            tokens = shlex.split(line)
+            if "-m" in tokens and tokens[tokens.index("-m") + 1] == "geno":
+                scheduled_fastas.append(Path(tokens[tokens.index("-i") + 1]).name)
+    assert scheduled_fastas == (["middle.fna"] if reuse_count == 2 else [])

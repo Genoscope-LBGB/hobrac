@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import glob
+import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -258,8 +260,9 @@ def generate_snakemake_command(args) -> str:
 
     if getattr(args, "busco_assembly_override_path", None):
         cmd += f"busco_assembly_override='{args.busco_assembly_override_path}' "
-    if getattr(args, "busco_reference_override_path", None):
-        cmd += f"busco_reference_override='{args.busco_reference_override_path}' "
+    if args.busco_reference_override_paths:
+        overrides = shlex.quote(json.dumps(args.busco_reference_override_paths))
+        cmd += f"busco_reference_overrides={overrides} "
 
     if args.reference:
         # Pass manual references as a semicolon-separated string of paths
@@ -277,6 +280,7 @@ def main():
         print(f"Snakemake profile path does not exist: {args.profile}", file=sys.stderr)
         sys.exit(1)
 
+    validate_manual_references(args.reference)
     create_dir(args.output_directory)
     os.chdir(args.output_directory)
 
@@ -290,19 +294,20 @@ def main():
     else:
         args.busco_assembly_override_path = None
 
-    if getattr(args, "busco_reference", None):
-        norm = normalize_busco_dir(args.busco_reference)
-        link_busco_dir(norm, os.path.join("busco", "busco_reference"))
-        args.busco_reference_override_path = os.path.abspath(
-            os.path.join("busco", "busco_reference")
-        )
-    else:
-        args.busco_reference_override_path = None
+    args.busco_reference_override_paths = {}
+    for ref_path, busco_path in zip(args.reference or [], args.busco_reference or []):
+        base_name = fasta_basename(ref_path)
+        norm = normalize_busco_dir(busco_path)
+        dest = os.path.join("busco", f"busco_reference_{base_name}")
+        link_busco_dir(norm, dest)
+        args.busco_reference_override_paths[base_name] = os.path.abspath(dest)
 
     # Dependencies: require busco only if at least one side still needs to run
     if not args.use_docker and not args.use_singularity and not args.use_apptainer:
         require_busco = not (
-            args.busco_assembly_override_path and args.busco_reference_override_path
+            args.busco_assembly_override_path
+            and args.reference
+            and len(args.busco_reference_override_paths) == len(args.reference)
         )
         check_dependencies(
             require_busco=require_busco,
@@ -312,7 +317,6 @@ def main():
         )
 
     if args.reference:
-        validate_manual_references(args.reference)
         # Copy manual references to reference directory
         create_dir("reference")
         for ref_path in args.reference:
@@ -327,7 +331,7 @@ def main():
                 ref_path,
                 dest_path,
                 mapping_path,
-                rename_chromosomes=not args.busco_reference_override_path,
+                rename_chromosomes=base_name not in args.busco_reference_override_paths,
             )
 
     # Prepare the assembly likewise, preserving ids for precomputed BUSCO.

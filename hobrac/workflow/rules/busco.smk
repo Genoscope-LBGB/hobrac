@@ -1,6 +1,13 @@
 import os
 
 
+def get_busco_reference_dir(accession):
+    """Resolve supplied BUSCO results before requesting a computed directory."""
+    return config.get("busco_reference_overrides", {}).get(
+        accession, f"busco/busco_reference_{accession}"
+    )
+
+
 rule get_lineage:
     output:
         "busco/lineage.txt",
@@ -209,9 +216,7 @@ rule busco_to_paf:
     input:
         reference=ancient("reference/{accession}.fna"),
         assembly=config["assembly"],
-        busco_reference=lambda wildcards: config.get(
-            "busco_reference_override", f"busco/busco_reference_{wildcards.accession}"
-        ),
+        busco_reference=lambda wildcards: get_busco_reference_dir(wildcards.accession),
         busco_assembly=lambda wildcards: config.get(
             "busco_assembly_override", "busco/busco_assembly"
         ),

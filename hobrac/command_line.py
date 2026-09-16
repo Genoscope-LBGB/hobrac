@@ -87,12 +87,13 @@ def get_args():
     )
     optional_args.add_argument(
         "--busco-reference",
-        action="store",
+        action="append",
         dest="busco_reference",
         help=(
             "Path to a BUSCO result directory"
             " (or run dir or full_table.tsv)"
-            " to reuse for the reference; requires exactly one -r/--reference"
+            " to reuse for a manual reference. Repeat in the same order as -r;"
+            " BUSCO runs for any remaining references."
         ),
         default=None,
         type=os.path.abspath,
@@ -369,9 +370,14 @@ def get_args():
 
     args = parser.parse_args()
 
-    if args.busco_reference and (not args.reference or len(args.reference) != 1):
-        parser.error(
-            "--busco-reference requires exactly one manual reference (-r/--reference)"
-        )
+    if args.busco_reference:
+        if not args.reference:
+            parser.error(
+                "--busco-reference requires manual references (-r/--reference)"
+            )
+        if len(args.busco_reference) > len(args.reference):
+            parser.error(
+                "Cannot provide more --busco-reference inputs than -r references"
+            )
 
     return args

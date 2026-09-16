@@ -6,7 +6,7 @@ def get_busco_reference_dirs(wildcards):
         for line in f:
             if line.strip():
                 accessions.append(line.strip())
-    return expand("busco/busco_reference_{accession}", accession=accessions)
+    return [get_busco_reference_dir(accession) for accession in accessions]
 
 
 def get_reference_report_inputs(wildcards):
@@ -91,7 +91,7 @@ rule resolve_jcvi_color_scheme:
 
 rule jcvi_synteny:
     input:
-        busco_assembly="busco/busco_assembly",
+        busco_assembly=config.get("busco_assembly_override", "busco/busco_assembly"),
         busco_references=get_busco_reference_dirs,
         accession_order="mash/selected_accessions.txt",
         assembly=config["assembly"],
