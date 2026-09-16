@@ -1,5 +1,7 @@
 # Hobrac - Homology-based reference genome acquisition and comparison
 
+**Preprint:** [Hobrac: a reference-guided workflow for genome comparison and synteny visualization](https://www.biorxiv.org/content/10.64898/2026.07.17.739168v2) (bioRxiv).
+
 The purpose of Hobrac is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes too noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in Hobrac:
   - the user provides a genome assembly fasta file, a taxid and the organism name
   - the lineage of the organism is retrieved thanks to Taxonkit
