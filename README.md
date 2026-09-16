@@ -17,25 +17,51 @@ On the left is the genome-to-genome alignment of Felimare picta (y-axis) vs Phyl
 | ![](assets/dotplot_Felimare_picta_vs_Phyllidia_flava.png) | ![](assets/busco_Felimare_picta_vs_Phyllidia_flava.png) |
 
 
-## Dependencies
-
-Hobrac relies on several dependencies. You can either install them manually or use containers (see [Using Containers](#using-containers) below).
-
-  - Python >= 3.11
-  - [Taxonkit](https://github.com/shenwei356/taxonkit)
-  - [NCBI datasets](https://github.com/ncbi/datasets) 
-  - [MASH](https://github.com/marbl/Mash)
-  - [BUSCO](https://gitlab.com/ezlab/busco) **>= 6.1.0**
-  - [Minimap2](https://github.com/lh3/minimap2)
-  - [dotplotrs](https://github.com/Genoscope-LBGB/dotplotrs)
-
 ## Installation
+
+### Install Hobrac
+
+The Hobrac launcher runs on the host and requires Python **>= 3.11**, even when workflow tools run in containers.
 
 ```
 git clone https://github.com/Genoscope-LBGB/hobrac
 cd hobrac
 pip install .
 ```
+
+### Using Containers
+
+#### Taxonkit Database
+
+Before running either container example, download the Taxonkit taxonomy database from [NCBI](https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz), extract it, and set the `TAXONKIT_DB` environment variable to point to the directory containing the extracted files:
+
+```
+export TAXONKIT_DB=/path/to/taxonkit_db
+```
+
+
+#### With Singularity/Apptainer (recommended for HPC)
+
+```
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea --use-apptainer
+```
+
+#### With Docker
+
+```
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea --use-docker
+```
+
+### Manual Dependency Installation
+
+If you are not using containers, install the following workflow tools and ensure they are available on your `PATH`:
+
+  - [Taxonkit](https://github.com/shenwei356/taxonkit)
+  - [NCBI datasets](https://github.com/ncbi/datasets) 
+  - [MASH](https://github.com/marbl/Mash)
+  - [BUSCO](https://gitlab.com/ezlab/busco) **>= 6.1.0**
+  - [Minimap2](https://github.com/lh3/minimap2)
+  - [dotplotrs](https://github.com/Genoscope-LBGB/dotplotrs)
 
 ## Usage 
 
@@ -191,31 +217,6 @@ hobrac_analysis/
 When using `--ref-count`, the `aln/` directory will contain one `vs_<accession>` and one `busco_<accession>` subdirectory per reference, along with numbered symlinks (`rank1_<Species_name>_*`, `rank2_<Species_name>_*`, ...) sorted by MASH distance. The `rank<i>` prefix keeps each symlink unique even when two references belong to the same species; references without an NCBI assembly report (e.g. manual references) fall back to the accession in place of the species name.
 
 The PAF alignment files can be loaded directly into the [online viewer](https://www.genoscope.cns.fr/lbgb/hobrac/) for interactive exploration.
-
-## Using Containers
-
-Hobrac supports running all workflow steps inside containers, which eliminates the need to manually install dependencies. A Docker image containing all required tools is available at `ghcr.io/cea-lbgb/hobrac-tools`.
-
-### With Singularity/Apptainer (recommended for HPC)
-
-```
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea --use-apptainer
-```
-
-### With Docker
-
-```
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea --use-docker
-```
-
-### Taxonkit Database
-
-When using containers, you need to provide the Taxonkit taxonomy database. Download it from [NCBI](https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz) and set the `TAXONKIT_DB` environment variable to point to the directory containing the extracted files:
-
-```
-export TAXONKIT_DB=/path/to/taxonkit_db
-hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogaster_purpurea --use-apptainer
-```
 
 ## Visualization
 
