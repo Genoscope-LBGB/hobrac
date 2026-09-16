@@ -92,7 +92,7 @@ def get_args():
         help=(
             "Path to a BUSCO result directory"
             " (or run dir or full_table.tsv)"
-            " to reuse for the reference"
+            " to reuse for the reference; requires exactly one -r/--reference"
         ),
         default=None,
         type=os.path.abspath,
@@ -368,5 +368,10 @@ def get_args():
     )
 
     args = parser.parse_args()
+
+    if args.busco_reference and (not args.reference or len(args.reference) != 1):
+        parser.error(
+            "--busco-reference requires exactly one manual reference (-r/--reference)"
+        )
 
     return args

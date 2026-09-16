@@ -159,3 +159,33 @@ def test_busco_reuse_preserves_matching_ids_per_input(
     )
     fields = (alignment / "aln_busco.paf").read_text().strip().split("\t")
     assert [fields[0], fields[5]] == expected_ids
+
+
+@pytest.mark.parametrize("references", [(), ("reference_1.fa", "reference_2.fa")])
+def test_busco_reference_requires_one_manual_reference_before_preparation(
+    tmp_path, monkeypatch, references
+):
+    output = tmp_path / "output"
+    argv = [
+        "hobrac",
+        "-a",
+        str(tmp_path / "assembly.fa"),
+        "-n",
+        "Test species",
+        "-t",
+        "1",
+        "--busco-reference",
+        str(tmp_path / "busco_reference"),
+        "-o",
+        str(output),
+    ]
+    for reference in references:
+        argv.extend(["-r", str(tmp_path / reference)])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", argv)
+
+    # Reject the combination before opening inputs or creating output files.
+    with pytest.raises(SystemExit) as exit_info:
+        hobrac_main.main()
+    assert exit_info.value.code == 2
+    assert not output.exists()
