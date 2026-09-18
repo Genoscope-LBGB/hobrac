@@ -174,40 +174,16 @@ The custom color file is a tab-separated file with three columns: a BUSCO gene I
 4283313at33208	#aa7e27	Ea
 ```
 
-When using custom colors, ALG detection still runs by default. A plotted link receives its gene's custom color only when the gene's selected display chain contains both assemblies. Genes absent from the color mapping, genes with no compatible chain, and links outside the selected display chain are shown in grey. This is a chain-membership check, not another pairwise significance test. With `--skip-alg` and a nonempty custom-color mapping, detection and chain-membership filtering are bypassed: every listed gene receives its custom color on every plotted pair where it is present.
+When using custom colors, ALG statistical testing still runs by default in order to determine which chromosome associations are significant. Genes that are not in the color file or that are not part of a significant association are shown in grey. The `--skip-alg` flag disables statistical testing entirely, so that all genes listed in the color file receive their custom color regardless of significance.
 
 ### ALG Detection Parameters
 
 Hobrac detects significant chromosome associations using Fisher's exact test with Bonferroni correction. The following parameters control this behavior:
 
   - `--alg-pvalue`: base significance threshold (default: 0.01)
-  - `--min-chain-genes`: minimum distinct genes with observed-path support for a chromosome chain (default: 5). A gene may support multiple alternative chains; missing assemblies do not contribute support.
-  - `--permissive-alg`: relax chain validation so that each node only needs one significant link instead of `floor(n/2)`.
-  - `--hide-non-significant`: hide links that would otherwise be light grey.
-
-
-### Ambiguous Chains and Display Colors
-
-For each single-copy BUSCO gene present in at least two assemblies, Hobrac builds the graph of significant associations between its observed chromosomes. Every distinct longest-path chromosome set in each connected component receives one vote from the gene. Different traversal orders of the same chromosome set do not add votes. Chains below the support threshold are removed before strict subsets of longer chains are pruned.
-
-Chain validation iteratively removes chromosomes with too few significant links. Surviving groups are reconstructed from their actual significant links, not from an arbitrary traversal order. When candidates produce the same validated chain, their supporting gene IDs are unioned so shared genes are counted only once. Inferred chromosome sets and their support are independent of assembly/chromosome names and input order, after accounting for renamed identifiers. If exact path enumeration exceeds its search bound, Hobrac stops rather than exporting incomplete, name-dependent support.
-
-Display assignment is separate from support. A gene is compatible with a surviving chain when its chromosome matches at every shared assembly; missing assemblies are tolerated for compatibility only. All compatible chains are retained in the per-gene output. One is selected for display using, in order:
-
-1. Highest observed-path gene support, frozen before any display assignments.
-2. Most links that can actually be drawn for this gene between consecutive assemblies in the JCVI layout.
-3. Lowest chain ID in deterministic sorted order.
-
-Assignments never increment support. The second and third criteria may change the display choice when the layout or names change, but do not change detected chromosome sets or support counts. For equal-support chains ABC and ABD in an A–B–C–D layout, a gene observed in all four assemblies is displayed using ABC: A–B and B–C receive its color, while C–D remains grey. Compatible alternatives are not combined into an artificial ABCD chain.
-
-The tables in `synteny_plots/` distinguish biological support from display choices:
-
-- **`algs.tsv`**: `chain_id`, `color`, `n_genes`, followed by one chromosome column per assembly. `n_genes` is observed-path support, including shared genes, not the number finally displayed with that chain. Its sum can exceed the number of distinct genes. Custom-color runs write `-` for the chain color because custom colors belong to individual genes.
-- **`gene_chains.tsv`**: `chain_ids`, `custom_alg_id`, `gene`, `color`, `display_chain_id`, followed by assembly chromosome columns and `<assembly>_pos` coordinate columns. `chain_ids` contains every compatible surviving chain ID, comma-separated, or `-`; `display_chain_id` records the single plotting choice, or `-`. `custom_alg_id` remains the external ALG annotation from the custom-color file. The `color` column is the gene's global identity color; individual JCVI links outside its display chain are still grey.
-
-This replaces the former scalar `chain_id` column in `gene_chains.tsv`; downstream consumers should use `chain_ids` for alternatives and `display_chain_id` for visualization. Gene and color remain columns 3 and 4 for dotplot extraction. The legend uses the display chain (or the external custom ALG label), never a comma-separated membership list as a new ALG.
-
-A gene observed on A1, B2 and C3 but absent from D may list both ABC and ABD as compatible chains, while contributing observed-path support only to ABC. Therefore `algs.tsv` support counts need not equal the number of rows listing a chain in `gene_chains.tsv`.
+  - `--min-chain-genes`: minimum BUSCO genes a chromosome chain must be supported by to appear in the output (default: 5)
+  - `--permissive-alg`: relax chain validation so that each node only needs one significant link instead of n/2
+  - `--hide-non-significant`: hide links between chromosome pairs without significant associations, which produces a cleaner plot
 
 ### Other Synteny Options
 
@@ -242,8 +218,6 @@ hobrac_analysis/
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/
 ├── synteny_plots/
 │   ├── karyotype.png                # JCVI karyotype plot
-│   ├── algs.tsv                     # Chains and shared observed-path support
-│   ├── gene_chains.tsv              # Compatible chains and display assignments
 │   ├── dotplots/                    # Per-reference ALG dotplots
 │   ├── dotplots_grid.png            # All per-reference dotplots tiled
 │   └── dotplots_grid_dark.png
