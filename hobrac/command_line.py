@@ -347,10 +347,10 @@ def get_args():
         action="store",
         dest="min_chain_genes",
         help=(
-            "Minimum BUSCO genes a chromosome chain must be supported by to"
-            " appear in the final output. Chains with fewer genes are dropped"
-            " before sub-chain pruning, so sub-chains hidden inside a dropped"
-            " long chain can re-emerge."
+            "Minimum distinct BUSCO genes supporting an observed chromosome"
+            " path. Shared genes count once toward every supported alternative;"
+            " missing assemblies do not add support. Applied before sub-chain"
+            " pruning, so shorter chains can re-emerge when longer ones fail."
         ),
         default=5,
         type=int,
@@ -362,7 +362,7 @@ def get_args():
         help=(
             "Use a permissive threshold for chain validation. By default each"
             " node in a chain of length n must have significant associations"
-            " with at least n/2 other nodes; this flag relaxes the requirement"
+            " with at least floor(n/2) other nodes; this flag relaxes the requirement"
             " to just 1 significant link per node."
         ),
         default=False,

@@ -7,8 +7,8 @@ labels right-aligned in the left margin (from the ``# track_labels`` comment in
 the layouts file), plus a legend panel of stacked colour bricks on the right, one
 brick per ALG actually shown in the plot.
 
-Legend contents come straight from ``gene_chains.tsv`` (columns ``chain_id``,
-``custom_alg_id``, ``gene``, ``color``):
+Legend contents come straight from ``gene_chains.tsv`` (columns
+``custom_alg_id``, ``color``, and ``display_chain_id``):
 
   * Only genes drawn as coloured ribbons count: rows whose ``color`` is
     ``lightgrey`` (non-significant / unlisted) are ignored, so the legend lists
@@ -16,9 +16,9 @@ Legend contents come straight from ``gene_chains.tsv`` (columns ``chain_id``,
   * When a named colour scheme is active each coloured gene carries a
     ``custom_alg_id`` (e.g. ``O1``); the legend then shows one brick per ALG
     name. With default chain colouring ``custom_alg_id`` is ``-`` and the legend
-    shows one brick per chain, labelled with the chain id -- even where the
-    palette reuses a colour across chains, so the brick count stays faithful to
-    the chain count.
+    shows one brick per selected display chain, labelled with its id -- even
+    where a gene is compatible with multiple inferred chains or the palette
+    reuses a colour across chains.
 
 Bricks are stacked top-to-bottom in natural-sorted label order (``A1``, ``A2``,
 ``B1`` ... / numeric chain ids), confined to the vertical band of the plotted
@@ -73,13 +73,12 @@ LABEL_FONT_FRAC = 0.018
 LABEL_MAX_SPACING_FRAC = 0.34
 LABEL_GAP_FRAC = 0.008
 
+
 def _positive_finite_float(raw):
     try:
         value = float(raw)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "must be a finite positive number"
-        ) from exc
+        raise argparse.ArgumentTypeError("must be a finite positive number") from exc
     if not math.isfinite(value) or value <= 0:
         raise argparse.ArgumentTypeError("must be a finite positive number")
     return value
@@ -97,30 +96,29 @@ def collect_legend_entries(gene_chains_path):
     """Return ``[(label, hex_color)]`` for every ALG shown, in legend order.
 
     Reads ``gene_chains.tsv`` and keeps one entry per legend unit: per
-    ``custom_alg_id`` when a named scheme is in use, else per ``chain_id``. Rows
-    coloured ``lightgrey`` (the default, non-significant colour) are skipped. The
-    first colour seen for a unit wins; entries come back natural-sorted by label.
+    ``custom_alg_id`` when a named scheme is in use, else per
+    ``display_chain_id``. Rows coloured ``lightgrey`` (the default,
+    non-significant colour) are skipped. The first colour seen for a unit wins;
+    entries come back natural-sorted by label.
     """
     entries = {}
     with open(gene_chains_path) as f:
         header = f.readline().rstrip("\n").split("\t")
         try:
-            i_chain = header.index("chain_id")
+            i_display_chain = header.index("display_chain_id")
             i_alg = header.index("custom_alg_id")
             i_color = header.index("color")
         except ValueError as exc:
-            raise SystemExit(
-                f"{gene_chains_path}: missing expected column ({exc})"
-            )
+            raise SystemExit(f"{gene_chains_path}: missing expected column ({exc})")
         for line in f:
             cols = line.rstrip("\n").split("\t")
-            if len(cols) <= i_color:
+            if len(cols) <= max(i_display_chain, i_alg, i_color):
                 continue
             color = cols[i_color]
             if not color or color == DEFAULT_COLOR:
                 continue
             alg = cols[i_alg]
-            label = alg if alg and alg != "-" else cols[i_chain]
+            label = alg if alg and alg != "-" else cols[i_display_chain]
             if not label or label == "-":
                 continue
             entries.setdefault(label, color)
@@ -388,9 +386,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Composite an ALG colour legend onto the karyotype PNG."
     )
-    parser.add_argument(
-        "--gene-chains", required=True, help="Path to gene_chains.tsv"
-    )
+    parser.add_argument("--gene-chains", required=True, help="Path to gene_chains.tsv")
     parser.add_argument(
         "--karyotype", required=True, help="Karyotype PNG to annotate (overwritten)"
     )

@@ -6,6 +6,7 @@ from scipy.stats import fisher_exact
 from .chains import build_gene_chain_mapping, enumerate_chains, validate_chains
 from .models import (
     ALG_PALETTE,
+    AlgDetection,
     BuscoGene,
     ChromosomeAssociation,
     PairwiseAssociation,
@@ -114,33 +115,14 @@ def detect_algs_transitive(
     min_genes: int = 5,
     min_chain_genes: int = 5,
     permissive_alg: bool = False,
-) -> Tuple[
-    List[PairwiseAssociation],
-    List[List[Tuple[str, str]]],
-    Dict[str, int],
-    Dict[int, str],
-    List[ChromosomeAssociation],
-]:
-    """
-    Detect ALGs with consistent colors across all species using chain-based
-    grouping.
+) -> AlgDetection:
+    """Detect chains with shared observed support and separate display choices.
 
-    Args:
-        species_busco: List of (species_name, busco_data) tuples
-        alpha: Significance level before correction
-        min_genes: Minimum genes in a chr pair to test
-        min_chain_genes: Minimum BUSCO genes a chain must be supported by to
-            survive. Chains with fewer genes are dropped before sub-chain
-            pruning, so sub-chains contained in a dropped chain can
-            re-emerge. Default 5.
-
-    Returns:
-        Tuple of:
-        - all_associations: List of PairwiseAssociation objects
-        - chains: List of chromosome chains
-        - gene_to_chain: Dict mapping BUSCO gene ID to chain ID
-        - chain_colors: Dict mapping chain ID to hex color
-        - all_chromosome_associations: List of all tested ChromosomeAssociation objects
+    Every distinct longest observed path receives its supporting gene's vote.
+    Chains below ``min_chain_genes`` are removed before subset pruning, then
+    validated using the strict/permissive significant-link requirement.
+    Display choices use frozen support and the consecutive species layout;
+    they never modify support or discard compatible alternative memberships.
     """
     all_associations: List[PairwiseAssociation] = []
     all_chromosome_associations: List[ChromosomeAssociation] = []
@@ -154,25 +136,30 @@ def detect_algs_transitive(
             all_associations.extend(significant)
             all_chromosome_associations.extend(tested)
 
-    chains = enumerate_chains(
+    evidence = enumerate_chains(
         all_associations, species_busco, min_chain_genes=min_chain_genes
     )
     if all_chromosome_associations:
-        chains = validate_chains(
-            chains,
+        evidence = validate_chains(
+            evidence,
             all_chromosome_associations,
             permissive=permissive_alg,
             min_chain_genes=min_chain_genes,
-            species_busco=species_busco,
         )
 
-    gene_to_chain = build_gene_chain_mapping(species_busco, chains)
+    chains = [list(chain) for chain in evidence]
+    chain_support = {i: len(genes) for i, genes in enumerate(evidence.values())}
+    gene_to_chains, gene_to_display_chain = build_gene_chain_mapping(
+        species_busco, chains, chain_support
+    )
     chain_colors = {i: ALG_PALETTE[i % len(ALG_PALETTE)] for i in range(len(chains))}
 
-    return (
-        all_associations,
-        chains,
-        gene_to_chain,
-        chain_colors,
-        all_chromosome_associations,
+    return AlgDetection(
+        associations=all_associations,
+        chains=chains,
+        chain_support=chain_support,
+        gene_to_chains=gene_to_chains,
+        gene_to_display_chain=gene_to_display_chain,
+        chain_colors=chain_colors,
+        chromosome_associations=all_chromosome_associations,
     )

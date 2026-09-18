@@ -10,7 +10,12 @@ from hobrac.jcvi_synteny.coloring import (
     apply_custom_colors,
     apply_custom_colors_with_algs,
 )
-from hobrac.jcvi_synteny.models import ALG_PALETTE, BuscoGene, PairwiseAssociation
+from hobrac.jcvi_synteny.models import (
+    ALG_PALETTE,
+    AlgDetection,
+    BuscoGene,
+    PairwiseAssociation,
+)
 from hobrac.jcvi_synteny.output import generate_links_file, run
 from hobrac.jcvi_synteny.statistics import detect_algs_transitive
 
@@ -62,17 +67,17 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
     def chain_fixture(self):
         sp1 = {"g1": _gene("chr1"), "g2": _gene("chr3")}
         sp2 = {"g1": _gene("chrA"), "g2": _gene("chrC")}
-        gene_to_chain = {"g1": 0, "g2": -1}
+        display = {"g1": 0, "g2": -1}
         chain_colors = {0: "#ff0000"}
         chains = [[("sp1", "chr1"), ("sp2", "chrA")]]
-        return sp1, sp2, gene_to_chain, chain_colors, chains
+        return sp1, sp2, display, chain_colors, chains
 
     def test_empty_custom_colors_gives_chain_colors(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
+        sp1, sp2, display, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
             sp1,
             sp2,
-            gene_to_chain,
+            display,
             chain_colors,
             {},
             chains=chains,
@@ -82,11 +87,11 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         assert result["g1"] == chain_colors[0]
 
     def test_all_genes_in_custom(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
+        sp1, sp2, display, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
             sp1,
             sp2,
-            gene_to_chain,
+            display,
             chain_colors,
             {"g1": "#00ff00", "g2": "#0000ff"},
             chains=chains,
@@ -99,11 +104,11 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         assert result["g2"] == "lightgrey"
 
     def test_no_genes_in_custom(self, chain_fixture):
-        sp1, sp2, gene_to_chain, chain_colors, chains = chain_fixture
+        sp1, sp2, display, chain_colors, chains = chain_fixture
         result = apply_custom_colors_with_algs(
             sp1,
             sp2,
-            gene_to_chain,
+            display,
             chain_colors,
             {},
             chains=chains,
@@ -113,42 +118,41 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         assert result["g1"] == "#ff0000"
         assert result["g2"] == "lightgrey"
 
-    def test_gene_grey_when_chain_does_not_cover_pair(self):
-        """A gene on chain [(B,B1),(C,C1)] must be lightgrey in the A-B pair
-        because the chain does not cover the A→B edge."""
-        sp_a = {"g1": _gene("A1")}
+    def test_only_selected_display_chain_can_color_a_species_pair(self):
         sp_b = {"g1": _gene("B1")}
         sp_c = {"g1": _gene("C1")}
-        # Chain only covers B→C, not A→B
-        chains = [[("B", "B1"), ("C", "C1")]]
-        gene_to_chain = {"g1": 0}
-        chain_colors = {0: "#ff0000"}
+        sp_d = {"g1": _gene("D1")}
+        chains = [
+            [("A", "A1"), ("B", "B1"), ("C", "C1")],
+            [("C", "C1"), ("D", "D1")],
+        ]
+        display = {"g1": 0}
+        chain_colors = {0: "#ff0000", 1: "#0000ff"}
+        custom = {"g1": "#00ff00"}
 
-        # A-B pair: chain doesn't cover this edge → lightgrey
-        colors_ab = apply_custom_colors_with_algs(
-            sp_a,
-            sp_b,
-            gene_to_chain,
-            chain_colors,
-            {},
-            chains=chains,
-            sp1_name="A",
-            sp2_name="B",
-        )
-        assert colors_ab["g1"] == "lightgrey"
-
-        # B-C pair: chain covers this edge → colored
         colors_bc = apply_custom_colors_with_algs(
             sp_b,
             sp_c,
-            gene_to_chain,
+            display,
             chain_colors,
-            {},
+            custom,
             chains=chains,
             sp1_name="B",
             sp2_name="C",
         )
-        assert colors_bc["g1"] == "#ff0000"
+        colors_cd = apply_custom_colors_with_algs(
+            sp_c,
+            sp_d,
+            display,
+            chain_colors,
+            custom,
+            chains=chains,
+            sp1_name="C",
+            sp2_name="D",
+        )
+
+        assert colors_bc["g1"] == "#00ff00"
+        assert colors_cd["g1"] == "lightgrey"
 
     def test_chain_covers_pair_canonical_order(self):
         """Chain in canonical (lex) order must still cover a pair whose
@@ -157,14 +161,14 @@ class TestApplyCustomColorsWithAlgsEdgeCases:
         sp_a = {"g1": _gene("A1")}
         # Chain in canonical order: A before Z
         chains = [[("A", "A1"), ("Z", "Z1")]]
-        gene_to_chain = {"g1": 0}
+        display = {"g1": 0}
         chain_colors = {0: "#ff0000"}
 
         # species_busco order is Z, A (non-lex)
         colors = apply_custom_colors_with_algs(
             sp_z,
             sp_a,
-            gene_to_chain,
+            display,
             chain_colors,
             {},
             chains=chains,
@@ -300,9 +304,9 @@ class TestCrossFileGeneColorConsistency:
     """
 
     def test_shared_gene_identical_color_across_pairs(self, tmp_path):
-        # Shared ortholog `g_shared` present in all three species. The same
-        # `gene_colors` mapping (derived from a single run-wide gene_to_chain)
-        # must be used for both pairs, and the resulting lines must agree.
+        # Shared ortholog `g_shared` is present in all three species. The same
+        # run-wide selected display chain color is used for both pairs, so the
+        # resulting lines must agree.
         sp1 = {"g_shared": _gene("chr1", 1000), "g_sp1_only": _gene("chr2", 2000)}
         sp2 = {"g_shared": _gene("chrA", 1000), "g_sp2_only": _gene("chrB", 2000)}
         sp3 = {"g_shared": _gene("chrX", 1000), "g_sp3_only": _gene("chrY", 2000)}
@@ -410,7 +414,10 @@ class TestRunColorExports:
         } == {("chr1", "chr1", "10", "-"), ("chr2", "chr2", "10", "-")}
 
         genes = {row["gene"]: row for row in self._read_tsv(output["gene_chains"])}
-        assert genes["g0"]["chain_id"] == genes["g1"]["chain_id"] != "-"
+        assert genes["g0"]["chain_ids"] == genes["g1"]["chain_ids"] != "-"
+        assert genes["g0"]["display_chain_id"] == genes["g1"]["display_chain_id"] != "-"
+        assert genes["g0"]["custom_alg_id"] == "ALG_A"
+        assert genes["g1"]["custom_alg_id"] == "ALG_B"
         assert genes["g0"]["color"] == "#123456"
         assert genes["g1"]["color"] == "#abcdef"
         assert genes["g2"]["color"] == "lightgrey"
@@ -427,8 +434,15 @@ class TestRunColorExports:
         palette = {row["chain_id"]: row["color"] for row in algs}
         assert set(palette.values()) == set(ALG_PALETTE[:2])
         genes = self._read_tsv(output["gene_chains"])
+        assert list(genes[0])[:5] == [
+            "chain_ids",
+            "custom_alg_id",
+            "gene",
+            "color",
+            "display_chain_id",
+        ]
         for row in genes:
-            assert row["color"] == palette.get(row["chain_id"], "lightgrey")
+            assert row["color"] == palette.get(row["display_chain_id"], "lightgrey")
         assert _parse_simple_file(output["links_files"][0]) == {
             row["gene"]: row["color"] for row in genes
         }
@@ -439,7 +453,11 @@ class TestRunColorExports:
 
         assert self._read_tsv(output["algs"]) == []
         genes = {row["gene"]: row for row in self._read_tsv(output["gene_chains"])}
-        assert {row["chain_id"] for row in genes.values()} == {"-"}
+        assert {row["chain_ids"] for row in genes.values()} == {"-"}
+        assert {row["display_chain_id"] for row in genes.values()} == {"-"}
+        assert genes["g0"]["custom_alg_id"] == "ALG_A"
+        assert genes["g1"]["custom_alg_id"] == "ALG_B"
+        assert genes["unlinked"]["custom_alg_id"] == "ALG_C"
         assert genes["g0"]["color"] == "#123456"
         assert genes["g1"]["color"] == "#abcdef"
         assert genes["g2"]["color"] == "lightgrey"
@@ -453,590 +471,391 @@ def _assoc(sp1, sp2, chr1, chr2):
     return PairwiseAssociation(sp1, sp2, chr1, chr2, p_value=0.001, gene_count=10)
 
 
+def _chain(*nodes):
+    return tuple(sorted(nodes))
+
+
 class TestEnumerateChains:
     def test_empty_input(self):
-        assert enumerate_chains([], []) == []
+        assert enumerate_chains([], []) == {}
 
-    def test_two_species_single_pair(self):
-        assocs = [_assoc("A", "B", "A1", "B1")]
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B1")]]
-
-    def test_two_species_multiple_pairs(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("A", "B", "A2", "B2"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A1"), ("B", "B1")] in chains
-        assert [("A", "A2"), ("B", "B2")] in chains
-
-    def test_three_species_linear(self):
+    def test_observed_genes_are_the_chain_support(self):
         assocs = [
             _assoc("A", "B", "A1", "B1"),
             _assoc("B", "C", "B1", "C1"),
         ]
         species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {"g1": _gene("C1")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C1")]]
-
-    def test_three_species_downstream_branching(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("B", "C", "B1", "C2"),
-            _assoc("B", "C", "B1", "C3"),
-        ]
-        species_busco = [
             ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
             ("B", {"g1": _gene("B1"), "g2": _gene("B1")}),
-            ("C", {"g1": _gene("C2"), "g2": _gene("C3")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
-        assert [("A", "A1"), ("B", "B1"), ("C", "C3")] in chains
-
-    def test_three_species_upstream_merging(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("A", "B", "A2", "B1"),
-            _assoc("B", "C", "B1", "C2"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B1")}),
-            ("C", {"g1": _gene("C2"), "g2": _gene("C2")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
-        assert [("A", "A2"), ("B", "B1"), ("C", "C2")] in chains
-
-    def test_three_species_dead_end(self):
-        assocs = [_assoc("A", "B", "A1", "B1")]
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B1")]]
-
-    def test_orphan_chain_later_species(self):
-        assocs = [_assoc("B", "C", "B3", "C4")]
-        species_busco = [
-            ("A", {}),
-            ("B", {"g1": _gene("B3")}),
-            ("C", {"g1": _gene("C4")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("B", "B3"), ("C", "C4")]]
-
-    def test_deterministic_ordering(self):
-        assocs = [
-            _assoc("A", "B", "A2", "B2"),
-            _assoc("A", "B", "A1", "B1"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains[0] == [("A", "A1"), ("B", "B1")]
-        assert chains[1] == [("A", "A2"), ("B", "B2")]
-
-    def test_mixed_dead_end_and_orphan(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("B", "C", "B3", "C4"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B3")}),
-            ("C", {"g2": _gene("C4")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A1"), ("B", "B1")] in chains
-        assert [("B", "B3"), ("C", "C4")] in chains
-
-    def test_four_species_spanning_chain(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("B", "C", "B1", "C2"),
-            _assoc("C", "D", "C2", "D3"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {"g1": _gene("C2")}),
-            ("D", {"g1": _gene("D3")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B1"), ("C", "C2"), ("D", "D3")]]
-
-    def test_diamond_converging_at_last_species(self):
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("A", "B", "A1", "B2"),
-            _assoc("B", "C", "B1", "C2"),
-            _assoc("B", "C", "B2", "C2"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
-            ("C", {"g1": _gene("C2"), "g2": _gene("C2")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A1"), ("B", "B1"), ("C", "C2")] in chains
-        assert [("A", "A1"), ("B", "B2"), ("C", "C2")] in chains
-
-    def test_subchain_removed_when_longer_chain_exists(self):
-        """A gene breaking at a non-significant edge should not create a
-        sub-chain that lets unrelated genes match."""
-        assocs = [
-            _assoc("A", "B", "A1", "B2"),
-            _assoc("B", "C", "B2", "C4"),
-        ]
-        # g1 walks A1→B2 (sig) → C4 (sig) → full chain
-        # g2 walks A1→B2 (sig) → C3 (NOT sig) → would emit sub-chain [(A,A1),(B,B2)]
-        # That sub-chain is a prefix of the full chain and must be dropped.
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
-            ("B", {"g1": _gene("B2"), "g2": _gene("B2")}),
-            ("C", {"g1": _gene("C4"), "g2": _gene("C3")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("B", "B2"), ("C", "C4")]]
-
-    def test_cross_product_pruned_by_gene_evidence(self):
-        """Shared node B2 should NOT produce cartesian product of chains."""
-        assocs = [
-            _assoc("A", "B", "A4", "B2"),
-            _assoc("A", "B", "A9", "B2"),
-            _assoc("B", "C", "B2", "C11"),
-            _assoc("B", "C", "B2", "C14"),
-        ]
-        species_busco = [
-            ("A", {"g1": _gene("A4"), "g2": _gene("A9")}),
-            ("B", {"g1": _gene("B2"), "g2": _gene("B2")}),
-            ("C", {"g1": _gene("C11"), "g2": _gene("C14")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert len(chains) == 2
-        assert [("A", "A4"), ("B", "B2"), ("C", "C11")] in chains
-        assert [("A", "A9"), ("B", "B2"), ("C", "C14")] in chains
-        # Spurious chains must NOT exist:
-        assert [("A", "A4"), ("B", "B2"), ("C", "C14")] not in chains
-        assert [("A", "A9"), ("B", "B2"), ("C", "C11")] not in chains
-
-    def test_chain_skips_absent_species(self):
-        """Gene absent in middle species should not break the chain."""
-        assocs = [_assoc("A", "C", "A1", "C1")]
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {}),
-            ("C", {"g1": _gene("C1")}),
-        ]
-        chains = enumerate_chains(assocs, species_busco)
-        assert chains == [[("A", "A1"), ("C", "C1")]]
-
-    def test_skip_species_subchain_pruned_by_longer(self):
-        """Chain skipping a species must be pruned when a longer chain
-        covering that species exists."""
-        assocs = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("A", "C", "A1", "C1"),
-            _assoc("B", "C", "B1", "C1"),
-        ]
-        # g1 present in all 3 → walks A1→B1→C1 (full chain)
-        # g2 absent from B → walks A1→C1 (subsequence of full chain)
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
             ("C", {"g1": _gene("C1"), "g2": _gene("C1")}),
         ]
-        chains = enumerate_chains(assocs, species_busco)
-        # Within-chain order is not significant (consumers index by species),
-        # so assert on the node set rather than the DFS canonicalization order.
-        assert len(chains) == 1
-        assert set(chains[0]) == {("A", "A1"), ("B", "B1"), ("C", "C1")}
 
-    def test_order_independence(self):
-        """Same species set, different input order → same chains."""
-        # B has a fragmented genome for this ALG: gene g1 is NOT in B.
-        # A-C and C-D have significant associations.
-        assocs_order1 = [
-            _assoc("A", "B", "A1", "B9"),
-            _assoc("A", "C", "A1", "C1"),
-            _assoc("A", "D", "A1", "D1"),
-            _assoc("B", "C", "B9", "C1"),
-            _assoc("B", "D", "B9", "D1"),
-            _assoc("C", "D", "C1", "D1"),
-        ]
-        busco_order1 = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {}),
-            ("C", {"g1": _gene("C1")}),
-            ("D", {"g1": _gene("D1")}),
-        ]
+        assert enumerate_chains(assocs, species_busco) == {
+            _chain(("A", "A1"), ("B", "B1"), ("C", "C1")): {"g1", "g2"}
+        }
 
-        # Same species, B moved to second position
-        assocs_order2 = [
-            _assoc("C", "B", "C1", "B9"),
-            _assoc("C", "A", "C1", "A1"),
-            _assoc("C", "D", "C1", "D1"),
-            _assoc("B", "A", "B9", "A1"),
-            _assoc("B", "D", "B9", "D1"),
-            _assoc("A", "D", "A1", "D1"),
-        ]
-        busco_order2 = [
-            ("C", {"g1": _gene("C1")}),
-            ("B", {}),
-            ("A", {"g1": _gene("A1")}),
-            ("D", {"g1": _gene("D1")}),
-        ]
-
-        chains1 = enumerate_chains(assocs_order1, busco_order1)
-        chains2 = enumerate_chains(assocs_order2, busco_order2)
-
-        # Normalize: sort each chain's nodes by species name, then sort chains
-        def normalize(chains):
-            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
-
-        assert normalize(chains1) == normalize(chains2)
-        assert len(chains1) == 1
-
-    def test_order_independence_partial_edges(self):
-        """Partial pairwise significance must not make chains order-dependent."""
-        # A-B and B-C significant, but A-C NOT significant.
-        # Gene g1 present in A, B, C → should form chain [A,B,C].
-        assocs_order1 = [
-            _assoc("A", "B", "A1", "B1"),
-            _assoc("B", "C", "B1", "C1"),
-        ]
-        busco_order1 = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {"g1": _gene("C1")}),
-        ]
-
-        # Reversed species order
-        assocs_order2 = [
-            _assoc("C", "B", "C1", "B1"),
+    def test_star_retains_every_longest_node_set_with_distinct_supporters(self):
+        assocs = [
             _assoc("B", "A", "B1", "A1"),
+            _assoc("B", "C", "B1", "C1"),
+            _assoc("B", "D", "B1", "D1"),
         ]
-        busco_order2 = [
-            ("C", {"g1": _gene("C1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("A", {"g1": _gene("A1")}),
+        species_busco = [
+            ("A", {"all": _gene("A1"), "missing_d": _gene("A1")}),
+            ("B", {"all": _gene("B1"), "missing_d": _gene("B1")}),
+            ("C", {"all": _gene("C1"), "missing_d": _gene("C1")}),
+            ("D", {"all": _gene("D1")}),
         ]
 
-        chains1 = enumerate_chains(assocs_order1, busco_order1)
-        chains2 = enumerate_chains(assocs_order2, busco_order2)
+        assert enumerate_chains(assocs, species_busco) == {
+            _chain(("A", "A1"), ("B", "B1"), ("C", "C1")): {
+                "all",
+                "missing_d",
+            },
+            _chain(("A", "A1"), ("B", "B1"), ("D", "D1")): {"all"},
+            _chain(("B", "B1"), ("C", "C1"), ("D", "D1")): {"all"},
+        }
 
-        def normalize(chains):
-            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
-
-        assert normalize(chains1) == normalize(chains2)
-        assert len(chains1) == 1
-
-    def test_order_independence_four_species_sparse(self):
-        """Order independence with 4 species, only consecutive edges significant."""
-        assocs_fwd = [
+    def test_gene_votes_once_when_multiple_traversals_have_same_node_set(self):
+        assocs = [
             _assoc("A", "B", "A1", "B1"),
             _assoc("B", "C", "B1", "C1"),
             _assoc("C", "D", "C1", "D1"),
+            _assoc("D", "A", "D1", "A1"),
         ]
-        busco_fwd = [
+        species_busco = [
             ("A", {"g1": _gene("A1")}),
             ("B", {"g1": _gene("B1")}),
             ("C", {"g1": _gene("C1")}),
             ("D", {"g1": _gene("D1")}),
         ]
 
-        # Scrambled order: C, A, D, B
-        # Same 3 significant pairs, species1/species2 follow i<j in new order
-        assocs_scrambled = [
-            _assoc("C", "B", "C1", "B1"),
-            _assoc("C", "D", "C1", "D1"),
+        assert enumerate_chains(assocs, species_busco) == {
+            _chain(
+                ("A", "A1"),
+                ("B", "B1"),
+                ("C", "C1"),
+                ("D", "D1"),
+            ): {"g1"}
+        }
+
+    @patch("hobrac.jcvi_synteny.chains._MAX_DFS_VISITS", 1)
+    def test_exact_search_bound_fails_instead_of_returning_partial_evidence(self):
+        with pytest.raises(RuntimeError):
+            enumerate_chains(
+                [_assoc("A", "B", "A1", "B1")],
+                [
+                    ("A", {"g1": _gene("A1")}),
+                    ("B", {"g1": _gene("B1")}),
+                ],
+            )
+
+    def test_candidate_identity_and_support_are_input_order_and_name_invariant(self):
+        assocs = [
             _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C1"),
+            _assoc("A", "B", "A2", "B2"),
         ]
-        busco_scrambled = [
-            ("C", {"g1": _gene("C1")}),
-            ("A", {"g1": _gene("A1")}),
-            ("D", {"g1": _gene("D1")}),
-            ("B", {"g1": _gene("B1")}),
+        original = [
+            ("A", {"g_full": _gene("A1"), "g_pair": _gene("A2")}),
+            ("B", {"g_full": _gene("B1"), "g_pair": _gene("B2")}),
+            ("C", {"g_full": _gene("C1")}),
         ]
-
-        chains_fwd = enumerate_chains(assocs_fwd, busco_fwd)
-        chains_scr = enumerate_chains(assocs_scrambled, busco_scrambled)
-
-        def normalize(chains):
-            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
-
-        assert normalize(chains_fwd) == normalize(chains_scr)
-        norm = normalize(chains_fwd)
-        assert len(norm) == 1
-        assert norm[0] == [("A", "A1"), ("B", "B1"), ("C", "C1"), ("D", "D1")]
-
-    def test_order_independence_detect_algs_transitive(self):
-        """Full pipeline: detect_algs_transitive gives same chains regardless
-        of species_busco ordering."""
-        busco_order1 = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
-            ("C", {"g1": _gene("C1"), "g2": _gene("C2")}),
+        renamed_and_reordered = [
+            ("C", {"renamed_full": _gene("C1")}),
+            (
+                "B",
+                {
+                    "renamed_pair": _gene("B2"),
+                    "renamed_full": _gene("B1"),
+                },
+            ),
+            (
+                "A",
+                {
+                    "renamed_pair": _gene("A2"),
+                    "renamed_full": _gene("A1"),
+                },
+            ),
         ]
-        busco_order2 = [
-            ("C", {"g1": _gene("C1"), "g2": _gene("C2")}),
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
+        reversed_assocs = [
+            _assoc(a.species2, a.species1, a.chr2, a.chr1) for a in reversed(assocs)
         ]
 
-        _, chains1, mapping1, _, _ = detect_algs_transitive(
-            busco_order1, min_genes=1, min_chain_genes=0
-        )
-        _, chains2, mapping2, _, _ = detect_algs_transitive(
-            busco_order2, min_genes=1, min_chain_genes=0
-        )
+        first = enumerate_chains(assocs, original)
+        second = enumerate_chains(reversed_assocs, renamed_and_reordered)
 
-        def normalize(chains):
-            return sorted(sorted(c, key=lambda n: n[0]) for c in chains)
+        assert list(first) == list(second)
+        assert [len(supporters) for supporters in first.values()] == [
+            len(supporters) for supporters in second.values()
+        ]
 
-        assert normalize(chains1) == normalize(chains2)
-        # Gene-to-chain mapping should match (same gene → same chain content)
-        for gene_id in mapping1:
-            if mapping1[gene_id] == -1:
-                assert mapping2[gene_id] == -1
-            else:
-                chain1_nodes = set((sp, ch) for sp, ch in chains1[mapping1[gene_id]])
-                chain2_nodes = set((sp, ch) for sp, ch in chains2[mapping2[gene_id]])
-                assert chain1_nodes == chain2_nodes, (
-                    f"gene {gene_id} mapped differently"
-                )
+    def test_support_threshold_at_five_runs_before_subset_pruning(self):
+        short = [f"short{i}" for i in range(5)]
+        long = [f"long{i}" for i in range(4)]
+        species_busco = [
+            (
+                "A",
+                {gene: _gene("A1") for gene in short + long},
+            ),
+            (
+                "B",
+                {gene: _gene("B1") for gene in short + long},
+            ),
+            (
+                "C",
+                {gene: _gene("C1") for gene in long},
+            ),
+        ]
+        assocs = [
+            _assoc("A", "B", "A1", "B1"),
+            _assoc("B", "C", "B1", "C1"),
+        ]
+
+        assert enumerate_chains(assocs, species_busco) == {
+            _chain(("A", "A1"), ("B", "B1"), ("C", "C1")): set(long)
+        }
+        assert enumerate_chains(
+            assocs,
+            species_busco,
+            min_chain_genes=5,
+        ) == {_chain(("A", "A1"), ("B", "B1")): set(short)}
 
 
 class TestBuildGeneChainMapping:
-    def test_exact_match_three_species(self):
+    def test_returns_all_candidates_and_selected_display_chain(self):
         species_busco = [
             ("A", {"g1": _gene("A1")}),
             ("B", {"g1": _gene("B1")}),
-            ("C", {"g1": _gene("C2")}),
+            ("C", {"g1": _gene("C1")}),
         ]
-        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2")]]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == 0
+        chains = [
+            [("A", "A1"), ("B", "B1")],
+            [("A", "A1"), ("B", "B1"), ("C", "C1")],
+        ]
 
-    def test_no_match_gives_minus_one(self):
+        candidates, display = build_gene_chain_mapping(
+            species_busco, chains, {0: 3, 1: 7}
+        )
+
+        assert candidates == {"g1": [0, 1]}
+        assert display == {"g1": 1}
+
+    def test_missing_species_is_compatible_but_adds_no_visible_link(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("X", {}),
+            ("C", {"g1": _gene("C1")}),
+            ("D", {"g1": _gene("D1")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1"), ("X", "X1"), ("C", "C1")],
+            [("A", "A1"), ("B", "B1"), ("C", "C1"), ("D", "D1")],
+        ]
+
+        candidates, display = build_gene_chain_mapping(
+            species_busco, chains, {0: 4, 1: 4}
+        )
+
+        assert candidates["g1"] == [0, 1]
+        assert display["g1"] == 1
+
+    def test_observed_support_precedes_visible_coverage(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+            ("C", {"g1": _gene("C1")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1")],
+            [("A", "A1"), ("B", "B1"), ("C", "C1")],
+        ]
+
+        candidates, display = build_gene_chain_mapping(
+            species_busco, chains, {0: 8, 1: 7}
+        )
+
+        assert candidates["g1"] == [0, 1]
+        assert display["g1"] == 0
+
+    def test_chain_id_is_the_last_display_tiebreaker(self):
+        species_busco = [
+            ("A", {"g1": _gene("A1")}),
+            ("B", {"g1": _gene("B1")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1")],
+            [("A", "A1"), ("B", "B1")],
+        ]
+
+        candidates, display = build_gene_chain_mapping(
+            species_busco, chains, {0: 5, 1: 5}
+        )
+
+        assert candidates["g1"] == [0, 1]
+        assert display["g1"] == 0
+
+    def test_assignments_never_reinforce_later_display_choices(self):
+        species_busco = [
+            (
+                "A",
+                {
+                    "ambiguous_a": _gene("A1"),
+                    "ambiguous_b": _gene("A1"),
+                    "exact": _gene("A1"),
+                },
+            ),
+            (
+                "B",
+                {
+                    "ambiguous_a": _gene("B1"),
+                    "ambiguous_b": _gene("B1"),
+                    "exact": _gene("B1"),
+                },
+            ),
+            ("C", {"exact": _gene("C3")}),
+        ]
+        chains = [
+            [("A", "A1"), ("B", "B1"), ("C", "C2")],
+            [("A", "A1"), ("B", "B1"), ("C", "C3")],
+        ]
+
+        candidates, display = build_gene_chain_mapping(
+            species_busco, chains, {0: 5, 1: 5}
+        )
+
+        assert candidates == {
+            "ambiguous_a": [0, 1],
+            "ambiguous_b": [0, 1],
+            "exact": [1],
+        }
+        assert display == {
+            "ambiguous_a": 0,
+            "ambiguous_b": 0,
+            "exact": 1,
+        }
+
+    def test_unmatched_and_empty_chains_keep_eligible_genes_explicit(self):
         species_busco = [
             ("A", {"g1": _gene("A1")}),
             ("B", {"g1": _gene("B9")}),
         ]
-        chains = [[("A", "A1"), ("B", "B1")]]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == -1
 
-    def test_partial_match_gene_absent_from_one_species(self):
+        candidates, display = build_gene_chain_mapping(
+            species_busco,
+            [[("A", "A1"), ("B", "B1")]],
+            {0: 1},
+        )
+        empty_candidates, empty_display = build_gene_chain_mapping(
+            species_busco, [], {}
+        )
+
+        assert candidates == {"g1": []}
+        assert display == {"g1": -1}
+        assert empty_candidates == {"g1": []}
+        assert empty_display == {"g1": -1}
+
+    def test_gene_in_single_species_is_excluded(self):
         species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {}),
+            ("A", {"shared": _gene("A1"), "lone": _gene("A9")}),
+            ("B", {"shared": _gene("B1")}),
         ]
-        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2")]]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == 0
 
-    def test_ambiguous_picks_most_populated_chain(self):
-        # g2, g4 exactly match chain 0; g3 exactly matches chain 1
-        # g1 absent from C → matches both → picks chain 0 (2 genes vs 1)
-        species_busco = [
-            ("A", {k: _gene("A1") for k in ("g1", "g2", "g3", "g4")}),
-            ("B", {k: _gene("B1") for k in ("g1", "g2", "g3", "g4")}),
-            ("C", {"g2": _gene("C2"), "g3": _gene("C3"), "g4": _gene("C2")}),
-        ]
-        chains = [
-            [("A", "A1"), ("B", "B1"), ("C", "C2")],
-            [("A", "A1"), ("B", "B1"), ("C", "C3")],
-        ]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g2"] == 0
-        assert result["g4"] == 0
-        assert result["g3"] == 1
-        assert result["g1"] == 0
+        candidates, display = build_gene_chain_mapping(
+            species_busco,
+            [[("A", "A1"), ("B", "B1")]],
+            {0: 1},
+        )
 
-    def test_ambiguous_tiebreak_lowest_id(self):
-        # Equal population → tie-break by lowest chain ID
-        species_busco = [
-            ("A", {k: _gene("A1") for k in ("g1", "g2", "g3")}),
-            ("B", {k: _gene("B1") for k in ("g1", "g2", "g3")}),
-            ("C", {"g2": _gene("C2"), "g3": _gene("C3")}),
-        ]
-        chains = [
-            [("A", "A1"), ("B", "B1"), ("C", "C2")],
-            [("A", "A1"), ("B", "B1"), ("C", "C3")],
-        ]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == 0
-
-    def test_two_species_baseline(self):
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "g2": _gene("A2")}),
-            ("B", {"g1": _gene("B1"), "g2": _gene("B2")}),
-        ]
-        chains = [
-            [("A", "A1"), ("B", "B1")],
-            [("A", "A2"), ("B", "B2")],
-        ]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == 0
-        assert result["g2"] == 1
-
-    def test_four_species(self):
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-            ("C", {"g1": _gene("C2")}),
-            ("D", {"g1": _gene("D3")}),
-        ]
-        chains = [[("A", "A1"), ("B", "B1"), ("C", "C2"), ("D", "D3")]]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert result["g1"] == 0
-
-    def test_gene_in_single_species_excluded(self):
-        species_busco = [
-            ("A", {"g1": _gene("A1"), "lone": _gene("A9")}),
-            ("B", {"g1": _gene("B1")}),
-        ]
-        chains = [[("A", "A1"), ("B", "B1")]]
-        result = build_gene_chain_mapping(species_busco, chains)
-        assert "lone" not in result
-
-    def test_empty_chains_all_minus_one(self):
-        species_busco = [
-            ("A", {"g1": _gene("A1")}),
-            ("B", {"g1": _gene("B1")}),
-        ]
-        result = build_gene_chain_mapping(species_busco, [])
-        assert result["g1"] == -1
-
-    def test_empty_species_returns_empty(self):
-        result = build_gene_chain_mapping([], [[("A", "A1")]])
-        assert result == {}
+        assert "lone" not in candidates
+        assert "lone" not in display
 
 
 class TestDetectAlgsTransitive:
     @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
-    def test_two_species_returns_gene_to_chain(self, mock_pairwise):
-        sp1 = {"g1": _gene("A1"), "g2": _gene("A2")}
-        sp2 = {"g1": _gene("B1"), "g2": _gene("B2")}
-        mock_pairwise.return_value = (
-            [
-                _assoc("sp1", "sp2", "A1", "B1"),
-                _assoc("sp1", "sp2", "A2", "B2"),
-            ],
-            [],
-        )
-
-        assocs, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
-        )
-
-        assert len(assocs) == 2
-        assert len(chains) == 2
-        assert isinstance(gene_to_chain, dict)
-        assert all(isinstance(v, int) for v in gene_to_chain.values())
-        assert gene_to_chain["g1"] != gene_to_chain["g2"]
-        assert gene_to_chain["g1"] in chain_colors
-        assert gene_to_chain["g2"] in chain_colors
-
-    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
-    def test_each_chain_gets_palette_color(self, mock_pairwise):
-        sp1 = {"g1": _gene("A1"), "g2": _gene("A2")}
-        sp2 = {"g1": _gene("B1"), "g2": _gene("B2")}
-        mock_pairwise.return_value = (
-            [
-                _assoc("sp1", "sp2", "A1", "B1"),
-                _assoc("sp1", "sp2", "A2", "B2"),
-            ],
-            [],
-        )
-
-        _, _, _, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
-        )
-
-        for chain_id, color in chain_colors.items():
-            assert color == ALG_PALETTE[chain_id % len(ALG_PALETTE)]
-
-    @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
-    def test_three_species_branching_distinct_chains(self, mock_pairwise):
-        sp1 = {"g1": _gene("A1"), "g2": _gene("A1")}
-        sp2 = {"g1": _gene("B1"), "g2": _gene("B1")}
-        sp3 = {"g1": _gene("C1"), "g2": _gene("C2")}
+    def test_observed_support_is_frozen_before_ambiguous_display_selection(
+        self, mock_pairwise
+    ):
+        sp1 = {
+            "g1": _gene("A1"),
+            "g2": _gene("A1"),
+            "g3": _gene("A1"),
+            "ambiguous": _gene("A1"),
+        }
+        sp2 = {
+            "g1": _gene("B1"),
+            "g2": _gene("B1"),
+            "g3": _gene("B1"),
+            "ambiguous": _gene("B1"),
+        }
+        sp3 = {
+            "g1": _gene("C2"),
+            "g2": _gene("C2"),
+            "g3": _gene("C3"),
+        }
         mock_pairwise.side_effect = [
             ([_assoc("sp1", "sp2", "A1", "B1")], []),
-            ([], []),  # sp1-sp3 (non-adjacent, no effect on chains)
+            ([], []),
             (
                 [
-                    _assoc("sp2", "sp3", "B1", "C1"),
                     _assoc("sp2", "sp3", "B1", "C2"),
+                    _assoc("sp2", "sp3", "B1", "C3"),
                 ],
                 [],
             ),
         ]
 
-        _, _, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)], min_chain_genes=1
+        result = detect_algs_transitive(
+            [("sp1", sp1), ("sp2", sp2), ("sp3", sp3)],
+            min_chain_genes=1,
         )
 
-        assert gene_to_chain["g1"] != gene_to_chain["g2"]
-        assert len(chain_colors) == 2
+        assert isinstance(result, AlgDetection)
+        assert result.chain_support == {0: 2, 1: 1}
+        assert result.gene_to_chains == {
+            "ambiguous": [0, 1],
+            "g1": [0],
+            "g2": [0],
+            "g3": [1],
+        }
+        assert result.gene_to_display_chain["ambiguous"] == 0
+        assert result.chain_colors == {
+            0: ALG_PALETTE[0],
+            1: ALG_PALETTE[1],
+        }
+        assert len(result.associations) == 3
 
     @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
-    def test_no_associations_returns_empty(self, mock_pairwise):
+    def test_no_associations_returns_empty_dataclass_fields(self, mock_pairwise):
         sp1 = {"g1": _gene("A1")}
         sp2 = {"g1": _gene("B1")}
         mock_pairwise.return_value = ([], [])
 
-        assocs, chains, gene_to_chain, chain_colors, chr_assocs = (
-            detect_algs_transitive([("sp1", sp1), ("sp2", sp2)], min_chain_genes=1)
-        )
+        result = detect_algs_transitive([("sp1", sp1), ("sp2", sp2)], min_chain_genes=1)
 
-        assert assocs == []
-        assert chains == []
-        assert chain_colors == {}
-        assert all(v == -1 for v in gene_to_chain.values())
-        assert chr_assocs == []
+        assert isinstance(result, AlgDetection)
+        assert result.associations == []
+        assert result.chains == []
+        assert result.chain_support == {}
+        assert result.gene_to_chains == {"g1": []}
+        assert result.gene_to_display_chain == {"g1": -1}
+        assert result.chain_colors == {}
+        assert result.chromosome_associations == []
 
     @patch(f"{STATS_MODULE}.detect_algs_pairwise_raw")
-    def test_single_species_returns_empty(self, mock_pairwise):
-        sp1 = {"g1": _gene("A1")}
-
-        assocs, chains, gene_to_chain, chain_colors, chr_assocs = (
-            detect_algs_transitive([("sp1", sp1)])
-        )
+    def test_single_species_does_not_run_pairwise_detection(self, mock_pairwise):
+        result = detect_algs_transitive([("sp1", {"g1": _gene("A1")})])
 
         mock_pairwise.assert_not_called()
-        assert assocs == []
-        assert chains == []
-        assert gene_to_chain == {}
-        assert chain_colors == {}
-        assert chr_assocs == []
+        assert isinstance(result, AlgDetection)
+        assert result.associations == []
+        assert result.chains == []
+        assert result.chain_support == {}
+        assert result.gene_to_chains == {}
+        assert result.gene_to_display_chain == {}
+        assert result.chain_colors == {}
+        assert result.chromosome_associations == []
 
 
 class TestThreeSpeciesIntegration:
@@ -1107,24 +926,24 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = branching_pairwise
 
-        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            branching_species, min_chain_genes=1
-        )
+        detection = detect_algs_transitive(branching_species, min_chain_genes=1)
 
-        assert gene_to_chain["g_b1"] != gene_to_chain["g_b2"]
-        assert gene_to_chain["g_b1"] >= 0
-        assert gene_to_chain["g_b2"] >= 0
-        assert gene_to_chain["g_nosig"] == -1
+        display = detection.gene_to_display_chain
+        assert display["g_b1"] != display["g_b2"]
+        assert display["g_b1"] >= 0
+        assert display["g_b2"] >= 0
+        assert detection.gene_to_chains["g_nosig"] == []
+        assert display["g_nosig"] == -1
 
         sp1_busco = branching_species[0][1]
         sp2_busco = branching_species[1][1]
         colors_ab = apply_custom_colors_with_algs(
             sp1_busco,
             sp2_busco,
-            gene_to_chain,
-            chain_colors,
+            display,
+            detection.chain_colors,
             {},
-            chains=chains,
+            chains=detection.chains,
             sp1_name="sp1",
             sp2_name="sp2",
         )
@@ -1139,27 +958,25 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = linear_pairwise
 
-        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            linear_species, min_chain_genes=1
-        )
+        detection = detect_algs_transitive(linear_species, min_chain_genes=1)
 
         colors_ab = apply_custom_colors_with_algs(
             linear_species[0][1],
             linear_species[1][1],
-            gene_to_chain,
-            chain_colors,
+            detection.gene_to_display_chain,
+            detection.chain_colors,
             {},
-            chains=chains,
+            chains=detection.chains,
             sp1_name="sp1",
             sp2_name="sp2",
         )
         colors_bc = apply_custom_colors_with_algs(
             linear_species[1][1],
             linear_species[2][1],
-            gene_to_chain,
-            chain_colors,
+            detection.gene_to_display_chain,
+            detection.chain_colors,
             {},
-            chains=chains,
+            chains=detection.chains,
             sp1_name="sp2",
             sp2_name="sp3",
         )
@@ -1173,9 +990,7 @@ class TestThreeSpeciesIntegration:
     ):
         mock_pairwise.side_effect = linear_pairwise
 
-        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
-            linear_species, min_chain_genes=1
-        )
+        detection = detect_algs_transitive(linear_species, min_chain_genes=1)
 
         custom = {"g_sig": "#00ff00"}
         sp1_busco = linear_species[0][1]
@@ -1184,10 +999,10 @@ class TestThreeSpeciesIntegration:
         colors = apply_custom_colors_with_algs(
             sp1_busco,
             sp2_busco,
-            gene_to_chain,
-            chain_colors,
+            detection.gene_to_display_chain,
+            detection.chain_colors,
             custom,
-            chains=chains,
+            chains=detection.chains,
             sp1_name="sp1",
             sp2_name="sp2",
         )
@@ -1221,17 +1036,17 @@ class TestTwoSpeciesBackwardCompat:
             [],
         )
 
-        _, chains, gene_to_chain, chain_colors, _ = detect_algs_transitive(
+        detection = detect_algs_transitive(
             [("sp1", sp1), ("sp2", sp2)], min_chain_genes=1
         )
 
         colors = apply_custom_colors_with_algs(
             sp1,
             sp2,
-            gene_to_chain,
-            chain_colors,
+            detection.gene_to_display_chain,
+            detection.chain_colors,
             {},
-            chains=chains,
+            chains=detection.chains,
             sp1_name="sp1",
             sp2_name="sp2",
         )
@@ -1241,6 +1056,6 @@ class TestTwoSpeciesBackwardCompat:
         assert colors["g1"] in ALG_PALETTE
         assert colors["g2"] in ALG_PALETTE
         assert colors["g_nosig"] == "lightgrey"
-        assert len(chains) == 2
-        for cid, color in chain_colors.items():
+        assert len(detection.chains) == 2
+        for cid, color in detection.chain_colors.items():
             assert color == ALG_PALETTE[cid % len(ALG_PALETTE)]
