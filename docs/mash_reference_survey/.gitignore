@@ -1,5 +1,6 @@
 # Local cluster configuration and generated survey data
 config.local.sh
+data/
 work/
 logs/
 __pycache__/
