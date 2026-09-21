@@ -148,7 +148,7 @@ class SurveyTests(unittest.TestCase):
                 bad["excluded_from_refseq"] = "contaminated"
                 rows.append(bad)
             path.write_text(
-                "# assembly_accession\t"
+                "#assembly_accession\t"
                 + "\t".join(HEADER[1:])
                 + "\n"
                 + "".join("\t".join(row[k] for k in HEADER) + "\n" for row in rows)
@@ -171,6 +171,36 @@ class SurveyTests(unittest.TestCase):
         ):
             survey.prepare(args)
         return survey.read_tsv(self.work / "manifest.tsv")
+
+    def test_assembly_rows_accepts_ncbi_header_spacing(self):
+        path = self.work / "assembly_summary.txt"
+        expected = metadata_row("GCA_000000001.1", 11)
+        expected["excluded_from_refseq"] = ""
+        for spacing in ("", " ", "  ", "\t"):
+            with self.subTest(spacing=spacing):
+                path.write_text(
+                    "## See README_assembly_summary.txt for column descriptions.\n"
+                    + "#"
+                    + spacing
+                    + "\t".join(HEADER)
+                    + "\n"
+                    + "\t".join(expected[k] for k in HEADER)
+                    + "\n"
+                )
+                self.assertEqual(list(survey.assembly_rows(path)), [expected])
+
+    def test_assembly_rows_rejects_missing_header(self):
+        path = self.work / "assembly_summary.txt"
+        for text in (
+            "",
+            "## Description only\n",
+            "#assembly_accession_extra\ttaxid\nGCA_000000001.1\t11\n",
+            "GCA_000000001.1\t11\n",
+        ):
+            with self.subTest(text=text):
+                path.write_text(text)
+                with self.assertRaisesRegex(ValueError, "assembly.summary"):
+                    list(survey.assembly_rows(path))
 
     def test_balanced_sample_reproducible_and_order_independent(self):
         rows = [

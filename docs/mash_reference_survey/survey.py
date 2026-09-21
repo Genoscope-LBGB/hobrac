@@ -172,9 +172,12 @@ def assembly_rows(path):
     with Path(path).open() as handle:
         header = None
         for line in handle:
-            if line.startswith("# assembly_accession\t"):
-                header = line[2:].rstrip("\n").split("\t")
-            elif not line.startswith("#") and line.strip():
+            if line.startswith("#"):
+                # NCBI headers occur both with and without a space after '#'.
+                candidate = line[1:].lstrip(" \t")
+                if candidate.startswith("assembly_accession\t"):
+                    header = candidate.rstrip("\n").split("\t")
+            elif line.strip():
                 if header is None:
                     raise ValueError(f"Missing NCBI assembly-summary header in {path}")
                 yield dict(zip(header, line.rstrip("\n").split("\t")))
