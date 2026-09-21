@@ -1,0 +1,6 @@
+# Local cluster configuration and generated survey data
+config.local.sh
+work/
+logs/
+__pycache__/
+*.pyc
