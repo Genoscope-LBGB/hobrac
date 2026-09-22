@@ -1,92 +1,89 @@
 # Mash reference-availability survey
 
-## What this is
+This workflow samples species across hobrac-supported eukaryotic phyla and uses Mash to find and measure their nearest eligible reference genome. The preparation step freezes both the sample manifest and reference sketches.
 
-We want to know how far away the nearest eligible reference tends to be when hobrac stops after the Mash step, across a broad set of eukaryotic species. The approach: sample 100 species balanced across the phyla that hobrac supports, download one NCBI assembly per species, run the installed hobrac with `--stop-after-mash` only, and plot the nearest eligible reference distance grouped by query phylum. The default seed is `20260717`.
+```text
+                    download A → Mash A ─┐
+Frozen manifest ─── download B → Mash B ─┼─ report
+                    download C → Mash C ─┘
+```
 
-## 1. Configure your Slurm cluster run
+## Quick start
 
-Copy this whole directory to the cluster:
+To run the workflow, you will need Linux, Bash, Python >=3.11, installed hobrac and host-side Mash, Snakemake 9 with its Slurm executor plugin, and matplotlib. If needed, you can install the workflow dependencies directly into your hobrac environment:
 
 ```bash
-cd docs/mash_reference_survey
+python3 -m pip install 'snakemake>=9,<10' snakemake-executor-plugin-slurm 'matplotlib>=3.6'
+```
+
+Copy **this whole directory** to your machine, making sure to include `scripts/` and `profiles/`.
+
+### 1. Configure
+
+```bash
 cp config.example.sh config.local.sh
 # Edit config.local.sh before submitting anything.
 ```
 
-The settings that matter most:
+In `config.local.sh`, set `WORK` to an absolute shared path without spaces or shell metacharacters, choose your sample `COUNT` (which defaults to 1000), and fill in your environment and Slurm settings. `MAX_CONCURRENT` limits submitted child jobs, including pending jobs, `MASTER_TIME` sets the runtime limit for the controller job, and `TIME` limits the runtime of each Mash job.
 
-**`WORK`** should be an absolute path, with no spaces or shell metacharacters. You need room for 100 compressed genomes plus hobrac's uncompressed prepared FASTAs, the taxonomy, sketches and logs. Large eukaryotic genomes can push the total to hundreds of GB or more, and nothing is deleted automatically.
+**A different count, seed, scope, or reference snapshot requires a new `WORK` directory.**
 
-**`ENV_SETUP`** is optional but useful: the absolute path of a Bash script that activates your existing hobrac environment. It runs both at submission time and inside each job.
-
-**`PARTITION`, `ACCOUNT`, `QOS`** take your site's values, or leave them empty for defaults.
-
-**`CONTAINER`** should be `none` if your dependencies are native, or `apptainer`/`singularity` if that is how your installed hobrac normally runs.
-
-**Resources** default to 2 CPUs, 24 GB and 4 hours per query, with at most 4 concurrent queries. Preparation and reporting each request 16 GB because the frozen NCBI taxonomy is loaded in memory. Adjust for your cluster and the genomes you expect.
-
-### Scope decision
-
-`ANCESTOR_TAXID=2759` samples across supported eukaryotic phyla, including animals, fungi, plants and protists. Use `33208` instead if the intended article comparison should be animals only. Decide this before you look at any distances.
-
-### Required software and access
-
-You will need Linux, Bash, Slurm (`sbatch`).
-
-Python >=3.11, your installed `hobrac` with `--stop-after-mash` and `-e local` support, and host-side `mash` (including for container runs, since preparation validates downloaded sketches with `mash info` and execution records the host version).
-
-Matplotlib for the report: install it in your chosen environment if it is not already there, e.g. `python3 -m pip install 'matplotlib>=3.6'`.
-
-`job.sh` sets `TAXONKIT_DB` to the frozen survey taxonomy for query jobs. For Apptainer/Singularity, the runner appends an explicit bind of the canonical `WORK` path to the container's bind environment, preserving whatever binds your site already configures. This makes the shared sketch symlink target visible under the same absolute path inside the container. Confirm your site's container policy permits this during the pilot. No nested Slurm submission occurs: each task calls `hobrac ... -e local --stop-after-mash` directly.
-
-## 2. Freeze metadata and select the queries
+### 2. Prepare and review
 
 ```bash
 bash submit.sh prepare
 ```
 
-Wait for the preparation job to finish successfully. Its Slurm log is under `$WORK/logs/`. Then inspect:
+Monitor `$WORK/logs/` and confirm that the preparation job completes successfully. Inspect `manifest.tsv`, `phylum_coverage.tsv`, and `sampling_exclusions.json` to verify the sampling results before you proceed.
 
-- `manifest.tsv`: the exact query accessions with versions, taxids, species taxids, names, phyla, assembly levels, release dates, download URLs and zero-based task IDs.
-- `phylum_coverage.tsv`: eligible assembly and species counts, sketch availability, and allocated sample sizes. Phyla with no eligible queries are retained here so you can see the gaps.
-- `sampling_exclusions.json`: counts excluded by each sequential metadata filter.
-
-Preparation freezes NCBI metadata, taxonomy, and one hobrac sketch per sampled phylum, rather than downloading a potentially different reference database for every query. The `snapshot.json` hashes these inputs. **Never regenerate a finished snapshot in place.** A different scope, seed, or fresh database requires a new `WORK` directory. Re-running an interrupted preparation reuses already-downloaded files after checksum verification; a completed preparation refuses to overwrite its snapshot.
-
-### How the sampling works
-
-1. Download GenBank assembly summaries for `invertebrate`, `vertebrate_mammalian`, `vertebrate_other`, `plant`, `fungi` and `protozoa`.
-
-2. Keep latest Chromosome / Complete Genome, full-genome assemblies with no `excluded_from_refseq` reason.
-
-3. Require a species ancestor and a named phylum in the frozen NCBI taxonomy, species-taxid agreement with the assembly summary, ancestry within the selected scope, a downloadable versioned GCA accession, and an exact matching phylum sketch in hobrac's published directory.
-
-4. Choose one assembly per species deterministically: Complete Genome before Chromosome, then reference/representative designation, then newest release date, then lexicographic accession as the final tie-break.
-
-5. Seeded random sampling without replacement within each phylum. Allocate one query to each phylum per round in a seeded random phylum order until the total is reached. Phyla with too few eligible species contribute all available species; their unused allocation is redistributed. If fewer species than the requested total exist, preparation fails rather than silently reducing the count.
-
-`eligible_species.tsv` preserves the entire sampling frame.
-
-## 3. Run the Slurm array
+### 3. Run
 
 ```bash
-bash submit.sh array
+bash submit.sh workflow
 ```
 
-This submits one task per manifest row and an `afterany` summary job and the report runs even if some tasks fail. 
+By default (`CLEANUP=true`), the workflow deletes downloaded and prepared FASTA files for successful queries to save disk space. It retains all final results, mappings, logs, provenance metadata, and shared reference data. If a query fails, its FASTA files are kept so you can investigate the failure.
 
-Each task downloads its query with bounded retries, validates gzip integrity, and quarantines invalid gzip or FASTA responses under `rejected_downloads/` before retrying the same accession (at most three validation attempts). It then links the frozen phylum sketch into hobrac's expected `mash/mash_db.msh` path, and stops after producing `mash/mash.dist`. All raw reference comparisons are kept. Current hobrac uses `mash dist -s 10000` and the reference sketch's stored k-mer parameters, so inspect the saved `sketches/*.info.txt` for the actual sketch settings.
+### 4. Inspect results
 
-## 4. Inspect the results
+Start with these reports under `$WORK/report/`:
 
-Under `$WORK/report/`:
+- `distance_by_phylum.png` / `.pdf`: Distance distributions grouped by query phylum.
+- `nearest_references.tsv`: Every sampled query, including failures.
+- `phylum_summary.tsv` and `summary.json`: Counts and status summaries.
 
-| File | Content |
+## Restart or inspect a run
+
+```bash
+bash submit.sh workflow                  # Continue unfinished work
+bash submit.sh summarize                 # Produce a partial report separately
+bash workflow.sh config.local.sh --dry-run
+```
+
+Snakemake reuses results from completed queries automatically, even after their temporary FASTA files have been removed. If the controller times out or is killed forcefully, make sure all previous child jobs have finished or been cancelled before you restart. Never run two controllers against the same `WORK` directory. Clear a stale lock only after confirming that no controller or child job is still writing to `WORK`.
+
+To run the workflow locally instead of through Slurm:
+
+```bash
+bash workflow.sh config.local.sh --executor local --cores 8
+```
+
+## Directory layout
+
+| Path | Purpose |
 | --- | --- |
-| `nearest_references.tsv` | One row for every sampled query, including failures: nearest eligible reference, distance, P-value, matching hashes, taxonomic relationship and exclusion counts |
-| `distance_by_phylum.png`, `.pdf` | Individual distances and boxplots by query phylum, with sample counts |
-| `phylum_summary.tsv` | Counts of sampled queries, available references, no-shared-hash cases and incomplete/failed queries |
-| `summary.json` | Overall status counts and provenance |
-| `retry_task_ids.txt` | Comma-separated ordinary failed/incomplete task IDs for retry |
-| `reset_required_task_ids.txt` | Corrupted/invalid results needing investigation before rerun |
+| `config.example.sh` | Template configuration to copy and edit for your run |
+| `submit.sh` | Submits preparation, the controller, or reporting jobs to Slurm |
+| `workflow.sh`, `Snakefile` | Launches the Snakemake controller and defines the DAG |
+| `profiles/` | Default scheduler configuration profiles |
+| `scripts/` | Internal Python backend and Slurm job entry point |
+| `tests/` | Offline unit tests and local workflow integration tests |
+
+To run the test suite from this directory:
+
+```bash
+python3 -m unittest discover -s tests -t .. -v
+```
+
+These tests run entirely offline using a mock hobrac/Mash setup and a loopback FASTA server, so they do not submit real Slurm jobs or download files from NCBI. They verify step overlap, temporary file cleanup, restarts, failure handling, migration, and include a 1,000-genome DAG dry run.

@@ -1,0 +1,152 @@
+"""Bounded per-genome download -> Mash DAG over an immutable survey snapshot."""
+
+import math
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+# Resolve helpers independently of --directory (which is the survey WORK).
+SCRIPTS = Path(workflow.basedir).resolve() / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+import survey
+
+WORK = Path(config["work"]).expanduser().resolve()
+if Path.cwd().resolve() != WORK:
+    raise ValueError("Run with --directory set to the survey work directory")
+survey.load_snapshot(WORK)
+ROWS = {row["accession"]: row for row in survey.read_tsv(WORK / "manifest.tsv")}
+if not ROWS:
+    raise ValueError("Empty survey manifest")
+PYTHON = sys.executable
+SCRIPT = str(SCRIPTS / "survey.py")
+CONTAINER = config.get("container", "none")
+CLEANUP = str(config.get("cleanup", True)).lower() == "true"
+CPUS = int(config.get("cpus", 2))
+REPORTS = [
+    "report/summary.json",
+    "report/nearest_references.tsv",
+    "report/phylum_summary.tsv",
+    "report/distance_by_phylum.png",
+    "report/distance_by_phylum.pdf",
+    "report/retry_task_ids.txt",
+    "report/reset_required_task_ids.txt",
+]
+
+
+def memory_mb(value):
+    match = re.fullmatch(r"(\d+)([KMGT]?)", str(value).upper())
+    if not match:
+        raise ValueError(f"Invalid memory {value!r}; use Slurm units, e.g. 24G")
+    units = {"": 1, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1024**2}
+    return max(1, math.ceil(int(match[1]) * units[match[2]]))
+
+
+def runtime_minutes(value):
+    # Config uses HH:MM:SS or D-HH:MM:SS; bare integers are minutes.
+    value = str(value)
+    if value.isdigit():
+        return max(1, int(value))
+    match = re.fullmatch(r"(?:(\d+)-)?(\d+):(\d{2}):(\d{2})", value)
+    if not match or int(match[3]) >= 60 or int(match[4]) >= 60:
+        raise ValueError(f"Invalid runtime {value!r}; use HH:MM:SS or D-HH:MM:SS")
+    minutes = (
+        int(match[1] or 0) * 1440 + int(match[2]) * 60
+        + int(match[3]) + int(match[4]) / 60
+    )
+    return max(1, math.ceil(minutes))
+
+
+ACCOUNT = config.get("account", "")
+PARTITION = config.get("partition", "")
+EXTRA = str(config.get("slurm_extra", ""))
+if config.get("qos"):
+    EXTRA += " " + shlex.quote("--qos=" + str(config["qos"]))
+
+wildcard_constraints:
+    accession="GCA_[0-9]+\\.[0-9]+"
+
+localrules: all, report
+
+rule all:
+    input:
+        # Request each genome explicitly: an onerror partial report must never
+        # hide missing upstream results on the next invocation.
+        expand("runs/{accession}/completed.json", accession=ROWS),
+        expand("runs/{accession}/mash.dist", accession=ROWS),
+        REPORTS,
+
+
+rule download_genome:
+    input:
+        snapshot=ancient("snapshot.json"),
+        manifest=ancient("manifest.tsv"),
+    output:
+        genome=(
+            temp("runs/{accession}/{accession}.fna.gz")
+            if CLEANUP else "runs/{accession}/{accession}.fna.gz"
+        ),
+        receipt="runs/{accession}/{accession}.fna.gz.download.json",
+    params:
+        task_id=lambda wc: ROWS[wc.accession]["task_id"],
+    threads: 1
+    resources:
+        mem_mb=memory_mb(config.get("download_memory", "2G")),
+        runtime=runtime_minutes(config.get("download_time", "01:00:00")),
+        slurm_account=ACCOUNT,
+        slurm_partition=PARTITION,
+        slurm_extra=EXTRA,
+    log:
+        "logs/download/{accession}.log",
+    shell:
+        "{PYTHON:q} {SCRIPT:q} download --work {WORK:q} --task-id {params.task_id} "
+        "> {log:q} 2>&1"
+
+
+rule mash:
+    input:
+        genome=rules.download_genome.output.genome,
+        receipt=rules.download_genome.output.receipt,
+        snapshot=ancient("snapshot.json"),
+        manifest=ancient("manifest.tsv"),
+        sketch=lambda wc: "sketches/" + ROWS[wc.accession]["phylum"] + ".msh",
+    output:
+        result="runs/{accession}/mash.dist",
+        complete="runs/{accession}/completed.json",
+    params:
+        task_id=lambda wc: ROWS[wc.accession]["task_id"],
+        cleanup="--cleanup" if CLEANUP else "",
+    # Prefer consuming ready FASTAs over starting more downloads.
+    priority: 10
+    threads: CPUS
+    resources:
+        mem_mb=memory_mb(config.get("memory", "24G")),
+        runtime=runtime_minutes(config.get("time", "04:00:00")),
+        slurm_account=ACCOUNT,
+        slurm_partition=PARTITION,
+        slurm_extra=EXTRA,
+    log:
+        "logs/mash/{accession}.log",
+    shell:
+        "{PYTHON:q} {SCRIPT:q} run --work {WORK:q} --task-id {params.task_id} "
+        "--container {CONTAINER:q} --skip-download "
+        "--complete {params.cleanup} > {log:q} 2>&1"
+
+
+rule report:
+    input:
+        complete=expand("runs/{accession}/completed.json", accession=ROWS),
+        results=expand("runs/{accession}/mash.dist", accession=ROWS),
+        snapshot="snapshot.json",
+    output:
+        REPORTS,
+    threads: 1
+    shell:
+        "{PYTHON:q} {SCRIPT:q} summarize --work {WORK:q}"
+
+
+onerror:
+    # Keep failed/not-run queries visible without declaring their Mash jobs successful.
+    # This runs on the controller, which reserves SUMMARY_MEMORY for taxonomy/reporting.
+    subprocess.run([PYTHON, SCRIPT, "summarize", "--work", str(WORK)], check=False)

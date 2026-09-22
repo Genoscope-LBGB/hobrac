@@ -5,6 +5,7 @@ import gzip
 import io
 import json
 import os
+import shlex
 import subprocess
 import tarfile
 import tempfile
@@ -13,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
-import survey
+from ..scripts import survey
 
 NODES = [
     (1, 1, "no rank"),
@@ -407,9 +408,9 @@ class SurveyTests(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertFalse(path.with_suffix(".txt.part").exists())
 
-    def test_slurm_array_and_afterany_summary_submission(self):
+    def test_slurm_submission_only_submits_one_controller(self):
         self.prepare()
-        scripts = Path(survey.__file__).parent
+        scripts = Path(__file__).resolve().parents[1]
         config = (
             (scripts / "config.example.sh")
             .read_text()
@@ -430,18 +431,148 @@ class SurveyTests(unittest.TestCase):
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "TEST_LOG": str(log),
         }
+        for stage in ("workflow", "array", "retry"):
+            with self.subTest(stage=stage):
+                log.unlink(missing_ok=True)
+                subprocess.run(
+                    ["bash", str(scripts / "submit.sh"), stage, str(config_path)],
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                calls = log.read_text().splitlines()
+                self.assertEqual(len(calls), 1)
+                self.assertIn("--job-name=hobrac-survey-workflow", calls[0])
+                self.assertIn("--mem=16G", calls[0])
+                self.assertIn("--time=24:00:00", calls[0])
+                self.assertNotIn("--array", calls[0])
+                self.assertIn(str(scripts / "scripts/job.sh") + " workflow", calls[0])
+
+    def test_spooled_workflow_preserves_environment_and_slurm_arguments(self):
+        self.prepare()
+        scripts = Path(__file__).resolve().parents[1]
+        config = (
+            (scripts / "config.example.sh")
+            .read_text()
+            .replace("/path/to/shared/scratch/hobrac_mash_survey", str(self.work))
+        )
+        extras = ["--comment=survey pilot", "--constraint=cpu&ssd"]
+        config_path = self.work / "config.sh"
+        setup = self.work / "activate.sh"
+        setup.write_text("export TEST_ACTIVATIONS=$(( ${TEST_ACTIVATIONS:-0} + 1 ))\n")
+        config_path.write_text(
+            config + f"\nEXTRA_SBATCH=({shlex.join(extras)})\nENV_SETUP={setup}\n"
+        )
+        # Slurm runs a spooled script, not the original path in scripts/.
+        spooled = self.work / "spooled-job.sh"
+        spooled.write_text((scripts / "scripts/job.sh").read_text())
+        bin_dir = self.work / "bin"
+        bin_dir.mkdir()
+        executable = bin_dir / "snakemake"
+        executable.write_text(
+            '#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ARGS"\n'
+            'printf "%s\\n" "$TEST_ACTIVATIONS" > "$TEST_ENV"\n'
+        )
+        executable.chmod(0o755)
+        log = self.work / "arguments.txt"
         subprocess.run(
-            ["bash", str(scripts / "submit.sh"), "array", str(config_path)],
-            env=env,
+            ["bash", str(spooled), "workflow", str(config_path), str(scripts)],
+            env={
+                **os.environ,
+                "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                "TEST_ARGS": str(log),
+                "TEST_ENV": str(self.work / "environment.txt"),
+                "TEST_ACTIVATIONS": "0",
+            },
             check=True,
             capture_output=True,
-            text=True,
         )
-        calls = log.read_text().splitlines()
-        self.assertEqual(len(calls), 2)
-        self.assertIn("--array=0-3%4", calls[0])
-        self.assertIn("--dependency=afterany:123", calls[1])
-        self.assertIn(str(scripts / "job.sh"), calls[0])
+        arguments = log.read_text().splitlines()
+        self.assertEqual(arguments[arguments.index("--jobs") + 1], "4")
+        path = Path(arguments[arguments.index("--configfile") + 1])
+        settings = json.loads(path.read_text())
+        self.assertEqual(shlex.split(settings["slurm_extra"]), extras)
+        self.assertEqual(settings["work"], str(self.work))
+        self.assertEqual((self.work / "environment.txt").read_text(), "1\n")
+
+    def test_published_result_can_be_removed_without_losing_original(self):
+        run = self.work / "runs" / "GCA_000000001.1"
+        source = run / "hobrac" / "mash" / "mash.dist"
+        source.parent.mkdir(parents=True)
+        source.write_text("OTHER:21\tquery\t0.2\t0\t50/10000\n")
+        recorded = {"status": "success", "mash_dist_sha256": survey.sha256(source)}
+        args = argparse.Namespace(complete=True, cleanup=False)
+        for copy_fallback in (False, True):
+            with self.subTest(copy_fallback=copy_fallback):
+                if copy_fallback:
+                    with patch.object(
+                        survey.os, "link", side_effect=OSError("no links")
+                    ):
+                        survey.finish_run(args, run, recorded)
+                else:
+                    survey.finish_run(args, run, recorded)
+                published = run / "mash.dist"
+                self.assertEqual(published.read_bytes(), source.read_bytes())
+                published.unlink()  # Snakemake deletes declared outputs on rerun.
+                (run / "completed.json").unlink()
+                self.assertEqual(survey.sha256(source), recorded["mash_dist_sha256"])
+                self.assertEqual(
+                    json.loads((run / "status.json").read_text()), recorded
+                )
+
+    def test_download_rule_records_failure_without_completion(self):
+        rows = self.prepare()
+        args = argparse.Namespace(work=self.work, task_id=0)
+        with patch.object(survey, "download", side_effect=OSError("offline")):
+            with self.assertRaisesRegex(OSError, "offline"):
+                survey.download_one(args)
+        run = self.work / "runs" / rows[0]["accession"]
+        state = json.loads((run / "status.json").read_text())
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["phase"], "download")
+        self.assertFalse((run / "completed.json").exists())
+
+    def test_cleanup_preserves_mapping_and_never_follows_directory_symlinks(self):
+        run = self.work / "runs" / "GCA_000000001.1"
+        assembly = run / "hobrac" / "assembly"
+        assembly.mkdir(parents=True)
+        fasta = assembly / f"{run.name}.fna"
+        fasta.write_text(">chr1\\nACGT\\n")
+        mapping = assembly / f"{run.name}.chr_rename.tsv"
+        mapping.write_text("old_name\\tnew_name\\n")
+        survey.cleanup_prepared_fasta(run)
+        self.assertFalse(fasta.exists())
+        self.assertTrue(mapping.exists())
+        mapping.unlink()
+        assembly.rmdir()
+        outside = self.work / "outside"
+        outside.mkdir()
+        fasta = outside / f"{run.name}.fna"
+        fasta.write_text("protected")
+        assembly.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            survey.cleanup_prepared_fasta(run)
+        self.assertEqual(fasta.read_text(), "protected")
+
+    def test_preflight_rejects_changed_completed_result(self):
+        rows = self.prepare()
+        run = self.work / "runs" / rows[0]["accession"]
+        result = run / "hobrac" / "mash" / "mash.dist"
+        result.parent.mkdir(parents=True)
+        result.write_text("OTHER:21\\tquery\\t0.2\\t0\\t50/10000\\n")
+        survey.save_json(
+            run / "status.json",
+            {
+                "status": "success",
+                "mash_dist_sha256": survey.sha256(result),
+            },
+        )
+        args = argparse.Namespace(work=self.work)
+        survey.check_work(args)
+        result.write_text("changed")
+        with self.assertRaisesRegex(ValueError, "Completed Mash result changed"):
+            survey.check_work(args)
 
     def test_plot_includes_empty_phylum_and_no_shared_hashes(self):
         try:

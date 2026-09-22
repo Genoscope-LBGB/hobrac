@@ -5,7 +5,7 @@ WORK=/path/to/shared/scratch/hobrac_mash_survey
 # Example contents: source /path/to/miniforge/etc/profile.d/conda.sh; conda activate hobrac
 ENV_SETUP=""
 
-COUNT=100
+COUNT=1000
 SEED=20260717
 # All supported eukaryotic phyla by default
 ANCESTOR_TAXID=2759
@@ -19,7 +19,16 @@ ACCOUNT=""
 QOS=""
 # Additional sbatch options, e.g. EXTRA_SBATCH=(--constraint=...)
 EXTRA_SBATCH=()
+# Maximum submitted Snakemake child jobs (downloads and Mash share this pool).
+# One additional controller job builds the report using SUMMARY_MEMORY.
 MAX_CONCURRENT=4
+MASTER_TIME=24:00:00
+# Optional custom Snakemake profile; empty uses profiles/slurm beside the scripts.
+PROFILE=""
+# Delete successful queries' FASTAs and known large intermediates; retain results/logs.
+CLEANUP=true
+DOWNLOAD_MEMORY=2G
+DOWNLOAD_TIME=01:00:00
 CPUS=2
 MEMORY=24G
 TIME=04:00:00

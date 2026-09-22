@@ -388,7 +388,7 @@ def prepare(args):
     )
     n_phyla = len({r["phylum"] for r in manifest})
     print(f"Prepared {len(manifest)} queries in {n_phyla} phyla")
-    print(f"Review {work / 'phylum_coverage.tsv'} before submitting the array")
+    print(f"Review {work / 'phylum_coverage.tsv'} before submitting the workflow")
 
 
 def load_snapshot(work, verify_all=False):
@@ -454,6 +454,97 @@ def download_genome(url, path):
             time.sleep(5)
 
 
+def task_context(work, task_id):
+    snapshot = load_snapshot(work)
+    manifest = read_tsv(work / "manifest.tsv")
+    if not 0 <= task_id < len(manifest):
+        raise ValueError("Task ID outside manifest range")
+    row = manifest[task_id]
+    run = work / "runs" / row["accession"]
+    run.mkdir(parents=True, exist_ok=True)
+    return snapshot, row, run
+
+
+def check_work(args):
+    """Fail before scheduling if frozen inputs or successful results were changed."""
+    load_snapshot(args.work, verify_all=True)
+    for row in read_tsv(args.work / "manifest.tsv"):
+        run = args.work / "runs" / row["accession"]
+        state = run / "status.json"
+        if state.exists():
+            recorded = json.loads(state.read_text())
+            if recorded["status"] == "success":
+                result = run / "hobrac" / "mash" / "mash.dist"
+                if sha256(result) != recorded["mash_dist_sha256"]:
+                    raise ValueError(f"Completed Mash result changed: {result}")
+                published = run / "mash.dist"
+                if published.exists() and not published.samefile(result):
+                    if sha256(published) != recorded["mash_dist_sha256"]:
+                        raise ValueError(f"Published Mash result changed: {published}")
+
+
+def download_one(args):
+    """A separately schedulable download, preserving failure details for reporting."""
+    import fcntl
+
+    _, row, run = task_context(args.work, args.task_id)
+    with (run / "task.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        state = run / "status.json"
+        successful = (
+            state.exists() and json.loads(state.read_text())["status"] == "success"
+        )
+        status = {
+            "status": "running",
+            "phase": "download",
+            "task_id": args.task_id,
+            "started_utc": now(),
+        }
+        if not successful:
+            save_json(state, status)
+        try:
+            download_genome(row["fasta_url"], run / f"{row['accession']}.fna.gz")
+        except Exception as exc:
+            if not successful:
+                save_json(
+                    state,
+                    {
+                        **status,
+                        "status": "failed",
+                        "error": str(exc),
+                        "finished_utc": now(),
+                    },
+                )
+            raise
+
+
+def cleanup_prepared_fasta(run):
+    """Delete only hobrac's known prepared query; keep mappings, logs and sketches."""
+    for relative in ("hobrac", "hobrac/assembly"):
+        if (run / relative).is_symlink():
+            raise ValueError(f"Refusing cleanup through a symlink: {run / relative}")
+    (run / "hobrac" / "assembly" / f"{run.name}.fna").unlink(missing_ok=True)
+
+
+def finish_run(args, run, recorded):
+    if getattr(args, "cleanup", False):
+        cleanup_prepared_fasta(run)
+    save_json(run / "status.json", recorded)
+    if getattr(args, "complete", False):
+        # Snakemake removes declared outputs before rerunning a job. Publish a
+        # separate link/copy so the validated hobrac original survives reruns.
+        temporary = run / "mash.dist.tmp"
+        temporary.unlink(missing_ok=True)
+        source = run / "hobrac" / "mash" / "mash.dist"
+        try:
+            os.link(source, temporary)
+        except OSError:
+            shutil.copyfile(source, temporary)
+        temporary.replace(run / "mash.dist")
+        # Keep status.json outside declared outputs so failures remain reportable.
+        save_json(run / "completed.json", recorded)
+
+
 def container_environment(container, work):
     env = dict(os.environ)
     if container != "none":
@@ -466,14 +557,8 @@ def container_environment(container, work):
 
 def run_one(args):
     work = args.work
-    snapshot = load_snapshot(work)
-    manifest = read_tsv(work / "manifest.tsv")
-    if not 0 <= args.task_id < len(manifest):
-        raise ValueError("Task ID outside manifest range")
-    row = manifest[args.task_id]
-    run = work / "runs" / row["accession"]
-    run.mkdir(parents=True, exist_ok=True)
-    # Prevent two array jobs from writing the same query simultaneously.
+    snapshot, row, run = task_context(work, args.task_id)
+    # Prevent two jobs from writing the same query simultaneously.
     import fcntl
 
     with (run / "task.lock").open("w") as lock:
@@ -486,6 +571,7 @@ def run_one(args):
                 raise ValueError(
                     "Completed Mash result changed; use a fresh run directory"
                 )
+            finish_run(args, run, recorded)
             print(f"Already complete: {row['accession']}")
             return
         save_json(
@@ -501,7 +587,17 @@ def run_one(args):
             if sha256(sketch) != snapshot["files"][str(sketch.relative_to(work))]:
                 raise ValueError("Frozen reference sketch checksum mismatch")
             genome = run / f"{row['accession']}.fna.gz"
-            download_genome(row["fasta_url"], genome)
+            if getattr(args, "skip_download", False):
+                # The download rule already validated gzip/FASTA integrity.
+                receipt = json.loads(
+                    genome.with_suffix(".gz.download.json").read_text()
+                )
+                if receipt["url"] != row["fasta_url"] or receipt["sha256"] != sha256(
+                    genome
+                ):
+                    raise ValueError(f"Download provenance mismatch: {genome}")
+            else:
+                download_genome(row["fasta_url"], genome)
             output = run / "hobrac"
             mash_dir = output / "mash"
             mash_dir.mkdir(parents=True, exist_ok=True)
@@ -569,8 +665,9 @@ def run_one(args):
             expected_sketch_hash = snapshot["files"][str(sketch.relative_to(work))]
             if target.resolve() != sketch or sha256(sketch) != expected_sketch_hash:
                 raise ValueError("Reference sketch changed during execution")
-            save_json(
-                state,
+            finish_run(
+                args,
+                run,
                 {
                     "status": "success",
                     "finished_utc": now(),
@@ -863,12 +960,30 @@ def main():
     run.add_argument(
         "--container", choices=("none", "apptainer", "singularity"), default="none"
     )
+    run.add_argument(
+        "--skip-download",
+        action="store_true",
+        help="Use a validated download-rule output",
+    )
+    run.add_argument(
+        "--cleanup", action="store_true", help="Remove the prepared FASTA after success"
+    )
+    run.add_argument(
+        "--complete", action="store_true", help="Write the Snakemake completion marker"
+    )
     run.set_defaults(func=run_one)
+    fetch = sub.add_parser("download", help="Download and validate one manifest genome")
+    fetch.add_argument("--task-id", type=int, required=True)
+    fetch.set_defaults(func=download_one)
+    check = sub.add_parser(
+        "check", help="Verify frozen inputs and successful results before scheduling"
+    )
+    check.set_defaults(func=check_work)
     summary = sub.add_parser(
         "summarize", help="Species-level exclusions, tables and plots"
     )
     summary.set_defaults(func=summarize)
-    for command in (prep, run, summary):
+    for command in (prep, run, fetch, check, summary):
         command.add_argument(
             "--work", type=lambda p: Path(p).expanduser().resolve(), required=True
         )
