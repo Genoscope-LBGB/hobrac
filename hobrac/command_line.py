@@ -247,6 +247,13 @@ def get_args():
         default=30,
         type=int,
     )
+    synteny_args.add_argument(
+        "--min-ri-alg-genes",
+        type=int,
+        default=5,
+        help="Minimum retained ALG-annotated BUSCO genes per ALG and species "
+        "for inclusion in the rearrangement index (at least 1)",
+    )
     color_group = synteny_args.add_mutually_exclusive_group()
     color_group.add_argument(
         "--custom-colors",
@@ -369,6 +376,9 @@ def get_args():
     )
 
     args = parser.parse_args()
+
+    if args.min_ri_alg_genes < 1:
+        parser.error("--min-ri-alg-genes must be at least 1")
 
     if args.busco_reference:
         if not args.reference:

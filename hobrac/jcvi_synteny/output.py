@@ -474,6 +474,7 @@ def run(
     min_chain_genes: int = 5,
     permissive_alg: bool = False,
     assembly_input_fasta: str = "",
+    min_ri_alg_genes: int = 5,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -498,6 +499,8 @@ def run(
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
         min_busco_genes: Minimum complete BUSCO genes required per sequence
+        min_ri_alg_genes: Minimum retained annotated BUSCO genes per ALG and
+                          species for inclusion in the RI averages (at least 1).
         custom_color_file: Path to custom color file for gene coloring.
         custom_names: Comma-separated custom names for JCVI tracks. If one name
                       is provided, it applies only to the assembly. If multiple
@@ -513,6 +516,8 @@ def run(
     Returns:
         Dictionary with paths to generated files
     """
+    if min_ri_alg_genes < 1:
+        raise ValueError("min_ri_alg_genes must be at least 1")
     os.makedirs(output_dir, exist_ok=True)
 
     assembly_fasta_sizes = read_fasta_sizes(assembly_fasta)
@@ -608,10 +613,14 @@ def run(
 
     rearrangement_summary = ""
     rearrangement_by_alg = ""
+    rearrangement_warnings = ""
     if custom_algs:
         rearrangement_summary = os.path.join(output_dir, "rearrangement_index.tsv")
         rearrangement_by_alg = os.path.join(
             output_dir, "rearrangement_index_by_alg.tsv"
+        )
+        rearrangement_warnings = os.path.join(
+            output_dir, "rearrangement_index_warnings.tsv"
         )
         rearrangement_rows = {
             name: calculate_rearrangement_indices(name, busco_data, custom_algs)
@@ -621,6 +630,9 @@ def run(
             rearrangement_rows,
             rearrangement_summary,
             rearrangement_by_alg,
+            rearrangement_warnings,
+            min_ri_alg_genes=min_ri_alg_genes,
+            expected_algs=custom_algs.values(),
         )
 
     bed_files = []
@@ -764,6 +776,7 @@ def run(
         "gene_chains": gene_chains_output,
         "rearrangement_index": rearrangement_summary,
         "rearrangement_index_by_alg": rearrangement_by_alg,
+        "rearrangement_index_warnings": rearrangement_warnings,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
@@ -826,6 +839,13 @@ def main():
         help="Minimum complete BUSCO genes required per sequence (default: 0)",
     )
     parser.add_argument(
+        "--min-ri-alg-genes",
+        type=int,
+        default=5,
+        help="Minimum retained ALG-annotated BUSCO genes per ALG and species "
+        "for inclusion in the rearrangement index (at least 1; default: 5)",
+    )
+    parser.add_argument(
         "--jcvi-custom-colors",
         default="",
         help="Path to custom color file (tab-separated: BUSCO_ID, COLOR, ALG_NAME; "
@@ -882,6 +902,8 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.min_ri_alg_genes < 1:
+        parser.error("--min-ri-alg-genes must be at least 1")
 
     run(
         assembly_busco=args.busco_assembly,
@@ -895,6 +917,7 @@ def main():
         assembly_display_name=args.assembly_display_name,
         reference_dir=args.reference_dir,
         min_busco_genes=args.min_busco_genes,
+        min_ri_alg_genes=args.min_ri_alg_genes,
         custom_color_file=args.jcvi_custom_colors,
         custom_names=args.jcvi_names,
         hide_non_significant=args.hide_non_significant,

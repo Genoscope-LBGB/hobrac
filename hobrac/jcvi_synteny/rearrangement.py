@@ -63,11 +63,18 @@ def calculate_rearrangement_indices(
 
 def summarize_rearrangement_indices(
     rows: Iterable[RearrangementAlgIndex],
+    min_ri_alg_genes: int = 5,
 ) -> Tuple[float, float, float, int, int]:
-    """Return Ri, splitting index, combining index, n ALGs, and n genes."""
-    row_list = list(rows)
+    """Average supported ALGs, returning indices and included ALG/gene counts.
+
+    Filtering here preserves chromosome denominators in the per-ALG scores.
+    No eligible ALGs means undefined indices, not evidence of conservation.
+    """
+    if min_ri_alg_genes < 1:
+        raise ValueError("min_ri_alg_genes must be at least 1")
+    row_list = [row for row in rows if row.alg_gene_count >= min_ri_alg_genes]
     if not row_list:
-        return 0.0, 0.0, 0.0, 0, 0
+        return float("nan"), float("nan"), float("nan"), 0, 0
 
     n_algs = len(row_list)
     n_genes = sum(row.alg_gene_count for row in row_list)
@@ -81,8 +88,17 @@ def save_rearrangement_indices(
     species_rows: Dict[str, List[RearrangementAlgIndex]],
     summary_path: str,
     by_alg_path: str,
+    warnings_path: str,
+    min_ri_alg_genes: int = 5,
+    expected_algs: Iterable[str] = (),
 ) -> None:
-    """Save rearrangement index summary and per-ALG detail TSV files."""
+    """Save filtered summaries, all observed ALG scores, and exclusion warnings.
+
+    ``expected_algs`` includes annotation-file ALGs absent from a species, so
+    these can also be reported with zero retained genes in the warning file.
+    """
+    if min_ri_alg_genes < 1:
+        raise ValueError("min_ri_alg_genes must be at least 1")
     with open(summary_path, "w") as f:
         f.write(
             "species\trearrangement_index\tsplitting_index\tcombining_index\t"
@@ -90,18 +106,17 @@ def save_rearrangement_indices(
         )
         for species in sorted(species_rows):
             ri, si, ci, n_algs, n_genes = summarize_rearrangement_indices(
-                species_rows[species]
+                species_rows[species], min_ri_alg_genes
             )
-            f.write(
-                f"{species}\t{ri:.6f}\t{si:.6f}\t{ci:.6f}\t" f"{n_algs}\t{n_genes}\n"
-            )
+            f.write(f"{species}\t{ri:.6f}\t{si:.6f}\t{ci:.6f}\t{n_algs}\t{n_genes}\n")
 
     with open(by_alg_path, "w") as f:
         f.write(
             "species\talg\tbest_chromosome\talg_gene_count\t"
             "chromosome_gene_count\talg_genes_on_best_chromosome\t"
             "splitting_parameter\tcombining_parameter\t"
-            "splitting_index\tcombining_index\trearrangement_index\n"
+            "splitting_index\tcombining_index\trearrangement_index\t"
+            "included_in_ri\n"
         )
         for species in sorted(species_rows):
             for row in species_rows[species]:
@@ -113,5 +128,20 @@ def save_rearrangement_indices(
                     f"{row.combining_parameter:.6f}\t"
                     f"{1 - row.splitting_parameter:.6f}\t"
                     f"{1 - row.combining_parameter:.6f}\t"
-                    f"{row.rearrangement_index:.6f}\n"
+                    f"{row.rearrangement_index:.6f}\t"
+                    f"{str(row.alg_gene_count >= min_ri_alg_genes).lower()}\n"
                 )
+
+    expected_algs = set(expected_algs)
+    with open(warnings_path, "w") as f:
+        f.write("species\talg\talg_gene_count\tmin_ri_alg_genes\twarning\n")
+        for species in sorted(species_rows):
+            counts = {row.alg: row.alg_gene_count for row in species_rows[species]}
+            for alg in sorted(expected_algs | counts.keys()):
+                count = counts.get(alg, 0)
+                if count < min_ri_alg_genes:
+                    f.write(
+                        f"{species}\t{alg}\t{count}\t{min_ri_alg_genes}\t"
+                        "Excluded from species RI: retained ALG-annotated BUSCO "
+                        f"gene count {count} is below minimum {min_ri_alg_genes}.\n"
+                    )
