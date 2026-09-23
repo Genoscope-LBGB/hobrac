@@ -214,6 +214,8 @@ def generate_snakemake_command(args) -> str:
 
     cmd += "--config "
     cmd += f"assembly={args.assembly} "
+    assembly_input = getattr(args, "assembly_input_fasta", args.assembly)
+    cmd += f"assembly_input_fasta={shlex.quote(assembly_input)} "
     cmd += f"scientific_name='{args.scientific_name}' "
     cmd += f"taxid={args.taxid} "
     cmd += f"allow_same_taxid={args.allow_same_taxid} "
@@ -347,6 +349,7 @@ def main():
         assembly_mapping,
         rename_chromosomes=not args.busco_assembly_override_path,
     )
+    args.assembly_input_fasta = args.assembly
     args.assembly = os.path.abspath(assembly_dest)
 
     # Validate JCVI names count if provided

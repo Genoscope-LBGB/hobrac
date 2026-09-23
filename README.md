@@ -188,7 +188,9 @@ Hobrac detects significant chromosome associations using Fisher's exact test wit
 ### Other Synteny Options
 
   - `--min-busco-genes`: minimum number of complete BUSCO genes required per sequence for a chromosome to appear in the plot (default: 30)
-  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
+  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references. Names apply to the assembly first, then references in `-r` order (or MASH-distance order for automatic selection).
+
+To check that names were assigned to the intended genomes, open `synteny_plots/name_mapping.tsv`. This tab-separated text file lists each track's number, role (assembly/reference), displayed name, internal identifier, and absolute FASTA path in plot order. For user-supplied genomes it records the original input FASTA, before chromosome renaming; for automatic references it records the downloaded FASTA. It records the mapping actually used, without detecting or correcting swapped names.
 
 ## Output
 
@@ -218,6 +220,7 @@ hobrac_analysis/
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/
 ├── synteny_plots/
 │   ├── karyotype.png                # JCVI karyotype plot
+│   ├── name_mapping.tsv             # Track names and their input FASTA paths
 │   ├── dotplots/                    # Per-reference ALG dotplots
 │   ├── dotplots_grid.png            # All per-reference dotplots tiled
 │   └── dotplots_grid_dark.png

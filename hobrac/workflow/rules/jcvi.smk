@@ -101,6 +101,7 @@ rule jcvi_synteny:
         seqids="synteny_plots/seqids",
         layouts="synteny_plots/layouts",
         gene_chains="synteny_plots/gene_chains.tsv",
+        name_mapping="synteny_plots/name_mapping.tsv",
         orders=directory("synteny_plots/dotplot_orders"),
     benchmark:
         "benchmarks/jcvi_synteny.txt"
@@ -111,6 +112,7 @@ rule jcvi_synteny:
         manual_refs=config.get("manual_references", ""),
         assembly_name=config["scientific_name"].replace(" ", "_"),
         assembly_display_name=config["scientific_name"],
+        assembly_input_fasta=config.get("assembly_input_fasta", config["assembly"]),
         outdir="synteny_plots",
         min_busco_genes=config.get("min_busco_genes", 0),
         jcvi_custom_colors=config.get("jcvi_custom_colors", ""),
@@ -134,6 +136,7 @@ rule jcvi_synteny:
         jcvi_synteny \
             --busco_assembly {input.busco_assembly}/run*/full_table.tsv \
             --assembly-fasta {input.assembly} \
+            --assembly-input-fasta {params.assembly_input_fasta:q} \
             --busco_references {input.busco_references} \
             --accession_order {input.accession_order} \
             --manual_refs "{params.manual_refs}" \

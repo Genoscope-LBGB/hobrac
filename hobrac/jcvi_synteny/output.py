@@ -1,4 +1,5 @@
 import argparse
+import csv
 import glob
 import os
 import sys
@@ -472,6 +473,7 @@ def run(
     alpha: float = 0.01,
     min_chain_genes: int = 5,
     permissive_alg: bool = False,
+    assembly_input_fasta: str = "",
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -479,6 +481,8 @@ def run(
     Args:
         assembly_busco: Path to assembly BUSCO full_table.tsv
         assembly_fasta: Path to the assembly fasta file
+        assembly_input_fasta: Original assembly FASTA before preparation, for
+                              provenance only. Defaults to assembly_fasta.
         busco_refs: List of reference BUSCO directory paths
         accession_order: Path to MASH-ordered accessions file
         manual_refs: Semicolon-separated manual reference paths
@@ -538,6 +542,7 @@ def run(
     # Determine species order
     species_order = []
     species_order.append((assembly_name, assembly_busco))
+    species_fastas = [assembly_input_fasta or assembly_fasta]
 
     if manual_refs:
         for ref_path in manual_refs.split(";"):
@@ -545,12 +550,16 @@ def run(
                 name = fasta_basename(ref_path)
                 if name in ref_busco_paths:
                     species_order.append((name, ref_busco_paths[name]))
+                    species_fastas.append(ref_path)
     else:
         with open(accession_order) as f:
             for line in f:
                 accession = line.strip()
                 if accession and accession in ref_busco_paths:
                     species_order.append((accession, ref_busco_paths[accession]))
+                    species_fastas.append(
+                        os.path.join(reference_dir, f"{accession}.fna")
+                    )
 
     # Stable, underscore-free per-species keys (assembly name / reference
     # accession). These key every generated file and gene-id prefix; custom
@@ -731,12 +740,25 @@ def run(
         reference_dir,
     )
 
+    # Record the exact track labels and input FASTAs, not the prepared copies
+    # whose filenames may hide an ordering mistake in --names / -r.
+    name_mapping_path = os.path.join(output_dir, "name_mapping.tsv")
+    with open(name_mapping_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="\t", lineterminator="\n")
+        writer.writerow(["track", "role", "name", "identifier", "fasta"])
+        for i, (key, label, fasta) in enumerate(
+            zip(species_keys, layout_labels, species_fastas, strict=True), start=1
+        ):
+            role = "assembly" if i == 1 else "reference"
+            writer.writerow([i, role, label, key, os.path.abspath(fasta)])
+
     layouts_path = os.path.join(output_dir, "layouts")
     generate_layouts_file(bed_files, links_files, layouts_path, labels=layout_labels)
 
     return {
         "seqids": seqids_path,
         "layouts": layouts_path,
+        "name_mapping": name_mapping_path,
         "chromosome_associations": associations_output,
         "algs": algs_output,
         "gene_chains": gene_chains_output,
@@ -757,6 +779,12 @@ def main():
     )
     parser.add_argument(
         "--assembly-fasta", required=True, help="Path to the assembly fasta file"
+    )
+    parser.add_argument(
+        "--assembly-input-fasta",
+        default="",
+        help="Original assembly FASTA path for the name mapping (before preparation). "
+        "Defaults to --assembly-fasta. Used for provenance only.",
     )
     parser.add_argument(
         "--busco_references",
@@ -858,6 +886,7 @@ def main():
     run(
         assembly_busco=args.busco_assembly,
         assembly_fasta=args.assembly_fasta,
+        assembly_input_fasta=args.assembly_input_fasta,
         busco_refs=args.busco_references,
         accession_order=args.accession_order,
         manual_refs=args.manual_refs,

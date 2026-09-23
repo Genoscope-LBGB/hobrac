@@ -288,6 +288,7 @@ def test_reference_busco_reuses_ordered_prefix(tmp_path, monkeypatch, reuse_coun
     (output / "busco" / "busco_downloads").mkdir()
     command = workflow_commands[0]
     config = command[command.index("--config") + 1 :]
+    assert f"assembly_input_fasta={assembly}" in config
     result = subprocess.run(
         [
             sys.executable,
@@ -302,7 +303,7 @@ def test_reference_busco_reuses_ordered_prefix(tmp_path, monkeypatch, reuse_coun
             "aln/busco_zeta",
             "aln/busco_alpha",
             "aln/busco_middle",
-            "synteny_plots/seqids",
+            "synteny_plots/name_mapping.tsv",
             "--config",
             *config,
         ],
@@ -313,6 +314,7 @@ def test_reference_busco_reuses_ordered_prefix(tmp_path, monkeypatch, reuse_coun
     )
     plan = result.stdout + result.stderr
     assert result.returncode == 0, plan
+    assert "--assembly-input-fasta " + shlex.quote(str(assembly)) in plan
     scheduled_fastas = []
     for line in plan.splitlines():
         if line.strip().startswith("busco "):
