@@ -2,6 +2,8 @@ import argparse
 import os
 import re
 
+from hobrac.mash_database import validate_mash_db_version
+
 
 def scientific_name(value: str) -> str:
     """Reject names with shell metacharacters (interpolated unquoted in rules)."""
@@ -26,7 +28,6 @@ def get_args():
         action="store",
         dest="assembly",
         help="Path to a genome assembly fasta file",
-        required=True,
         default=None,
         type=os.path.abspath,
     )
@@ -36,7 +37,6 @@ def get_args():
         action="store",
         dest="scientific_name",
         help="Scientific name of the organism given in --assembly",
-        required=True,
         default=None,
         type=scientific_name,
     )
@@ -46,7 +46,6 @@ def get_args():
         action="store",
         dest="taxid",
         help="Taxid of the organism given in --assembly",
-        required=True,
         default=None,
         type=int,
     )
@@ -60,6 +59,18 @@ def get_args():
     )
 
     optional_args = parser.add_argument_group("Optional arguments")
+    optional_args.add_argument(
+        "--mash-db-version",
+        type=validate_mash_db_version,
+        default="latest",
+        metavar="VERSION",
+        help="MASH database release (YYYYMMDD)",
+    )
+    optional_args.add_argument(
+        "--list-mash-db-versions",
+        action="store_true",
+        help="List available MASH database versions and exit",
+    )
     optional_args.add_argument(
         "-r",
         "--reference",
@@ -376,6 +387,21 @@ def get_args():
     )
 
     args = parser.parse_args()
+
+    if args.list_mash_db_versions:
+        return args
+
+    missing = [
+        flag
+        for flag, value in (
+            ("-a/--assembly", args.assembly),
+            ("-n/--name", args.scientific_name),
+            ("-t/--taxid", args.taxid),
+        )
+        if value is None
+    ]
+    if missing:
+        parser.error("the following arguments are required: " + ", ".join(missing))
 
     if args.min_ri_alg_genes < 1:
         parser.error("--min-ri-alg-genes must be at least 1")

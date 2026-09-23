@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from hobrac.command_line import get_args
+from hobrac.mash_database import list_mash_db_versions, resolve_mash_db_version
 from hobrac.rename_chr import fasta_basename, rename_reference
 
 thisdir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
@@ -223,6 +224,7 @@ def generate_snakemake_command(args) -> str:
     cmd += f"stop_after_mash={args.stop_after_mash} "
     cmd += f"skip_genomic={args.skip_genomic} "
     cmd += f"ref_count={args.ref_count} "
+    cmd += f"mash_db_version={shlex.quote(args.mash_db_version)} "
 
     if args.metaeuk:
         cmd += "busco_method=metaeuk "
@@ -279,11 +281,30 @@ def generate_snakemake_command(args) -> str:
 def main():
     args = get_args()
 
+    if args.list_mash_db_versions:
+        try:
+            versions = list_mash_db_versions()
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print("\n".join(versions))
+        return
+
     if getattr(args, "profile", None) and not os.path.exists(args.profile):
         print(f"Snakemake profile path does not exist: {args.profile}", file=sys.stderr)
         sys.exit(1)
 
     validate_manual_references(args.reference)
+    if not args.reference or args.stop_after_mash:
+        requested_version = args.mash_db_version
+        try:
+            args.mash_db_version = resolve_mash_db_version(requested_version)
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        if requested_version == "latest":
+            print(f"Resolved MASH database 'latest' to {args.mash_db_version}.")
+
     create_dir(args.output_directory)
     os.chdir(args.output_directory)
 
