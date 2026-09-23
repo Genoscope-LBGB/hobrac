@@ -21,6 +21,48 @@ def test_find_chr_name_matches_common_tokens():
     assert find_chr_name("chrMT mitochondrion") == "chrMT"
 
 
+@pytest.mark.parametrize(
+    "token", ["1", "12", "X", "Y", "Z", "W", "U", "2L", "MT", "Un"]
+)
+def test_find_chr_name_matches_complete_tokens(token):
+    assert find_chr_name(f"AC1 chr{token}, description") == f"chr{token}"
+    assert find_chr_name(f"AC1 chromosome: {token}, description") == f"chr{token}"
+    assert find_chr_name(f"chr{token}") == f"chr{token}"
+    assert find_chr_name(f"chromosome {token}") == f"chr{token}"
+
+
+@pytest.mark.parametrize("genus", ["Chrysomela", "Chrysochromulina", "Chrysanthemum"])
+def test_find_chr_name_does_not_match_genus(genus):
+    assert find_chr_name(f"AC1 {genus} unplaced scaffold") is None
+    assert find_chr_name(f"AC1 {genus} chromosome 1, complete sequence") == "chr1"
+    assert find_chr_name(f"AC1 {genus} chrX, complete sequence") == "chrX"
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "AC1 chromosome unknown",
+        "AC1 chromosome Xylophone",
+        "AC1 chromosome 2Long",
+        "AC1 microchromosome 1",
+        "AC1 _chromosome 1",
+        "AC1 mychr1",
+        "AC1 _chr1",
+        "AC1 chrUn_random",
+        "AC1 chr1_random",
+        "AC1 chr2Long",
+        "AC1 chromosome 1_random",
+    ],
+)
+def test_find_chr_name_rejects_partial_tokens(header):
+    assert find_chr_name(header) is None
+
+
+def test_find_chr_name_matches_case_insensitively():
+    assert find_chr_name("AC1 CHRx, description") == "CHRx"
+    assert find_chr_name("AC1 CHROMOSOME: mt, description") == "chrmt"
+
+
 def test_find_chr_name_matches_descriptive_chromosome():
     # GenBank / ENA style descriptions are normalized to chr<token>.
     assert (
@@ -78,6 +120,36 @@ def test_rename_reference_renames_and_writes_mapping(tmp_path):
         "old_name\tnew_name",
         "CM000663.2\tchr1",
         "scaffold_42\tscaffold_42",
+    ]
+
+
+def test_rename_reference_ignores_genus_and_preserves_unrecognized_ids(tmp_path):
+    src = _write(
+        tmp_path / "ref.fa",
+        ">AC1 Chrysomela populi chromosome 1, complete sequence\nACGT\n"
+        ">AC2 Chrysomela populi unplaced scaffold\nTTTT\n"
+        ">chrUn_random unplaced scaffold\nCCCC\n",
+    )
+    dest = tmp_path / "ref.fna"
+    mapping = tmp_path / "ref.chr_rename.tsv"
+
+    result = rename_reference(src, str(dest), str(mapping))
+
+    assert result == [
+        ("AC1", "chr1"),
+        ("AC2", "AC2"),
+        ("chrUn_random", "chrUn_random"),
+    ]
+    assert dest.read_text() == (
+        ">chr1\nACGT\n"
+        ">AC2 Chrysomela populi unplaced scaffold\nTTTT\n"
+        ">chrUn_random unplaced scaffold\nCCCC\n"
+    )
+    assert mapping.read_text().splitlines() == [
+        "old_name\tnew_name",
+        "AC1\tchr1",
+        "AC2\tAC2",
+        "chrUn_random\tchrUn_random",
     ]
 
 

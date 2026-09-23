@@ -23,19 +23,21 @@ from xopen import xopen
 CHR_TOKEN = r"(?:[0-9]+[A-Za-z]?|MT|Un|[XYZWU])"
 
 # Match a literal ``chr`` token such as chr1, chrX, chr2L, chrMT, chrUn...
-# anywhere in a header. The token must not be glued to a preceding word
-# character so we pick up whole tokens only.
+# anywhere in a header. Require boundaries on both sides and no arbitrary
+# suffix so genus names such as Chrysomela cannot be mistaken for chrY.
 CHR_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9_])chr" + CHR_TOKEN + r"[A-Za-z0-9_]*", re.IGNORECASE
+    r"(?<![A-Za-z0-9_])chr" + CHR_TOKEN + r"(?![A-Za-z0-9_])", re.IGNORECASE
 )
 
 # Match the descriptive form "chromosome 1", "chromosome: 1", "chromosome 2L"...
 # A single separator (colon or whitespace) must follow "chromosome" so plurals
 # ("chromosomes") are ignored, and the token must be chromosome-like so the
 # Ensembl "chromosome:GRCh38:1" form (assembly name right after the colon) does
-# not match.
+# not match. Require whole tokens here too, so "chromosome unknown" does not
+# become chrUn and embedded words such as "microchromosome" are ignored.
 CHROMOSOME_PATTERN = re.compile(
-    r"chromosome[:\s]\s*(" + CHR_TOKEN + r")", re.IGNORECASE
+    r"(?<![A-Za-z0-9_])chromosome[:\s]\s*(" + CHR_TOKEN + r")(?![A-Za-z0-9_])",
+    re.IGNORECASE,
 )
 
 
