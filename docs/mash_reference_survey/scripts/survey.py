@@ -842,9 +842,15 @@ def plot_results(results, report):
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
 
+    relationship_colors = {
+        "Same genus (or closer)": "#0072b2",
+        "Same family, different genus": "#e69f00",
+        "More distant than family": "#cc79a7",
+    }
     phyla = sorted({r["phylum"] for r in results})
     fig, ax = plt.subplots(figsize=(11, max(4, 0.42 * len(phyla) + 1.5)))
     rng = random.Random(0)
+    relationship_counts = Counter()
     labels, summaries = [], []
     for position, phylum in enumerate(phyla, 1):
         group = [r for r in results if r["phylum"] == phylum]
@@ -861,16 +867,21 @@ def plot_results(results, report):
             )
         for row in valid:
             no_signal = row["shared_hashes"] == 0
-            color = (
-                "#c53d3d"
-                if no_signal
-                else ("#d28a00" if row["pvalue"] > 0.01 else "#266da8")
-            )
+            relationship = row["relationship"]
+            if relationship in ("same_species", "same_genus"):
+                category = "Same genus (or closer)"
+            elif relationship == "same_family":
+                category = "Same family, different genus"
+            else:
+                category = "More distant than family"
+            relationship_counts[category] += 1
+            color = relationship_colors[category]
+            marker = "x" if no_signal else ("^" if row["pvalue"] > 0.01 else "o")
             ax.scatter(
                 row["distance"],
                 position + rng.uniform(-0.12, 0.12),
                 color=color,
-                marker="x" if no_signal else "o",
+                marker=marker,
                 s=27,
                 zorder=3,
             )
@@ -903,35 +914,44 @@ def plot_results(results, report):
         "Labels: queries with an eligible reference / sampled"
     )
     ax.grid(axis="x", alpha=0.2)
+    total_with_reference = sum(relationship_counts.values())
+    relationship_handles = []
+    for label, color in relationship_colors.items():
+        count = relationship_counts[label]
+        percentage = 100 * count / total_with_reference if total_with_reference else 0
+        relationship_handles.append(
+            Line2D(
+                [],
+                [],
+                color=color,
+                linewidth=4,
+                label=f"{label}: {count:,} ({percentage:.1f}%)",
+            )
+        )
+    relationship_legend = ax.legend(
+        handles=relationship_handles,
+        title=(
+            "Reference relationship (color)\n"
+            f"Genomes with an eligible reference: n={total_with_reference:,}"
+        ),
+        loc="upper right",
+        fontsize=8,
+        title_fontsize=8,
+    )
+    ax.add_artist(relationship_legend)
     ax.legend(
         handles=[
-            Line2D(
-                [],
-                [],
-                color="#266da8",
-                marker="o",
-                linestyle="",
-                label="Shared hashes; P ≤ 0.01",
-            ),
-            Line2D(
-                [],
-                [],
-                color="#d28a00",
-                marker="o",
-                linestyle="",
-                label="Shared hashes; P > 0.01",
-            ),
-            Line2D(
-                [],
-                [],
-                color="#c53d3d",
-                marker="x",
-                linestyle="",
-                label="No shared hashes (D = 1 sentinel)",
-            ),
+            Line2D([], [], color="#444444", marker=marker, linestyle="", label=label)
+            for marker, label in (
+                ("o", "Shared hashes; P ≤ 0.01"),
+                ("^", "Shared hashes; P > 0.01"),
+                ("x", "No shared hashes"),
+            )
         ],
+        title="Mash signal (shape)",
         loc="lower right",
         fontsize=8,
+        title_fontsize=8,
     )
     fig.tight_layout()
     for suffix in ("png", "pdf"):

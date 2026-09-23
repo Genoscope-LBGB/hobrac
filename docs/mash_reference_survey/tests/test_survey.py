@@ -586,6 +586,7 @@ class SurveyTests(unittest.TestCase):
                 "distance": 0.2,
                 "shared_hashes": 30,
                 "pvalue": 0.0,
+                "relationship": "same_genus",
             },
             {
                 "phylum": "A",
@@ -593,6 +594,7 @@ class SurveyTests(unittest.TestCase):
                 "distance": 0.3,
                 "shared_hashes": 10,
                 "pvalue": 0.02,
+                "relationship": "same_family",
             },
             {
                 "phylum": "A",
@@ -600,6 +602,7 @@ class SurveyTests(unittest.TestCase):
                 "distance": 1.0,
                 "shared_hashes": 0,
                 "pvalue": 1.0,
+                "relationship": "same_phylum",
             },
             {"phylum": "B", "status": "failed"},
         ]
@@ -609,6 +612,131 @@ class SurveyTests(unittest.TestCase):
         rows = survey.read_tsv(self.work / "phylum_summary.tsv")
         self.assertEqual(rows[0]["no_shared_hashes"], "1")
         self.assertEqual(rows[1]["incomplete_or_failed"], "1")
+
+    def test_plot_color_and_shape_are_independent(self):
+        try:
+            import matplotlib
+        except ImportError:
+            self.skipTest("Install matplotlib to exercise rendering")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.legend import Legend
+
+        relationships = {
+            "same_species": "#0072b2",
+            "same_genus": "#0072b2",
+            "same_family": "#e69f00",
+            "same_order": "#cc79a7",
+            "same_class": "#cc79a7",
+            "same_phylum": "#cc79a7",
+        }
+        signals = [(30, 0.01, "o"), (10, 0.02, "^"), (0, 1.0, "x")]
+        results, expected = [], []
+        for relationship, color in relationships.items():
+            for shared, pvalue, marker in signals:
+                results.append(
+                    {
+                        "phylum": "A",
+                        "status": "success",
+                        "distance": 0.2 if shared else 1.0,
+                        "shared_hashes": shared,
+                        "pvalue": pvalue,
+                        "relationship": relationship,
+                    }
+                )
+                expected.append((color, marker))
+        results.extend(
+            [
+                {"phylum": "B", "status": "failed"},
+                {"phylum": "B", "status": "no_eligible_reference"},
+            ]
+        )
+        fig, ax = plt.subplots()
+        self.addCleanup(plt.close, fig)
+        with (
+            patch.object(plt, "subplots", return_value=(fig, ax)),
+            patch.object(ax, "scatter", wraps=ax.scatter) as scatter,
+            patch.object(ax, "legend", wraps=ax.legend) as legend,
+            patch.object(ax, "boxplot", wraps=ax.boxplot) as boxplot,
+        ):
+            survey.plot_results(results, self.work)
+        self.assertEqual(
+            [(c.kwargs["color"], c.kwargs["marker"]) for c in scatter.call_args_list],
+            expected,
+        )
+        self.assertEqual(boxplot.call_args.args[0], [0.2] * 12)
+        self.assertEqual(legend.call_count, 2)
+        self.assertEqual(
+            legend.call_args_list[0].kwargs["title"],
+            "Reference relationship (color)\nGenomes with an eligible reference: n=18",
+        )
+        color_handles = legend.call_args_list[0].kwargs["handles"]
+        self.assertEqual(
+            [h.get_label() for h in color_handles],
+            [
+                "Same genus (or closer): 6 (33.3%)",
+                "Same family, different genus: 3 (16.7%)",
+                "More distant than family: 9 (50.0%)",
+            ],
+        )
+        self.assertEqual(
+            [h.get_color() for h in color_handles],
+            ["#0072b2", "#e69f00", "#cc79a7"],
+        )
+        shape_handles = legend.call_args_list[1].kwargs["handles"]
+        self.assertEqual(
+            [(h.get_marker(), h.get_label()) for h in shape_handles],
+            [
+                ("o", "Shared hashes; P ≤ 0.01"),
+                ("^", "Shared hashes; P > 0.01"),
+                ("x", "No shared hashes"),
+            ],
+        )
+        self.assertEqual(len({h.get_color() for h in shape_handles}), 1)
+        self.assertTrue(any(isinstance(a, Legend) for a in ax.artists))
+
+    def test_plot_legend_handles_zero_counts(self):
+        try:
+            import matplotlib
+        except ImportError:
+            self.skipTest("Install matplotlib to exercise rendering")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        for with_reference in (False, True):
+            with self.subTest(with_reference=with_reference):
+                results: list[dict[str, str | float | int]] = [
+                    {"phylum": "A", "status": "no_eligible_reference"}
+                ]
+                if with_reference:
+                    results.append(
+                        {
+                            "phylum": "A",
+                            "status": "success",
+                            "distance": 0.1,
+                            "shared_hashes": 50,
+                            "pvalue": 0.0,
+                            "relationship": "same_genus",
+                        }
+                    )
+                fig, ax = plt.subplots()
+                self.addCleanup(plt.close, fig)
+                with (
+                    patch.object(plt, "subplots", return_value=(fig, ax)),
+                    patch.object(ax, "legend", wraps=ax.legend) as legend,
+                ):
+                    survey.plot_results(results, self.work)
+                kwargs = legend.call_args_list[0].kwargs
+                self.assertTrue(kwargs["title"].endswith(f"n={int(with_reference)}"))
+                genus_count = "1 (100.0%)" if with_reference else "0 (0.0%)"
+                self.assertEqual(
+                    [h.get_label() for h in kwargs["handles"]],
+                    [
+                        f"Same genus (or closer): {genus_count}",
+                        "Same family, different genus: 0 (0.0%)",
+                        "More distant than family: 0 (0.0%)",
+                    ],
+                )
 
 
 if __name__ == "__main__":

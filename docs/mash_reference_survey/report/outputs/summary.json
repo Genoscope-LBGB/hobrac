@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-09-22T16:06:01.816509+00:00",
+  "sampled_queries": 1000,
+  "script_sha256": "d275e26ee187e3441149e6e668cc04b28183417605dd9dec066f6abe6476e91b",
+  "snapshot_sha256": "df97bd62b245fe5da117d9d0bf9e80751c7b982766fd92ba668dfb4db9fc0503",
+  "statuses": {
+    "no_eligible_reference": 6,
+    "success": 994
+  }
+}
