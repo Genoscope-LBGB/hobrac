@@ -1,0 +1,7 @@
+# Local cluster configuration and generated experiment data
+config.local.sh
+work/
+logs/
+.snakemake/
+__pycache__/
+*.pyc

@@ -1,0 +1,10 @@
+# Site-specific defaults can be changed here or in a separate PROFILE directory.
+executor: slurm
+jobs: 6
+local-cores: 1
+keep-going: true
+rerun-incomplete: true
+latency-wait: 60
+max-jobs-per-second: 1
+retries: 0
+scheduler: greedy
