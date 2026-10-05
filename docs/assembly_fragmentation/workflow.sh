@@ -16,7 +16,27 @@ fi
 export TAXONKIT_DB="$WORK/metadata/taxonomy"
 export MPLBACKEND=Agg
 export PYTHONUNBUFFERED=1
-PROFILE=${PROFILE:-$SCRIPT_DIR/profiles/slurm}
+# Snakemake drops the --cores limit as soon as a node limit exists (--jobs or a
+# profile's jobs:), and --jobs only becomes a cores alias when --cores is absent.
+# The local executor must therefore never receive --jobs, or MAX_CONCURRENT
+# hobrac runs would start at once regardless of their threads.
+LOCAL_EXECUTOR=false
+for ((i = 1; i <= $#; i++)); do
+    next=$((i + 1))
+    case "${!i}" in
+        --executor=local|-e=local) LOCAL_EXECUTOR=true ;;
+        --executor|-e) if [[ ${!next:-} == local ]]; then LOCAL_EXECUTOR=true; fi ;;
+    esac
+done
+if $LOCAL_EXECUTOR; then
+    PROFILE=${PROFILE:-$SCRIPT_DIR/profiles/local}
+    # One hobrac run at a time: rule hobrac declares threads: CPUS. Append
+    # --cores to run more in parallel on a larger machine.
+    PARALLELISM=(--cores "$CPUS")
+else
+    PROFILE=${PROFILE:-$SCRIPT_DIR/profiles/slurm}
+    PARALLELISM=(--jobs "$MAX_CONCURRENT")
+fi
 # Fail closed before scheduling if the frozen snapshot was modified.
 python3 "$SCRIPT_DIR/scripts/fragmentation.py" check --work "$WORK"
 # A per-launch config file preserves required defaults when the user supplies
@@ -44,5 +64,5 @@ Path(sys.argv[1]).write_text(json.dumps(settings))
 PY
 # Native Snakemake CLI options supplied last can override profile settings.
 exec snakemake --snakefile "$SCRIPT_DIR/Snakefile" --directory "$WORK" \
-    --profile "$PROFILE" --jobs "$MAX_CONCURRENT" \
+    --profile "$PROFILE" "${PARALLELISM[@]}" \
     --configfile "$WORKFLOW_CONFIG" "$@"

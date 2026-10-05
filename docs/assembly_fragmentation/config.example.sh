@@ -22,10 +22,12 @@ QOS=""
 # node type, e.g. EXTRA_SBATCH=(--constraint=...)
 EXTRA_SBATCH=()
 # Maximum submitted child jobs (downloads, level FASTAs and hobrac runs share it).
+# Ignored by --executor local, which runs one hobrac at a time (see README).
 MAX_CONCURRENT=6
 # The controller must outlive the slowest hobrac run plus queueing.
 MASTER_TIME=7-00:00:00
-# Optional custom Snakemake profile; empty uses profiles/slurm beside the scripts.
+# Optional custom Snakemake profile; empty uses profiles/slurm or profiles/local
+# beside the scripts, depending on the executor.
 PROFILE=""
 # Delete downloaded and level FASTAs once their hobrac runs succeed.
 CLEANUP=true

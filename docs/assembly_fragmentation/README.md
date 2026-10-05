@@ -129,11 +129,23 @@ bash submit.sh summarize                 # Produce a partial report separately
 bash workflow.sh config.local.sh --dry-run
 ```
 
-To run the workflow locally instead of through Slurm:
+To run the workflow locally instead of through Slurm, for example inside one allocation so that every run executes serially on the same node:
 
 ```bash
-bash workflow.sh config.local.sh --executor local --cores 24
+bash workflow.sh config.local.sh --executor local
 ```
+
+The local executor uses `profiles/local` and `--cores CPUS`, so exactly one hobrac run executes at a time (`rule hobrac` declares `threads: CPUS`); `MAX_CONCURRENT` does not apply. Append `--cores 2×CPUS` to run two at once on a larger machine, but note that each hobrac run then still sees every CPU of the allocation. Never pass `--jobs` to the local executor: Snakemake stops restricting cores as soon as a node limit is set, and `MAX_CONCURRENT` runs would start together.
+
+A serial series on one dedicated node, with the same per-run CPU count as the Slurm runs:
+
+```bash
+#!/bin/bash
+#SBATCH --nodes=1 --exclusive --cpus-per-task=24 --mem=160G --time=2-00:00:00
+bash /path/to/assembly_fragmentation/workflow.sh config.local.sh --executor local
+```
+
+`--cpus-per-task` must equal `CPUS`; the inner hobrac uses every CPU in its affinity mask, and `runs.tsv` records that count as `cpus`. Expect roughly one day for the 51 runs of the default sample on a current Xeon node.
 
 Never run two controllers against the same `WORK` directory.
 
@@ -144,7 +156,7 @@ Never run two controllers against the same `WORK` directory.
 | `config.example.sh` | Template configuration to copy and edit for your run |
 | `submit.sh` | Submits preparation, the controller, or reporting jobs to Slurm |
 | `workflow.sh`, `Snakefile` | Launches the Snakemake controller and defines the DAG |
-| `profiles/` | Default scheduler configuration profiles |
+| `profiles/` | Scheduler profiles: `slurm` for the default controller, `local` for `--executor local` |
 | `scripts/` | Python backend and Slurm job entry point |
 | `tests/` | Offline unit tests |
 
