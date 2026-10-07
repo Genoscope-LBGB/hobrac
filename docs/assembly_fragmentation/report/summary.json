@@ -1,0 +1,15 @@
+{
+  "created_utc": "2026-10-06T16:42:53.762819+00:00",
+  "genomes": 17,
+  "mash_db_version": "20260629",
+  "runs": 51,
+  "same_reference": {
+    "no": 1,
+    "yes": 16
+  },
+  "script_sha256": "3a0048d7cc97d84488b93d278d8ac6ecae38d02c3e250ce5718e7f6bde67cf2a",
+  "snapshot_sha256": "62c7cfc6905fabfee78fc229a772e2a8eac8a0cd301fda0a4e2dd677391f919a",
+  "statuses": {
+    "success": 51
+  }
+}

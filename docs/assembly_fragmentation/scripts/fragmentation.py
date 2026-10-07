@@ -1133,6 +1133,7 @@ def summarize(args):
         },
     )
     plot_runtime(rows, report)
+    plot_signal(rows, report)
     plot_dotplot_grids(rows, work, report, args.grid_rows)
     print(json.dumps(dict(statuses), indent=2))
     print(f"Tables and plots: {report}")
@@ -1174,98 +1175,176 @@ def phylum_colors(rows):
     return {p: cmap(i % 20) for i, p in enumerate(sorted({r["phylum"] for r in rows}))}
 
 
+def plain_log_formatter(label_only_base=True):
+    """Matplotlib's log-tick thinning, printed as 0.25 instead of 2.5e-01."""
+    from matplotlib.ticker import LogFormatter
+
+    class PlainLogFormatter(LogFormatter):
+        def __call__(self, x, pos=None):
+            return f"{x:.3g}" if super().__call__(x, pos) else ""
+
+    return PlainLogFormatter(labelOnlyBase=label_only_base)
+
+
+def log_axis(axis):
+    axis.set_major_formatter(plain_log_formatter())
+    axis.set_minor_formatter(plain_log_formatter(label_only_base=False))
+
+
+def successful_genomes(rows):
+    genomes = defaultdict(list)
+    for row in rows:
+        if row["status"] == "success":
+            genomes[row["accession"]].append(row)
+    return genomes
+
+
+def draw_series(ax, genomes, colors, x_of, y_of):
+    """One line per genome through its levels, markers by level, colours by phylum."""
+    for group in genomes.values():
+        points = sorted(
+            (
+                (x, y, r)
+                for r in group
+                for x, y in [(x_of(r), y_of(r))]
+                if x is not None and y is not None
+            ),
+            key=lambda point: point[:2],
+        )
+        if len(points) > 1:
+            ax.plot(
+                [p[0] for p in points],
+                [p[1] for p in points],
+                color=colors[group[0]["phylum"]],
+                linewidth=1,
+                alpha=0.6,
+            )
+        for x, y, r in points:
+            ax.scatter(
+                x,
+                y,
+                marker=LEVEL_MARKERS[r["level"]],
+                color=colors[r["phylum"]],
+                edgecolor="black",
+                linewidth=0.3,
+                s=32,
+                zorder=3,
+            )
+
+
+def draw_legends(ax, colors):
+    from matplotlib.lines import Line2D
+
+    ax.axis("off")
+    phylum_legend = ax.legend(
+        handles=[
+            Line2D([], [], color=color, linewidth=4, label=phylum)
+            for phylum, color in colors.items()
+        ],
+        title="Phylum (colour)",
+        loc="upper left",
+        ncol=2,
+        fontsize=7,
+        title_fontsize=8,
+        labelspacing=0.3,
+        handlelength=1.5,
+        columnspacing=1.0,
+    )
+    ax.add_artist(phylum_legend)
+    ax.legend(
+        handles=[
+            Line2D([], [], color="#444444", marker=marker, linestyle="", label=level)
+            for level, marker in LEVEL_MARKERS.items()
+        ],
+        title="Assembly level (shape)",
+        loc="lower left",
+        fontsize=7,
+        title_fontsize=8,
+        labelspacing=0.3,
+    )
+
+
 def plot_runtime(rows, report):
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    from matplotlib.ticker import LogFormatter
-
-    class PlainLogFormatter(LogFormatter):
-        """Matplotlib's log-tick thinning, printed as 0.25 instead of 2.5e-01."""
-
-        def __call__(self, x, pos=None):
-            return f"{x:.3g}" if super().__call__(x, pos) else ""
 
     colors = phylum_colors(rows)
-    done = [r for r in rows if r["status"] == "success"]
-    genomes = defaultdict(list)
-    for row in done:
-        genomes[row["accession"]].append(row)
+    genomes = successful_genomes(rows)
+    runs = sum(len(group) for group in genomes.values())
     for key, label, scale, stem, name in RUNTIME_AXES:
-        fig, axes = plt.subplots(2, 4, figsize=(18, 8.5))
+        fig, axes = plt.subplots(4, 2, figsize=(8.27, 11.69))
         for ax, (title, field) in zip(axes.flat, RUNTIME_PANELS):
-            for group in genomes.values():
-                points = sorted(
-                    (
-                        (float(r[key]) * scale, float(r[field]) / 60, r)
-                        for r in group
-                        if number(r.get(key)) and number(r.get(field))
-                    ),
-                    key=lambda point: point[:2],
-                )
-                if len(points) > 1:
-                    ax.plot(
-                        [p[0] for p in points],
-                        [p[1] for p in points],
-                        color=colors[group[0]["phylum"]],
-                        linewidth=1,
-                        alpha=0.6,
-                    )
-                for x, y, r in points:
-                    ax.scatter(
-                        x,
-                        y,
-                        marker=LEVEL_MARKERS[r["level"]],
-                        color=colors[r["phylum"]],
-                        edgecolor="black",
-                        linewidth=0.3,
-                        s=32,
-                        zorder=3,
-                    )
+            draw_series(
+                ax,
+                genomes,
+                colors,
+                lambda r, key=key: positive(r, key, scale),
+                lambda r, field=field: positive(r, field, 1 / 60),
+            )
             ax.set_xscale("log")
             ax.set_yscale("log")
-            for axis in (ax.xaxis, ax.yaxis):
-                axis.set_major_formatter(PlainLogFormatter())
-                axis.set_minor_formatter(PlainLogFormatter(labelOnlyBase=False))
+            log_axis(ax.xaxis)
+            log_axis(ax.yaxis)
             ax.set_title(title, fontsize=10)
             ax.set_xlabel(label)
             ax.set_ylabel("Wall-clock time (min)")
             ax.grid(alpha=0.2, which="both")
-        legend = axes.flat[-1]
-        legend.axis("off")
-        phylum_legend = legend.legend(
-            handles=[
-                Line2D([], [], color=color, linewidth=4, label=phylum)
-                for phylum, color in colors.items()
-            ],
-            title="Phylum (colour)",
-            loc="upper left",
-            fontsize=8,
-            title_fontsize=8,
-        )
-        legend.add_artist(phylum_legend)
-        legend.legend(
-            handles=[
-                Line2D(
-                    [], [], color="#444444", marker=marker, linestyle="", label=level
-                )
-                for level, marker in LEVEL_MARKERS.items()
-            ],
-            title="Assembly level (shape)",
-            loc="upper right",
-            fontsize=8,
-            title_fontsize=8,
-        )
-        fig.suptitle(
-            f"hobrac runtime per step vs {name} "
-            f"({len(done)} successful runs, lines join the levels of one genome)"
-        )
+        draw_legends(axes.flat[-1], colors)
+        fig.suptitle(f"hobrac runtime per step vs {name} ({runs} runs)", fontsize=11)
         fig.tight_layout()
         for suffix in ("png", "pdf"):
             fig.savefig(report / f"{stem}.{suffix}", dpi=200)
         plt.close(fig)
+
+
+def positive(row, field, scale=1.0):
+    """Scaled field value, or None when missing or non-positive (log axes)."""
+    value = number(row.get(field))
+    return value * scale if value and value > 0 else None
+
+
+def anchors_per_sequence(row):
+    anchors, sequences = positive(row, "busco_anchors"), positive(row, "anchor_sequences")
+    return anchors / sequences if anchors and sequences else None
+
+
+def plot_signal(rows, report):
+    """Share of anchors in significant pairs, by level and against contiguity."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    colors = phylum_colors(rows)
+    genomes = successful_genomes(rows)
+    runs = sum(len(group) for group in genomes.values())
+    fraction = lambda r: number(r.get("significant_anchor_fraction"))
+    fig, axes = plt.subplots(2, 2, figsize=(8.27, 7.5))
+    panels = (
+        ("Assembly level", lambda r: LEVELS.index(r["level"]), None),
+        ("N50 (Mb)", lambda r: positive(r, "n50", 1e-6), "log"),
+        ("Anchors per anchor-bearing sequence", anchors_per_sequence, "log"),
+    )
+    for ax, (label, x_of, scale) in zip(axes.flat, panels):
+        draw_series(ax, genomes, colors, x_of, fraction)
+        if scale:
+            ax.set_xscale(scale)
+            log_axis(ax.xaxis)
+        else:
+            ax.set_xticks(range(len(LEVELS)), LEVELS)
+            ax.set_xlim(-0.4, len(LEVELS) - 0.6)
+        ax.set_ylim(-0.03, 1.03)
+        ax.set_xlabel(label)
+        ax.set_ylabel("Anchors in significant pairs (fraction)")
+        ax.grid(alpha=0.2, which="both")
+    draw_legends(axes.flat[-1], colors)
+    fig.suptitle(f"Synteny signal vs assembly contiguity ({runs} runs)", fontsize=11)
+    fig.tight_layout()
+    for suffix in ("png", "pdf"):
+        fig.savefig(report / f"signal_vs_contiguity.{suffix}", dpi=200)
+    plt.close(fig)
 
 
 def tile_title(level, row):
