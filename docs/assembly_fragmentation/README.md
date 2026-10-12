@@ -10,7 +10,7 @@ Frozen manifest ── download ── levels ─┼─ scaffolds ─── hobr
 
 ## Results and interpretation
 
-The archived run evaluated **17 genomes from 17 phyla, 51 hobrac runs**, drawn with a fixed seed from the 386 ATLASea assemblies listed on 2 October 2026 and compared against MASH release 20260629. All 51 runs succeeded at the first attempt. The sample spans 8–3,505 sequences, 17 Mb–5.7 Gb and contig N50 from 1.2 to 30 Mb; five genomes have 222–1,194 scaffolds.
+The archived run evaluated **17 genomes from 17 phyla, 51 hobrac runs**, drawn with a fixed seed from the 386 ATLASea assemblies listed on 2 October 2026 and compared against MASH release 20260629. All 51 runs succeeded at the first attempt. The sample spans 7–3,505 sequences, 17 Mb–5.7 Gb and contig N50 from 1.2 to 30 Mb; six genomes have 222–1,194 scaffolds.
 
 ![Share of BUSCO anchors in significant pairs by assembly level, N50 and anchors per sequence](report/signal_vs_contiguity.png)
 
@@ -101,7 +101,7 @@ hobrac -a <level>.fna.gz -n <name> -t <taxid> -o runs/<accession>/<level>/hobrac
 ```
 
 - **Reference selection.** The reference is not fixed. The MASH release (`latest` by default) is resolved once during preparation, and every run uses that dated release, so a difference in the selected reference comes from the assembly level alone. `reference_selection.tsv` reports whether the three levels of each genome selected the same reference.
-- **One allocation per run.** Each run gets its own Slurm allocation (`CPUS`, `MEMORY`, `TIME`), and hobrac executes all of its steps inside it. The end-to-end time therefore excludes queueing. hobrac uses every CPU that Slurm assigns to the job.
+- **One shared allocation for the entire run.** Each run shares a Slurm allocation (`CPUS`, `MEMORY`, `TIME`), and hobrac executes all of its steps inside it. The end-to-end time therefore excludes queueing. hobrac uses every CPU that Slurm assigns to the job.
 - **Fixed options.** `HOBRAC_ARGS` applies the same extra options to every run. Options that would change the experiment are rejected: input, output, reference, executor, MASH release, precomputed BUSCO, `--stop-after-mash`, `--skip-genomic` and `--ref-count`.
 - **Retries.** A failed run is restarted from scratch, so every reported runtime comes from a single uninterrupted execution. `attempt` in `runs.tsv` counts the tries.
 - **Completed runs.** A successful run is never recomputed. Delete `runs/<accession>/<level>/` to force a rerun.
