@@ -1,6 +1,6 @@
 # Mash reference-availability survey
 
-This workflow samples species across the eukaryotic phyla that hobrac supports and uses Mash to find and measure their nearest eligible reference genome. The preparation step freezes both the sample manifest and the reference sketches.
+Samples species across the eukaryotic phyla Hobrac supports and uses Mash to find and measure each one's nearest eligible reference genome. The preparation step freezes the sample manifest and reference sketches; a Snakemake workflow then downloads, sketches, and reports.
 
 ```text
                     download A → Mash A ─┐
@@ -8,41 +8,29 @@ Frozen manifest ─── download B → Mash B ─┼─ report
                     download C → Mash C ─┘
 ```
 
-## Results and interpretation
-
-The archived run evaluated **1,000 distinct species from 41 eukaryotic phyla** using Mash 2.3 and inputs frozen on 22 September 2026. Queries were selected from 9,942 eligible species with chromosome-level or complete assemblies, with one assembly per species. Sampling was balanced across phyla where possible: all eligible species were included in 30 phyla, while 61–62 species were sampled from each of 11 larger pools.
+**Archived run:** 1,000 species, 41 phyla, Mash 2.3, inputs frozen 22 September 2026. 994 queries had an eligible reference; 50.6% of those matched a same-genus reference. **Conclusion: broad availability of detectable sequence matches, with uneven reference proximity.** This does not demonstrate optimal reference selection.
 
 ![Nearest eligible reference Mash distances by query phylum, colored by taxonomic relationship and shaped by Mash signal](report/outputs/distance_by_phylum.png)
 
-[Download the PDF](report/outputs/distance_by_phylum.pdf).
+[PDF version](report/outputs/distance_by_phylum.pdf). One point per query's nearest eligible reference from another species; lower distance = more similar. Color = taxonomic relationship, shape = Mash signal (see [Plot legend](#plot-legend)). Phylum labels show queries with an eligible reference / sampled.
 
-Each point represents one query's nearest eligible reference from another species. A lower Mash distance indicates greater sequence similarity. Color shows the taxonomic relationship, and shape distinguishes P ≤ 0.01, P > 0.01, and no shared hashes. Phylum labels show queries with an eligible reference / sampled. The legend percentages use the 994 queries with an eligible reference.
+## Key findings
 
-### Reference availability and taxonomic proximity
+**Sampling.** 9,942 eligible species (chromosome-level or complete assemblies, one assembly per species). All eligible species included in 30 phyla; 61–62 sampled from each of the 11 larger pools. All 1,000 queries completed with no failures.
 
-All 1,000 queries completed, and there were no failed or incomplete jobs. **994 had an eligible reference** after same-taxid references, zero-distance matches, the query assembly, and other same-species references were excluded. References with unresolved species assignments were also excluded.
+**Taxonomic proximity** (994 queries with an eligible reference):
 
-| Relationship to the selected reference | Genomes | Percentage of the 994 with a reference |
+| Relationship to the selected reference | Genomes | Percentage |
 | --- | ---: | ---: |
 | Same genus | 503 | 50.6% |
 | Same family, different genus | 212 | 21.3% |
 | More distant than family | 279 | 28.1% |
 
-The remaining six queries were from **Acanthocephala, Chytridiomycota, Discosea, Endomyxa, Glomeromycota, and Phoronida**. Each of these phyla had only one eligible query species, and the same-taxid or zero-distance rules excluded all of its reference entries. The `0/1` labels therefore indicate no eligible alternative for the sampled species, not necessarily a database with only one assembly: Endomyxa had two reference entries and Glomeromycota had six. Under this survey's database and rules, these queries could not be evaluated against a different-species reference. This is not a general limitation of hobrac when another suitable reference can be supplied.
+**Mash signal** (994 pairs): 990 with P ≤ 0.01, 3 with P > 0.01, 1 with no shared hashes. All three sampled Fornicata were weak or absent: *Giardia duodenalis* and *Giardia muris* shared 1 of 10,000 hashes, *Spironucleus salmonicida* shared none. The other weak match was *Phymatolithon calcareum* (Rhodophyta), 2 of 10,000.
 
-Among the 994 selected query–reference pairs:
+**Unevaluable queries.** Six phyla (Acanthocephala, Chytridiomycota, Discosea, Endomyxa, Glomeromycota, Phoronida) had a single eligible query species whose reference entries were all excluded by the same-taxid or zero-distance rules. Their `0/1` labels mean no eligible *alternative* under this survey's rules, not a database with only one assembly (Endomyxa had 2 entries, Glomeromycota 6). Hobrac can still use these species when another reference is supplied.
 
-- **990** had shared hashes with **P ≤ 0.01**.
-- **3** had shared hashes with **P > 0.01**.
-- **1** had **no shared hashes**. Its distance of 1 is a no-signal placeholder, not a measured evolutionary distance.
-
-All three sampled Fornicata had weak or undetectable signal: *Giardia duodenalis* and *Giardia muris* each shared only 1 of 10,000 sketch hashes with their selected reference, while *Spironucleus salmonicida* shared none. The other weak match was *Phymatolithon calcareum* (Rhodophyta), with 2 of 10,000 shared hashes.
-
-A small Mash P-value indicates that the sketch overlap is unlikely under Mash's random-sequence model. It does **not** establish that the reference is close enough for reliable whole-genome alignment or structural comparison, and these are pairwise Mash P-values, not a test of differences between phyla.
-
-### Do larger reference databases give more same-genus matches?
-
-The following examples compare reference database size with the selected reference's relationship and distance. Reference entries are the number of comparison rows in the phylum database **before exclusions**, not the number of unique species or the size of the eligible query pool. Same-genus percentages use the queries with an eligible reference in that phylum as the denominator.
+**Database size vs. same-genus rate.** Reference entries are comparison rows before exclusions; same-genus percentages use queries with an eligible reference as the denominator.
 
 | Phylum | Reference entries | Queries with a reference | Same-genus matches | Median Mash distance |
 | --- | ---: | ---: | ---: | ---: |
@@ -55,21 +43,17 @@ The following examples compare reference database size with the selected referen
 | Bacillariophyta | 19 | 25 | 8 (32.0%) | 0.291 |
 | Rhodophyta | 17 | 19 | 4 (21.1%) | 0.296 |
 
-Some sparsely represented groups have relatively distant matches, but **database size alone does not consistently predict the same-genus match rate**. Euglenozoa, for example, has fewer reference entries than Chordata but a higher same-genus rate. Taxonomic composition matters: 25 of the 44 Euglenozoa queries are *Leishmania* and another six are *Trypanosoma*. Sampling one assembly per species avoids repeated species, but it does not balance genera or families.
+Database size alone does not predict the same-genus rate. Euglenozoa has far fewer entries than Chordata but a higher rate, because 25 of its 44 queries are *Leishmania* and 6 are *Trypanosoma*; one-assembly-per-species sampling balances species, not genera. Within-phylum spread is also wide: Euglenozoa's interquartile range is 0.005–0.201 versus 0.018–0.078 for Chordata.
 
-Euglenozoa has the lowest median distance (0.027), but the distribution is broad: its middle 50% spans **0.005–0.201**, compared with **0.018–0.078** in Chordata. Rhodophyta has a much higher median (0.296), although that median is not the highest across all phyla. Both differences between groups and variation within groups matter when you assess reference availability. Results based on only a few species should not be generalized to an entire phylum.
+## Caveats
 
-### Conclusion
+- Selection criterion is minimum Mash distance, a sequence-similarity proxy. The most sequence-similar genome is not necessarily the closest in chromosome structure or gene order; this survey does no downstream alignment or synteny validation.
+- A small Mash P-value means the sketch overlap is unlikely under Mash's random-sequence model. It does not mean the reference is close enough for reliable whole-genome alignment. P-values are pairwise, not a test between phyla.
+- A no-shared-hash distance of 1 is a placeholder, not a measured distance.
+- Phyla with few sampled species should not be generalized.
+- Results reflect one database snapshot. Future database growth may improve coverage; this run cannot measure that.
 
-Finding a same-genus reference for **50.6%** of queries with an eligible reference is encouraging evidence of taxonomic proximity. Neither this statistic nor low Mash distances, however, demonstrate that hobrac selects the **best** reference for downstream analysis.
-
-Here, the selection criterion is explicitly **minimum Mash distance**, a proxy for sequence similarity. The genome that is most similar in sequence is not necessarily the most similar in chromosome structure or gene order. Establishing which reference is best for a particular application would require comparing candidate references using downstream alignment, synteny, or structural-conservation results. This survey stops after Mash and does not perform that validation.
-
-Reference availability depends on the genomes present in the database. Future sequencing and database updates may improve coverage, but this single snapshot cannot measure or guarantee that improvement. The appropriate conclusion is therefore **broad availability of detectable sequence matches, with uneven reference proximity**, rather than demonstrated optimal reference selection.
-
-### Archived inputs and outputs
-
-The files supporting these conclusions are organized as follows:
+## Archive contents
 
 ```text
 report/
@@ -89,92 +73,96 @@ report/
     └── reset_required_task_ids.txt
 ```
 
-See the [sample manifest](report/inputs/manifest.tsv), [sampling coverage](report/inputs/phylum_coverage.tsv), and [per-query results](report/outputs/nearest_references.tsv) for the underlying data. The input files and original provenance records are unchanged. The figures were regenerated from the per-query results with the revised colors, shapes, and legend counts. The script hashes in the provenance records identify the original run, not the later plotting changes.
+Start with the [sample manifest](report/inputs/manifest.tsv), [sampling coverage](report/inputs/phylum_coverage.tsv), and [per-query results](report/outputs/nearest_references.tsv).
 
-This is a **report archive**, not a complete runnable work directory. It does not include the frozen reference sketches, taxonomy files, raw Mash comparisons, or execution logs. Paths inside `snapshot.json` refer to the original work-directory layout. The input/output split here does not change the workflow layout described below: preparation still writes inputs under `$WORK/`, and reporting writes outputs under `$WORK/report/`.
+- This is a report archive, not a runnable work directory: no reference sketches, taxonomy files, raw Mash comparisons, or execution logs. Paths in `snapshot.json` refer to the original work-directory layout.
+- Inputs and provenance records are unchanged from the original run. Figures were regenerated from the per-query results with revised colors, shapes, and legend counts; script hashes in the provenance records identify the original run, not the plotting changes.
+- The `inputs/`/`outputs/` split is an archive convention. A live run writes inputs under `$WORK/` and outputs under `$WORK/report/`.
 
 # Running the workflow
 
-## Quick start
+## Requirements
 
-To run the workflow, you need Linux, Bash, Python >=3.11, installed hobrac and host-side Mash, Snakemake 9 with its Slurm executor plugin, and matplotlib. If needed, you can install the workflow dependencies directly into your hobrac environment:
+Linux, Bash, Python ≥ 3.11, Hobrac and host-side Mash installed, Snakemake 9 with the Slurm executor plugin, matplotlib. To install the workflow dependencies into your Hobrac environment:
 
 ```bash
 python3 -m pip install 'snakemake>=9,<10' snakemake-executor-plugin-slurm 'matplotlib>=3.6'
 ```
 
-Copy **this whole directory** to your machine, and make sure the copy includes `scripts/` and `profiles/`.
+Copy this whole directory, including `scripts/` and `profiles/`.
 
-### 1. Configure
+## Quick start
 
 ```bash
-cp config.example.sh config.local.sh
-# Edit config.local.sh before submitting anything.
+cp config.example.sh config.local.sh   # 1. edit before submitting anything
+bash submit.sh prepare                 # 2. freeze manifest + sketches; check $WORK/logs/
+bash submit.sh workflow                # 3. run
 ```
 
-In `config.local.sh`, set `WORK` to an absolute shared path without spaces or shell metacharacters, choose your sample `COUNT` (which defaults to 1000), and fill in your environment and Slurm settings. `MAX_CONCURRENT` limits submitted child jobs, including pending jobs. `MASTER_TIME` sets the runtime limit for the controller job, and `TIME` limits the runtime of each Mash job.
+After step 2, inspect `manifest.tsv`, `phylum_coverage.tsv`, and `sampling_exclusions.json` before proceeding. After step 3, results are under `$WORK/report/`.
 
-**A different count, seed, scope, or reference snapshot requires a new `WORK` directory.**
+## Configuration
 
-### 2. Prepare and review
+Set in `config.local.sh`:
+
+| Variable | Meaning |
+| --- | --- |
+| `WORK` | Absolute shared path; no spaces or shell metacharacters |
+| `COUNT` | Sample size (default 1000) |
+| `MAX_CONCURRENT` | Cap on submitted child jobs, including pending |
+| `MASTER_TIME` | Runtime limit for the controller job |
+| `TIME` | Runtime limit per Mash job |
+| `CLEANUP` | `true` (default): delete FASTA files for successful queries; failed queries keep theirs |
+
+Plus your environment and Slurm settings. **A different count, seed, scope, or reference snapshot requires a new `WORK` directory.** Cleanup never removes final results, mappings, logs, provenance, or shared reference data.
+
+## Outputs
+
+Under `$WORK/report/`:
+
+- `distance_by_phylum.png` / `.pdf`: distance distributions by query phylum.
+- `nearest_references.tsv`: every sampled query, including failures.
+- `phylum_summary.tsv`, `summary.json`: counts and status summaries.
+
+### Plot legend
+
+- **Color** = nearest reference's relationship: blue same genus or closer, orange same family/different genus, reddish purple more distant than family.
+- **Shape** = Mash signal: circle P ≤ 0.01, triangle P > 0.01, cross no shared hashes (distance 1 placeholder, keeps its relationship color).
+- Legend counts and percentages are over all queries with an eligible reference, including weak and no-hash matches; failed, incomplete, and no-eligible-reference queries are excluded. The legend title states the denominator.
+- Boxplots include only queries with shared hashes.
+- Display choices do not affect reference selection or reported statistics.
+
+## Restart or inspect
 
 ```bash
-bash submit.sh prepare
-```
-
-Monitor `$WORK/logs/` and confirm that the preparation job completes successfully. Before you proceed, inspect `manifest.tsv`, `phylum_coverage.tsv`, and `sampling_exclusions.json` and verify the sampling results.
-
-### 3. Run
-
-```bash
-bash submit.sh workflow
-```
-
-By default (`CLEANUP=true`), the workflow deletes downloaded and prepared FASTA files for successful queries so that it can save disk space. It retains all final results, mappings, logs, provenance metadata, and shared reference data. If a query fails, its FASTA files are kept so that you can investigate the failure.
-
-### 4. Inspect results
-
-Start with these reports under `$WORK/report/`:
-
-- `distance_by_phylum.png` / `.pdf`: Distance distributions grouped by query phylum.
-- `nearest_references.tsv`: Every sampled query, including failures.
-- `phylum_summary.tsv` and `summary.json`: Counts and status summaries.
-
-In the distance plot, point color shows the nearest reference's taxonomic relationship: **blue** for the same genus (or closer), **orange** for the same family but a different genus, and **reddish purple** for a relationship more distant than family. The color legend includes genome counts and percentages for each category, calculated over all queries with an eligible reference, including weak matches and queries with no shared hashes. Its title states this denominator, and failed, incomplete, and no-eligible-reference queries are excluded. Point shape shows the Mash signal: **circles** for shared hashes with P ≤ 0.01, **triangles** for shared hashes with P > 0.01, and **crosses** for no shared hashes. Crosses retain the relationship color, and their distance of 1 is a placeholder for no detected overlap, not a measured evolutionary distance. Boxplots include only queries with shared hashes. These display choices do not change reference selection or the reported statistics.
-
-## Restart or inspect a run
-
-```bash
-bash submit.sh workflow                  # Continue unfinished work
-bash submit.sh summarize                 # Produce a partial report separately
+bash submit.sh workflow                            # continue unfinished work
+bash submit.sh summarize                           # partial report
 bash workflow.sh config.local.sh --dry-run
+bash workflow.sh config.local.sh --executor local --cores 8   # run without Slurm
 ```
 
-Snakemake reuses results from completed queries automatically, even after their temporary FASTA files have been removed. If the controller times out or is killed forcefully, make sure all previous child jobs have finished or been cancelled before you restart. Never run two controllers against the same `WORK` directory. Clear a stale lock only after you confirm that no controller or child job is still writing to `WORK`.
-
-To run the workflow locally instead of through Slurm:
-
-```bash
-bash workflow.sh config.local.sh --executor local --cores 8
-```
+- Snakemake reuses completed queries, even after their FASTA files were cleaned up.
+- Never run two controllers against the same `WORK`.
+- If the controller timed out or was killed, confirm all child jobs have finished or been cancelled before restarting.
+- Clear a stale lock only after confirming nothing is still writing to `WORK`.
 
 ## Directory layout
 
 | Path | Purpose |
 | --- | --- |
-| `config.example.sh` | Template configuration to copy and edit for your run |
-| `submit.sh` | Submits preparation, the controller, or reporting jobs to Slurm |
+| `config.example.sh` | Template configuration to copy and edit |
+| `submit.sh` | Submits preparation, controller, or reporting jobs to Slurm |
 | `workflow.sh`, `Snakefile` | Launches the Snakemake controller and defines the DAG |
-| `profiles/` | Default scheduler configuration profiles |
-| `scripts/` | Internal Python backend and Slurm job entry point |
+| `profiles/` | Default scheduler profiles |
+| `scripts/` | Python backend and Slurm job entry point |
 | `tests/` | Offline unit tests and local workflow integration tests |
 | `report/inputs/` | Archived sampling inputs and snapshot provenance |
 | `report/outputs/` | Archived result tables, figures, and status summaries |
 
-To run the test suite from this directory:
+## Tests
 
 ```bash
 python3 -m unittest discover -s tests -t .. -v
 ```
 
-These tests run entirely offline, using a mock hobrac/Mash setup and a loopback FASTA server, so they do not submit real Slurm jobs or download files from NCBI. They verify step overlap, temporary file cleanup, restarts, failure handling, and migration, and they include a 1,000-genome DAG dry run.
+Fully offline (mock Hobrac/Mash, loopback FASTA server; no Slurm, no NCBI). Covers step overlap, temporary-file cleanup, restarts, failure handling, migration, and a 1,000-genome DAG dry run.
