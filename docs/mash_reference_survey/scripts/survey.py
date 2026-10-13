@@ -909,10 +909,6 @@ def plot_results(results, report):
         "Nearest reference Mash distance\n"
         "Native hobrac eligibility + same-species exclusion (zero distances excluded)"
     )
-    ax.set_title(
-        "Reference availability by query phylum\n"
-        "Labels: queries with an eligible reference / sampled"
-    )
     ax.grid(axis="x", alpha=0.2)
     total_with_reference = sum(relationship_counts.values())
     relationship_handles = []
