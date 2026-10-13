@@ -1292,7 +1292,6 @@ def plot_runtime(rows, report):
             ax.set_ylabel("Wall-clock time (min)")
             ax.grid(alpha=0.2, which="both")
         draw_legends(axes.flat[-1], colors)
-        fig.suptitle(f"hobrac runtime per step vs {name} ({runs} runs)", fontsize=11)
         fig.tight_layout()
         for suffix in ("png", "pdf"):
             fig.savefig(report / f"{stem}.{suffix}", dpi=200)
@@ -1340,7 +1339,6 @@ def plot_signal(rows, report):
         ax.set_ylabel("Anchors in significant pairs (fraction)")
         ax.grid(alpha=0.2, which="both")
     draw_legends(axes.flat[-1], colors)
-    fig.suptitle(f"Synteny signal vs assembly contiguity ({runs} runs)", fontsize=11)
     fig.tight_layout()
     for suffix in ("png", "pdf"):
         fig.savefig(report / f"signal_vs_contiguity.{suffix}", dpi=200)
