@@ -68,7 +68,7 @@ Across datasets, a substantial proportion of BUSCO genes could be assigned to th
 
 ## Figure 2 - Ribbon plots obtained with Hobrac on 6 metazoans with 3 BUSCO odb12 datasets, colored with the 29 metazoan ALGs
 
-! [Ribbon plots obtained with Hobrac on 6 metazoans with 3 BUSCO odb12 datasets, colored with the 29 metazoan ALGs](images/Ribbons.buscodatasets.png)
+![Ribbon plots obtained with Hobrac on 6 metazoans with 3 BUSCO odb12 datasets, colored with the 29 metazoan ALGs](images/Ribbons.buscodatasets.png)
 
 Figure 2 displays ribbon plots for the same 6 species compared with Hobrac run on 3 different BUSCO datasets. In the ribbon plot anchored with the metazoa odb12 dataset, containing only 672 genes, among which 514 are colored according to metazoan ALGs, the links appear sparse. Still, 22/29 ALGs are identified by Hobrac: they correspond to the colored links, the others are left in grey (panel c). Using --skip-alg displays all genes in the color file, revealing additional ALGs despite non-significant chromosome associations (panel d). Other BUSCO datasets (cnidaria odb12: 2197 busco genes colored/3203 (panel a) and crustaceaodb12 :1125/1536 (panel b) display higher link densities.
 These results show that BUSCO genes are efficient anchors to identify synteny even in distantly related lineages. 
