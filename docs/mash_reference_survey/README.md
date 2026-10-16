@@ -1,6 +1,6 @@
 # Mash reference-availability survey
 
-Samples species across the eukaryotic phyla Hobrac supports and uses Mash to find and measure each one's nearest eligible reference genome. The preparation step freezes the sample manifest and reference sketches; a Snakemake workflow then downloads, sketches, and reports.
+This survey samples species across the eukaryotic phyla Hobrac supports and uses Mash to find and measure each one's nearest eligible reference genome. The preparation step freezes the sample manifest and reference sketches; a Snakemake workflow then downloads, sketches, and reports.
 
 ```text
                     download A → Mash A ─┐
@@ -8,17 +8,21 @@ Frozen manifest ─── download B → Mash B ─┼─ report
                     download C → Mash C ─┘
 ```
 
-**Archived run:** 1,000 species, 41 phyla, Mash 2.3, inputs frozen 22 September 2026. 994 queries had an eligible reference; 50.6% of those matched a same-genus reference. **Conclusion: broad availability of detectable sequence matches, with uneven reference proximity.** This does not demonstrate optimal reference selection.
+The archived run covers 1,000 species from 41 phyla, with Mash 2.3 and inputs frozen on 22 September 2026. 994 queries had an eligible reference, and 50.6% of those matched a same-genus reference. Detectable sequence matches are widely available, but how close the reference is varies a lot. The survey does not show that the selected reference is the best one.
 
 ![Nearest eligible reference Mash distances by query phylum, colored by taxonomic relationship and shaped by Mash signal](report/outputs/distance_by_phylum.png)
 
 [PDF version](report/outputs/distance_by_phylum.pdf). One point per query's nearest eligible reference from another species; lower distance = more similar. Color = taxonomic relationship, shape = Mash signal (see [Plot legend](#plot-legend)). Phylum labels show queries with an eligible reference / sampled.
 
-## Key findings
+## Findings
 
-**Sampling.** 9,942 eligible species (chromosome-level or complete assemblies, one assembly per species). All eligible species included in 30 phyla; 61–62 sampled from each of the 11 larger pools. All 1,000 queries completed with no failures.
+### Sampling
 
-**Taxonomic proximity** (994 queries with an eligible reference):
+There are 9,942 eligible species (chromosome-level or complete assemblies, one assembly per species). In 30 phyla every eligible species was included; each of the 11 larger pools contributed 61–62. All 1,000 queries completed with no failures.
+
+### Taxonomic proximity
+
+Over the 994 queries with an eligible reference:
 
 | Relationship to the selected reference | Genomes | Percentage |
 | --- | ---: | ---: |
@@ -26,11 +30,17 @@ Frozen manifest ─── download B → Mash B ─┼─ report
 | Same family, different genus | 212 | 21.3% |
 | More distant than family | 279 | 28.1% |
 
-**Mash signal** (994 pairs): 990 with P ≤ 0.01, 3 with P > 0.01, 1 with no shared hashes. All three sampled Fornicata were weak or absent: *Giardia duodenalis* and *Giardia muris* shared 1 of 10,000 hashes, *Spironucleus salmonicida* shared none. The other weak match was *Phymatolithon calcareum* (Rhodophyta), 2 of 10,000.
+### Mash signal
 
-**Unevaluable queries.** Six phyla (Acanthocephala, Chytridiomycota, Discosea, Endomyxa, Glomeromycota, Phoronida) had a single eligible query species whose reference entries were all excluded by the same-taxid or zero-distance rules. Their `0/1` labels mean no eligible *alternative* under this survey's rules, not a database with only one assembly (Endomyxa had 2 entries, Glomeromycota 6). Hobrac can still use these species when another reference is supplied.
+Of the 994 pairs, 990 have P ≤ 0.01, 3 have P > 0.01, and 1 shares no hashes. All three sampled Fornicata were weak or absent: *Giardia duodenalis* and *Giardia muris* shared 1 of 10,000 hashes, *Spironucleus salmonicida* shared none. The other weak match was *Phymatolithon calcareum* (Rhodophyta), 2 of 10,000.
 
-**Database size vs. same-genus rate.** Reference entries are comparison rows before exclusions; same-genus percentages use queries with an eligible reference as the denominator.
+### Unevaluable queries
+
+Six phyla (Acanthocephala, Chytridiomycota, Discosea, Endomyxa, Glomeromycota, Phoronida) had a single eligible query species whose reference entries were all excluded by the same-taxid or zero-distance rules. Their `0/1` labels mean no eligible *alternative* under this survey's rules, not a database with only one assembly (Endomyxa had 2 entries, Glomeromycota 6). Hobrac can still use these species when another reference is supplied.
+
+### Database size vs. same-genus rate
+
+Reference entries are comparison rows before exclusions; same-genus percentages use queries with an eligible reference as the denominator.
 
 | Phylum | Reference entries | Queries with a reference | Same-genus matches | Median Mash distance |
 | --- | ---: | ---: | ---: | ---: |
@@ -47,7 +57,7 @@ Database size alone does not predict the same-genus rate. Euglenozoa has far few
 
 ## Caveats
 
-- Selection criterion is minimum Mash distance, a sequence-similarity proxy. The most sequence-similar genome is not necessarily the closest in chromosome structure or gene order; this survey does no downstream alignment or synteny validation.
+- The selection criterion is minimum Mash distance, a sequence-similarity proxy. The most sequence-similar genome is not necessarily the closest in chromosome structure or gene order; this survey does no downstream alignment or synteny validation.
 - A small Mash P-value means the sketch overlap is unlikely under Mash's random-sequence model. It does not mean the reference is close enough for reliable whole-genome alignment. P-values are pairwise, not a test between phyla.
 - A no-shared-hash distance of 1 is a placeholder, not a measured distance.
 - Phyla with few sampled species should not be generalized.
@@ -114,7 +124,7 @@ Set in `config.local.sh`:
 | `TIME` | Runtime limit per Mash job |
 | `CLEANUP` | `true` (default): delete FASTA files for successful queries; failed queries keep theirs |
 
-Plus your environment and Slurm settings. **A different count, seed, scope, or reference snapshot requires a new `WORK` directory.** Cleanup never removes final results, mappings, logs, provenance, or shared reference data.
+Set your environment and Slurm settings there too. **A different count, seed, scope, or reference snapshot requires a new `WORK` directory.** Cleanup never removes final results, mappings, logs, provenance, or shared reference data.
 
 ## Outputs
 
@@ -126,8 +136,8 @@ Under `$WORK/report/`:
 
 ### Plot legend
 
-- **Color** = nearest reference's relationship: blue same genus or closer, orange same family/different genus, reddish purple more distant than family.
-- **Shape** = Mash signal: circle P ≤ 0.01, triangle P > 0.01, cross no shared hashes (distance 1 placeholder, keeps its relationship color).
+- Color shows the nearest reference's relationship: blue for same genus or closer, orange for same family but different genus, reddish purple for more distant than family.
+- Shape shows the Mash signal: circle for P ≤ 0.01, triangle for P > 0.01, cross for no shared hashes (plotted at the placeholder distance of 1, still colored by relationship).
 - Legend counts and percentages are over all queries with an eligible reference, including weak and no-hash matches; failed, incomplete, and no-eligible-reference queries are excluded. The legend title states the denominator.
 - Boxplots include only queries with shared hashes.
 - Display choices do not affect reference selection or reported statistics.
@@ -165,4 +175,4 @@ bash workflow.sh config.local.sh --executor local --cores 8   # run without Slur
 python3 -m unittest discover -s tests -t .. -v
 ```
 
-Fully offline (mock Hobrac/Mash, loopback FASTA server; no Slurm, no NCBI). Covers step overlap, temporary-file cleanup, restarts, failure handling, migration, and a 1,000-genome DAG dry run.
+The tests run fully offline (mock Hobrac/Mash, loopback FASTA server; no Slurm, no NCBI) and cover step overlap, temporary-file cleanup, restarts, failure handling, migration, and a 1,000-genome DAG dry run.

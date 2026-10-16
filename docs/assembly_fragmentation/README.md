@@ -1,6 +1,6 @@
 # Assembly-fragmentation experiment
 
-Does Hobrac degrade on fragmented assemblies? For each sampled ATLASea genome, the full pipeline runs on the contigs, scaffolds and chromosomes of the same assembly.
+This experiment tests whether Hobrac degrades on fragmented assemblies. For each sampled ATLASea genome, the full pipeline runs on the contigs, scaffolds and chromosomes of the same assembly.
 
 ```text
                                        ┌─ contigs ───── Hobrac ─┐
@@ -10,13 +10,13 @@ Frozen manifest ── download ── levels ─┼─ scaffolds ─── Hobr
 
 ## Result
 
-Archived run: **17 genomes, 17 phyla, 51 runs**, fixed seed over the 386 ATLASea assemblies listed on 2 October 2026, MASH release 20260629, all runs successful at the first attempt. Sample: 7–3,505 sequences, 17 Mb–5.7 Gb, contig N50 1.2–30 Mb.
+The archived run covers 17 genomes from 17 phyla (51 runs), drawn with a fixed seed from the 386 ATLASea assemblies listed on 2 October 2026, against MASH release 20260629. Every run succeeded on the first attempt. Sample: 7–3,505 sequences, 17 Mb–5.7 Gb, contig N50 1.2–30 Mb.
 
-- **Sequence count has no measurable effect on signal or runtime.** Scaffolds match chromosomes in every genome (max Δ signal 0.06, otherwise ≤ 0.01), including six genomes with 222–1,194 unplaced scaffolds.
-- **Contigs lose signal only when they carry too few anchors.** Four genomes with < 10 BUSCO anchors per contig lost signal; none with > 20 did. Short-range collinearity stays visible in grey; what is lost is the chromosome-scale assignment.
-- **Four genomes have no signal at any level.** Their reference is too distant; this measures the MASH database, not fragmentation (see the [MASH reference survey](../mash_reference_survey/README.md)).
-- **Runtime is BUSCO-bound.** The longest BUSCO run takes 51–95% of wall time; contigs run in 0.81–1.09× the chromosome time.
-- **Limits.** Three points per genome from real assembler output, not a controlled N50 gradient; the exact N50 at which signal disappears is not located; dotplot significance is the only quantified output.
+- Sequence count has no measurable effect on signal or runtime. Scaffolds match chromosomes in every genome (max Δ signal 0.06, otherwise ≤ 0.01), including six genomes with 222–1,194 unplaced scaffolds.
+- Contigs lose signal only when they carry too few anchors. Four genomes with < 10 BUSCO anchors per contig lost signal; none with > 20 did. Short-range collinearity stays visible in grey, but the chromosome-scale assignment is lost.
+- Four genomes have no signal at any level. Their reference is too distant, so this measures the MASH database, not fragmentation (see the [MASH reference survey](../mash_reference_survey/README.md)).
+- Runtime is BUSCO-bound. The longest BUSCO run takes 51–95% of wall time; contigs run in 0.81–1.09× the chromosome time.
+- The design has three limits. Each genome gives three points from real assembler output rather than a controlled N50 gradient. The exact N50 at which signal disappears is not located. Dotplot significance is the only quantified output.
 
 ![Share of BUSCO anchors in significant pairs by assembly level, N50 and anchors per sequence](report/signal_vs_contiguity.png)
 
@@ -80,7 +80,7 @@ bash /path/to/assembly_fragmentation/workflow.sh config.local.sh --executor loca
 
 ## Outputs
 
-Written to `$WORK/report/`. The archived `report/` here is the output of `summarize` for the run above; it is a **report archive**, not a work directory (no manifest, taxdump, genomes, level FASTAs or run directories). Its signal and runtime figures were regenerated from `runs.tsv` with a revised layout; `script_sha256` in `summary.json` identifies the script of the original run.
+Written to `$WORK/report/`. The archived `report/` here is the output of `summarize` for the run above; it is a report archive, not a work directory (no manifest, taxdump, genomes, level FASTAs or run directories). Its signal and runtime figures were regenerated from `runs.tsv` with a revised layout; `script_sha256` in `summary.json` identifies the script of the original run.
 
 | File | Content |
 | --- | --- |
@@ -108,9 +108,13 @@ Dotplot colours: dotplotrs colours an assembly–reference sequence pair only wh
 
 ## Design
 
-**Genome set.** Preparation downloads the NCBI Datasets reports of every assembly in the ATLASea umbrella BioProject `PRJEB64126` into `atlasea_assemblies.tsv` with phylum (from a frozen NCBI taxdump, reused by Hobrac's taxonkit) and eligibility. Excluded: RefSeq copies (`GCF_`), alternate haplotypes, non-current, below chromosome level; taxid missing from the taxdump or lineage without phylum/species rank; phylum without a sketch in the frozen MASH release; duplicate species (representative chosen by assembly level, then reference status, then newest release, then accession). One species per phylum is drawn with a fixed seed from accession-sorted pools.
+### Genome set
 
-**Assembly levels**, built from the NCBI FASTA and its sequence report; `levels.json` records sequences, cumulative length, N50, remaining Ns and NCBI's own contig count:
+Preparation downloads the NCBI Datasets reports of every assembly in the ATLASea umbrella BioProject `PRJEB64126` into `atlasea_assemblies.tsv` with phylum (from a frozen NCBI taxdump, reused by Hobrac's taxonkit) and eligibility. Excluded: RefSeq copies (`GCF_`), alternate haplotypes, non-current, below chromosome level; taxid missing from the taxdump or lineage without phylum/species rank; phylum without a sketch in the frozen MASH release; duplicate species (representative chosen by assembly level, then reference status, then newest release, then accession). One species per phylum is drawn with a fixed seed from accession-sorted pools.
+
+### Assembly levels
+
+Levels are built from the NCBI FASTA and its sequence report. `levels.json` records sequences, cumulative length, N50, remaining Ns and NCBI's own contig count:
 
 | Level | Sequences | Names |
 | --- | --- | --- |
@@ -118,7 +122,9 @@ Dotplot colours: dotplotrs colours an assembly–reference sequence pair only wh
 | `scaffolds` | Chromosomes + unlocalized and unplaced scaffolds | GenBank accessions for non-chromosomes |
 | `contigs` | Every scaffold-level sequence split at runs of ≥ 10 Ns | `<name>_ctg<i>` when split |
 
-**Hobrac runs.** Each genome × level runs the default pipeline inside one shared Slurm allocation, so end-to-end time excludes queueing: MASH reference selection, BUSCO on assembly and reference, minimap2, plots.
+### Hobrac runs
+
+Each genome × level runs the default pipeline (MASH reference selection, BUSCO on assembly and reference, minimap2, plots) inside one shared Slurm allocation, so end-to-end time excludes queueing.
 
 ```text
 hobrac -a <level>.fna.gz -n <name> -t <taxid> -o runs/<accession>/<level>/hobrac \
@@ -142,7 +148,7 @@ Contigs vs chromosomes: 13 genomes change by < 0.10. The four that lose more all
 | *Opheodesoma grisea* (Echinodermata) | 131 | 29.7 Mb | 9.4 | 0.45 → 0.72 → 0.72 |
 | *Glandiceps talaboti* (Hemichordata) | 198 | 6.1 Mb | 5.9 | 0.77 → 0.93 → 0.93 |
 
-This is the expected behaviour of the test: a pair is coloured only if a sequence holds enough anchors from one reference chromosome to survive Bonferroni correction over every assembly × reference pair. The relevant quantity is shared BUSCO genes per sequence — N50 relative to the lineage's marker density — not N50 alone.
+This is the expected behaviour of the test: a pair is coloured only if a sequence holds enough anchors from one reference chromosome to survive Bonferroni correction over every assembly × reference pair. The relevant quantity is shared BUSCO genes per sequence (N50 relative to the lineage's marker density), not N50 alone.
 
 No significant pair at any level, chromosomes included:
 
@@ -165,7 +171,7 @@ Same reference at all three levels in 16 of 17 genomes (`reference_selection.tsv
 
 | Measure | Value |
 | --- | ---: |
-| End-to-end wall time | 3.1 min (*Dudresnaya verticillata*, 76 Mb) – 161 min (*Halophila stipulacea*, 5.7 Gb) |
+| End-to-end wall time | 3.1 min (*Dudresnaya verticillata*, 76 Mb) to 161 min (*Halophila stipulacea*, 5.7 Gb) |
 | Contigs / chromosomes time | 0.81–1.09× |
 | Scaffolds / chromosomes time | 0.83–1.28× (outliers: reference change in *A. lunulatus*, one slow *Striarca lactea* scaffold run) |
 | Longest BUSCO run (assembly or reference, concurrent) | 51–95% of wall time; depends on genome size and lineage |
