@@ -1,0 +1,8 @@
+# Local cluster configuration and generated survey data
+config.local.sh
+data/
+work/
+logs/
+.snakemake/
+__pycache__/
+*.pyc

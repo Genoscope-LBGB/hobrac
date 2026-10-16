@@ -38,6 +38,19 @@ class ChromosomeAssociation:
 
 
 @dataclass
+class AlgDetection:
+    """Observed chain evidence and a separate, layout-aware display assignment."""
+
+    associations: list[PairwiseAssociation]
+    chains: list[list[tuple[str, str]]]
+    chain_support: dict[int, int]
+    gene_to_chains: dict[str, list[int]]
+    gene_to_display_chain: dict[str, int]
+    chain_colors: dict[int, str]
+    chromosome_associations: list[ChromosomeAssociation]
+
+
+@dataclass
 class RearrangementAlgIndex:
     """Rearrangement index components for one ALG in one species."""
 

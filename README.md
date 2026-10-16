@@ -5,7 +5,7 @@
 The purpose of Hobrac is to facilitate structural comparison between two genomes. Direct genome-to-genome alignments are sometimes too noisy to easily analyze so conserved busco genes are used instead. Here are the major steps conducted in Hobrac:
   - the user provides a genome assembly fasta file, a taxid and the organism name
   - the lineage of the organism is retrieved thanks to Taxonkit
-  - Hobrac downloads the MASH database corresponding to the phylum of the assembly (we pre-computed a database per phylum and are making it available [here](https://www.genoscope.cns.fr/lbgb/mash/))
+  - Hobrac downloads the MASH database corresponding to the phylum of the assembly (we pre-computed a database per phylum and are making it available [here](https://www.genoscope.cns.fr/lbgb/mash_versioned/))
   - MASH is ran on all genomes of the selected phylum to determine which one is the closest to the provided assembly
   - Hobrac chooses the closest Busco dataset to use (based on taxonomy) and Busco is ran on the closest reference genome (based on the MASH distance) and on the assembly. A PAF file containing the positions of the Busco genes on the reference and on the assembly is created
   - Minimap2 is launched to align the closest reference (based on the MASH distance) and the assembly
@@ -86,6 +86,25 @@ hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 -o hobrac_lepadogast
 
 
 The list of available plugins is available [here](https://snakemake.github.io/snakemake-plugin-catalog/).
+
+## MASH Database Versions
+
+By default, Hobrac downloads the latest available version of the MASH database. To reproduce the same reference selection in a later run, specify a dated release:
+
+```bash
+hobrac -a scaffolds.fa -n 'Lepadogaster purpurea' -t 164309 \
+    --mash-db-version 20260629
+```
+
+To list the available versions without starting an analysis or providing inputs:
+
+```bash
+hobrac --list-mash-db-versions
+```
+
+This prints the dated releases, newest first.
+
+The MASH database version is recorded in `mash/mash_db.msh.version` when a sketch is downloaded. Each new invocation using `latest` checks the alias again. If it resolves to a different date, Snakemake downloads that release and reruns MASH. Use an explicit date and preferably a separate output directory per release to preserve reproducible analyses.
 
 ## Manual Reference
 
@@ -188,7 +207,9 @@ Hobrac detects significant chromosome associations using Fisher's exact test wit
 ### Other Synteny Options
 
   - `--min-busco-genes`: minimum number of complete BUSCO genes required per sequence for a chromosome to appear in the plot (default: 30)
-  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references.
+  - `--names`: comma-separated custom names for the tracks in the plot. If one name is provided, it applies to the assembly only. If multiple names are provided, the count must equal 1 (assembly) + number of references. Names apply to the assembly first, then references in `-r` order (or MASH-distance order for automatic selection).
+
+To check that names were assigned to the intended genomes, open `synteny_plots/name_mapping.tsv`. This tab-separated text file lists each track's number, role (assembly/reference), displayed name, internal identifier, and absolute FASTA path in plot order. For user-supplied genomes it records the original input FASTA, before chromosome renaming; for automatic references it records the downloaded FASTA. It records the mapping actually used, without detecting or correcting swapped names.
 
 ## Output
 
@@ -218,6 +239,7 @@ hobrac_analysis/
 │   └── rank1_<Species_name>_geno  -> vs_<accession>/
 ├── synteny_plots/
 │   ├── karyotype.png                # JCVI karyotype plot
+│   ├── name_mapping.tsv             # Track names and their input FASTA paths
 │   ├── dotplots/                    # Per-reference ALG dotplots
 │   ├── dotplots_grid.png            # All per-reference dotplots tiled
 │   └── dotplots_grid_dark.png

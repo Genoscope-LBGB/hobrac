@@ -45,26 +45,24 @@ def apply_custom_colors_with_algs(
     sp2_name: str,
 ) -> Dict[str, str]:
     """
-    Determine link colors for a species pair, gated by chain significance.
+    Determine link colors using the gene's selected display chain.
 
-    A gene is only colored for this pair if its chain actually covers the
-    edge between *sp1_name* and *sp2_name*. If the chain exists but doesn't
-    span this pair (e.g. the gene's chain starts at a later species), the
-    gene is lightgrey for this pair.
+    Only the selected chain is considered, not the union of all compatible
+    chains. A link is colored only when that chain contains both species;
+    direct pairwise significance is not re-tested here. Otherwise the link
+    is lightgrey, even when the gene has a custom color.
 
-    Non-significant genes (not on any chain) are always lightgrey, regardless
-    of whether they appear in custom_colors. Significant genes (on a chain
-    that covers this pair) get their custom color when listed in
-    custom_colors, the chain palette color when no custom file is provided,
-    or lightgrey when a custom file is provided but the gene is not listed.
+    Genes covered by their display chain get their custom color when listed,
+    the chain palette color when no custom mapping is provided, or lightgrey
+    when a custom mapping is provided but does not list the gene.
 
     Args:
         species1_busco: BUSCO data for species 1
         species2_busco: BUSCO data for species 2
-        gene_to_chain: Dict mapping BUSCO gene ID to chain ID (-1 = no chain)
+        gene_to_chain: BUSCO gene ID to selected display chain ID (-1 = none)
         chain_colors: Dict mapping chain ID to hex color
         custom_colors: Dictionary mapping BUSCO ID to hex color
-        chains: List of chains from enumerate_chains
+        chains: Retained chains from ALG detection
         sp1_name: Name of species 1 in the current pair
         sp2_name: Name of species 2 in the current pair
 

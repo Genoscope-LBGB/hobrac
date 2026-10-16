@@ -1,3 +1,15 @@
+from functools import lru_cache
+
+from hobrac.mash_database import mash_db_url, resolve_mash_db_version
+
+
+@lru_cache(maxsize=1)
+def get_mash_db_version():
+    # The CLI passes a resolved date. Also support direct Snakemake invocation,
+    # resolving lazily so manual-reference workflows do not need the server.
+    return resolve_mash_db_version(str(config.get("mash_db_version", "latest")))
+
+
 rule download_db:
     output:
         "mash/mash_db.msh",
@@ -10,11 +22,14 @@ rule download_db:
         runtime=30,
     params:
         taxid=config["taxid"],
+        db_version=lambda wildcards: get_mash_db_version(),
+        db_url=lambda wildcards: mash_db_url(get_mash_db_version()),
     shell:
         """
         phylum=$(echo "{params.taxid}" | taxonkit reformat -I 1 --format '{{p}}' -r 'no_returned_phylum' | cut -f 2)
-        wget https://www.genoscope.cns.fr/lbgb/mash/${{phylum}}.msh -O {output}
-        echo ${{phylum}} > {output}.phylum
+        wget "{params.db_url}${{phylum}}.msh" -O {output:q}
+        echo "${{phylum}}" > {output:q}.phylum
+        printf '%s\\n' {params.db_version:q} > {output:q}.version
     """
 
 

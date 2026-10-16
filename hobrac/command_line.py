@@ -2,6 +2,8 @@ import argparse
 import os
 import re
 
+from hobrac.mash_database import validate_mash_db_version
+
 
 def scientific_name(value: str) -> str:
     """Reject names with shell metacharacters (interpolated unquoted in rules)."""
@@ -26,7 +28,6 @@ def get_args():
         action="store",
         dest="assembly",
         help="Path to a genome assembly fasta file",
-        required=True,
         default=None,
         type=os.path.abspath,
     )
@@ -36,7 +37,6 @@ def get_args():
         action="store",
         dest="scientific_name",
         help="Scientific name of the organism given in --assembly",
-        required=True,
         default=None,
         type=scientific_name,
     )
@@ -46,7 +46,6 @@ def get_args():
         action="store",
         dest="taxid",
         help="Taxid of the organism given in --assembly",
-        required=True,
         default=None,
         type=int,
     )
@@ -60,6 +59,18 @@ def get_args():
     )
 
     optional_args = parser.add_argument_group("Optional arguments")
+    optional_args.add_argument(
+        "--mash-db-version",
+        type=validate_mash_db_version,
+        default="latest",
+        metavar="VERSION",
+        help="MASH database release (YYYYMMDD)",
+    )
+    optional_args.add_argument(
+        "--list-mash-db-versions",
+        action="store_true",
+        help="List available MASH database versions and exit",
+    )
     optional_args.add_argument(
         "-r",
         "--reference",
@@ -247,6 +258,13 @@ def get_args():
         default=30,
         type=int,
     )
+    synteny_args.add_argument(
+        "--min-ri-alg-genes",
+        type=int,
+        default=5,
+        help="Minimum retained ALG-annotated BUSCO genes per ALG and species "
+        "for inclusion in the rearrangement index (at least 1)",
+    )
     color_group = synteny_args.add_mutually_exclusive_group()
     color_group.add_argument(
         "--custom-colors",
@@ -347,10 +365,10 @@ def get_args():
         action="store",
         dest="min_chain_genes",
         help=(
-            "Minimum BUSCO genes a chromosome chain must be supported by to"
-            " appear in the final output. Chains with fewer genes are dropped"
-            " before sub-chain pruning, so sub-chains hidden inside a dropped"
-            " long chain can re-emerge."
+            "Minimum distinct BUSCO genes supporting an observed chromosome"
+            " path. Shared genes count once toward every supported alternative;"
+            " missing assemblies do not add support. Applied before sub-chain"
+            " pruning, so shorter chains can re-emerge when longer ones fail."
         ),
         default=5,
         type=int,
@@ -362,13 +380,31 @@ def get_args():
         help=(
             "Use a permissive threshold for chain validation. By default each"
             " node in a chain of length n must have significant associations"
-            " with at least n/2 other nodes; this flag relaxes the requirement"
+            " with at least floor(n/2) other nodes; this flag relaxes the requirement"
             " to just 1 significant link per node."
         ),
         default=False,
     )
 
     args = parser.parse_args()
+
+    if args.list_mash_db_versions:
+        return args
+
+    missing = [
+        flag
+        for flag, value in (
+            ("-a/--assembly", args.assembly),
+            ("-n/--name", args.scientific_name),
+            ("-t/--taxid", args.taxid),
+        )
+        if value is None
+    ]
+    if missing:
+        parser.error("the following arguments are required: " + ", ".join(missing))
+
+    if args.min_ri_alg_genes < 1:
+        parser.error("--min-ri-alg-genes must be at least 1")
 
     if args.busco_reference:
         if not args.reference:

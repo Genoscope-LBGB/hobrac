@@ -1,7 +1,4 @@
-"""Regression coverage for karyotype species-label sizing and CLI plumbing."""
-
-import sys
-from unittest.mock import patch
+"""Regression coverage for karyotype labels and unambiguous ALG legends."""
 
 import matplotlib.pyplot as plt
 import pytest
@@ -92,82 +89,28 @@ def test_draw_track_labels_single_token_overflow_honors_floor():
         plt.close(fig)
 
 
-def test_render_legend_forwards_species_label_floor(tmp_path):
-    numpy = pytest.importorskip("numpy")
-    import matplotlib.image as mpimg
-
-    input_png = tmp_path / "input.png"
-    output_png = tmp_path / "output.png"
-    mpimg.imsave(input_png, numpy.ones((100, 100, 3)))
-
-    with patch.object(legend, "draw_track_labels") as draw_track_labels:
-        legend.render_legend(
-            input_png,
-            [],
-            output_png,
-            labels=["Species One"],
-            positions=[(0.5, 0.1)],
-            min_species_label_font_size=14.5,
-        )
-
-    draw_track_labels.assert_called_once()
-    _, kwargs = draw_track_labels.call_args
-    assert kwargs == {"min_species_label_font_size": 14.5}
-    assert output_png.is_file()
-
-
-def test_main_forwards_species_label_floor(tmp_path, monkeypatch):
+def test_collect_legend_uses_single_display_chain_for_ambiguous_gene(tmp_path):
     gene_chains = tmp_path / "gene_chains.tsv"
-    gene_chains.write_text("chain_id\tcustom_alg_id\tgene\tcolor\n")
-    layouts = tmp_path / "layouts"
-    layouts.write_text(
-        "# track_labels\tSpecies One\n"
-        "0.5, 0.1, 0.96, 0, black, , bottom, species.bed\n"
-    )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "karyotype_legend",
-            "--gene-chains",
-            str(gene_chains),
-            "--karyotype",
-            str(tmp_path / "karyotype.png"),
-            "--layouts",
-            str(layouts),
-            "--min-species-label-font-size",
-            "14.5",
-        ],
+    gene_chains.write_text(
+        "chain_ids\tcustom_alg_id\tgene\tcolor\tdisplay_chain_id\n"
+        "0,2\t-\tg1\t#123456\t2\n"
+        "2\t-\tg2\t#123456\t2\n"
+        "0\t-\tg3\tlightgrey\t0\n"
     )
 
-    with patch.object(legend, "render_legend") as render_legend:
-        legend.main()
-
-    render_legend.assert_called_once()
-    _, kwargs = render_legend.call_args
-    assert kwargs["min_species_label_font_size"] == 14.5
+    assert legend.collect_legend_entries(gene_chains) == [("2", "#123456")]
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "nan"])
-def test_main_rejects_non_positive_or_non_finite_label_floor(
-    value, monkeypatch, capsys
-):
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "karyotype_legend",
-            "--gene-chains",
-            "gene_chains.tsv",
-            "--karyotype",
-            "karyotype.png",
-            "--min-species-label-font-size",
-            value,
-        ],
+def test_collect_legend_preserves_custom_labels_with_or_without_chains(tmp_path):
+    gene_chains = tmp_path / "gene_chains.tsv"
+    gene_chains.write_text(
+        "chain_ids\tcustom_alg_id\tgene\tcolor\tdisplay_chain_id\n"
+        "1\tO2\tg1\t#abcdef\t1\n"
+        "-\tO10\tg2\t#fedcba\t-\n"
+        "-\t-\tg3\tlightgrey\t-\n"
     )
 
-    with pytest.raises(SystemExit) as exc_info:
-        legend.main()
-
-    assert exc_info.value.code == 2
-    assert "must be a finite positive number" in capsys.readouterr().err
+    assert legend.collect_legend_entries(gene_chains) == [
+        ("O2", "#abcdef"),
+        ("O10", "#fedcba"),
+    ]

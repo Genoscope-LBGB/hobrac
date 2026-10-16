@@ -1,4 +1,5 @@
 import argparse
+import csv
 import glob
 import os
 import sys
@@ -71,11 +72,9 @@ def generate_links_file(
     """
     Generate a JCVI .simple file with one line per BUSCO gene pair.
 
-    Each line represents a single ortholog and uses its ``gene_colors`` entry
-    as the link color. Because ``gene_colors`` is derived from the single,
-    run-wide ``gene_to_chain`` mapping, this guarantees that a gene keeps the
-    same color across every .simple file of a single run — no block-level
-    majority vote can override its assignment.
+    Each line represents a single ortholog and uses its pair-specific
+    ``gene_colors`` entry. Colored links retain the gene's global identity
+    color; links outside its selected display chain are lightgrey.
 
     JCVI karyotype expects the 6-column format:
     ``startGene1 endGene1 startGene2 endGene2 score orientation``
@@ -278,7 +277,7 @@ def save_chromosome_associations(
 def save_chains(
     chains: List[List[Tuple[str, str]]],
     chain_colors: Dict[int, str] | None,
-    gene_to_chain: Dict[str, int],
+    chain_support: Dict[int, int],
     species_names: List[str],
     output_path: str,
 ) -> None:
@@ -289,17 +288,15 @@ def save_chains(
     then one column per species containing the chromosome covered by that
     chain, or '-' when the chain does not cover that species. Species
     columns appear in *species_names* order.
-    When *chain_colors* is None, color is '-' because gene-level custom
-    colors do not define a single color for an inferred chain.
+
+    ``n_genes`` is the number of distinct observed genes supporting the chain,
+    not the number of genes for which it was selected as the display chain.
+    When *chain_colors* is None, color is '-' because gene-level custom colors
+    do not define a single color for an inferred chain.
 
     The file is always written, even when *chains* is empty — in that case
     only the header row is emitted.
     """
-    gene_counts: Dict[int, int] = defaultdict(int)
-    for chain_id in gene_to_chain.values():
-        if chain_id >= 0:
-            gene_counts[chain_id] += 1
-
     header = ["chain_id", "color", "n_genes", *species_names]
     with open(output_path, "w") as f:
         f.write("\t".join(header) + "\n")
@@ -308,7 +305,7 @@ def save_chains(
             row = [
                 str(chain_id),
                 chain_colors[chain_id] if chain_colors is not None else "-",
-                str(gene_counts[chain_id]),
+                str(chain_support[chain_id]),
                 *(chrom_by_species.get(sp, "-") for sp in species_names),
             ]
             f.write("\t".join(row) + "\n")
@@ -316,7 +313,8 @@ def save_chains(
 
 def save_gene_chains(
     species_busco: List[Tuple[str, Dict[str, BuscoGene]]],
-    gene_to_chain: Dict[str, int],
+    gene_to_chains: Dict[str, List[int]],
+    gene_to_display_chain: Dict[str, int],
     gene_colors: Dict[str, str],
     custom_algs: Dict[str, str],
     output_path: str,
@@ -325,32 +323,31 @@ def save_gene_chains(
     Save a per-gene chain table to a TSV file in wide format.
 
     One row per BUSCO gene present in at least one species. Columns:
-    ``chain_id``, ``custom_alg_id``, ``gene``, ``color`` (the gene's run-wide
-    identity color), one column per species (in *species_busco* order) holding
-    the gene's own chromosome in that species or ``ABSENT`` when the gene is
-    missing there, then one ``<species>_pos`` column per species holding the
-    gene's coordinates as ``start:end`` (raw BUSCO ints), or ``ABSENT`` when
-    missing.
+    ``chain_ids``, ``custom_alg_id``, ``gene``, ``color`` (the gene's run-wide
+    identity color), ``display_chain_id``, one column per species (in
+    *species_busco* order) holding the gene's own chromosome in that species or
+    ``ABSENT`` when the gene is missing there, then one ``<species>_pos`` column
+    per species holding the gene's coordinates as ``start:end`` (raw BUSCO
+    ints), or ``ABSENT`` when missing.
 
-    ``chain_id`` is hobrac's own chain index, or ``-`` when the gene is on no
-    chain. ``custom_alg_id`` is the reference ALG label supplied by the user in
-    the custom color file (its third column), or ``-`` when there is no color
-    file or the gene is not listed with an ALG. The two sit side by side so the
-    hobrac-detected chain can be compared against the reference ALG.
+    ``chain_ids`` lists every compatible inferred chain in ascending order,
+    separated by commas, or ``-`` when there are none. ``display_chain_id`` is
+    the single chain selected for coloring and display, or ``-``. The separate
+    ``custom_alg_id`` is the reference ALG label supplied by the user in the
+    custom color file (its third column), or ``-`` when no label was supplied.
 
     ``gene_colors`` is the run-wide identity color resolved the same way the
-    karyotype renders it (custom override, else chain palette hex, else
+    karyotype renders it (custom override, else display-chain palette hex, else
     ``lightgrey``); genes missing from it fall back to ``lightgrey``. Because it
     is run-wide it cannot encode the plot's per-pair ``chains_covering_pair``
-    gating: a gene whose chain spans only some species pairs keeps its color
-    here but is drawn grey on the pairs its chain does not cover. See
+    gating: a gene whose selected chain spans only some species pairs keeps its
+    color here but is drawn grey on the pairs its chain does not cover. See
     ``resolve_gene_identity_colors``.
 
-    Rows are ordered with chain genes first, grouped by ``chain_id`` then gene
-    id, and no-chain (grey) genes last by gene id. The file is always written,
-    even when no genes are present — in that case only the header is emitted.
+    Rows are ordered by selected display chain then gene id, with genes lacking
+    a display chain last by gene id. The file is always written, even when no
+    genes are present — in that case only the header is emitted.
     """
-    custom_algs = custom_algs or {}
     species_names = [name for name, _ in species_busco]
 
     all_ids = set()
@@ -358,22 +355,24 @@ def save_gene_chains(
         all_ids.update(busco_data.keys())
 
     def sort_key(gid: str) -> Tuple[bool, int, str]:
-        chain_id = gene_to_chain.get(gid, -1)
+        chain_id = gene_to_display_chain.get(gid, -1)
         return (chain_id < 0, chain_id if chain_id >= 0 else 0, gid)
 
     pos_names = [f"{name}_pos" for name in species_names]
     header = [
-        "chain_id",
+        "chain_ids",
         "custom_alg_id",
         "gene",
         "color",
+        "display_chain_id",
         *species_names,
         *pos_names,
     ]
     with open(output_path, "w") as f:
         f.write("\t".join(header) + "\n")
         for gid in sorted(all_ids, key=sort_key):
-            chain_id = gene_to_chain.get(gid, -1)
+            chain_ids = sorted(gene_to_chains.get(gid, []))
+            display_chain_id = gene_to_display_chain.get(gid, -1)
             chroms = [
                 busco_data[gid].chromosome if gid in busco_data else "ABSENT"
                 for _, busco_data in species_busco
@@ -386,10 +385,19 @@ def save_gene_chains(
                 )
                 for _, busco_data in species_busco
             ]
+            chain_labels = ",".join(str(chain_id) for chain_id in chain_ids) or "-"
             custom_alg = custom_algs.get(gid, "-")
             color = gene_colors.get(gid, DEFAULT_COLOR)
-            chain_label = str(chain_id) if chain_id >= 0 else "-"
-            row = [chain_label, custom_alg, gid, color, *chroms, *positions]
+            display_label = str(display_chain_id) if display_chain_id >= 0 else "-"
+            row = [
+                chain_labels,
+                custom_alg,
+                gid,
+                color,
+                display_label,
+                *chroms,
+                *positions,
+            ]
             f.write("\t".join(row) + "\n")
 
 
@@ -465,6 +473,8 @@ def run(
     alpha: float = 0.01,
     min_chain_genes: int = 5,
     permissive_alg: bool = False,
+    assembly_input_fasta: str = "",
+    min_ri_alg_genes: int = 5,
 ) -> Dict[str, str]:
     """
     Main entry point for JCVI synteny analysis.
@@ -472,6 +482,8 @@ def run(
     Args:
         assembly_busco: Path to assembly BUSCO full_table.tsv
         assembly_fasta: Path to the assembly fasta file
+        assembly_input_fasta: Original assembly FASTA before preparation, for
+                              provenance only. Defaults to assembly_fasta.
         busco_refs: List of reference BUSCO directory paths
         accession_order: Path to MASH-ordered accessions file
         manual_refs: Semicolon-separated manual reference paths
@@ -487,6 +499,8 @@ def run(
         use_gravity_ordering: If True, order chromosomes by gravity for
                               diagonal alignment patterns
         min_busco_genes: Minimum complete BUSCO genes required per sequence
+        min_ri_alg_genes: Minimum retained annotated BUSCO genes per ALG and
+                          species for inclusion in the RI averages (at least 1).
         custom_color_file: Path to custom color file for gene coloring.
         custom_names: Comma-separated custom names for JCVI tracks. If one name
                       is provided, it applies only to the assembly. If multiple
@@ -502,6 +516,8 @@ def run(
     Returns:
         Dictionary with paths to generated files
     """
+    if min_ri_alg_genes < 1:
+        raise ValueError("min_ri_alg_genes must be at least 1")
     os.makedirs(output_dir, exist_ok=True)
 
     assembly_fasta_sizes = read_fasta_sizes(assembly_fasta)
@@ -531,6 +547,7 @@ def run(
     # Determine species order
     species_order = []
     species_order.append((assembly_name, assembly_busco))
+    species_fastas = [assembly_input_fasta or assembly_fasta]
 
     if manual_refs:
         for ref_path in manual_refs.split(";"):
@@ -538,12 +555,16 @@ def run(
                 name = fasta_basename(ref_path)
                 if name in ref_busco_paths:
                     species_order.append((name, ref_busco_paths[name]))
+                    species_fastas.append(ref_path)
     else:
         with open(accession_order) as f:
             for line in f:
                 accession = line.strip()
                 if accession and accession in ref_busco_paths:
                     species_order.append((accession, ref_busco_paths[accession]))
+                    species_fastas.append(
+                        os.path.join(reference_dir, f"{accession}.fna")
+                    )
 
     # Stable, underscore-free per-species keys (assembly name / reference
     # accession). These key every generated file and gene-id prefix; custom
@@ -592,10 +613,14 @@ def run(
 
     rearrangement_summary = ""
     rearrangement_by_alg = ""
+    rearrangement_warnings = ""
     if custom_algs:
         rearrangement_summary = os.path.join(output_dir, "rearrangement_index.tsv")
         rearrangement_by_alg = os.path.join(
             output_dir, "rearrangement_index_by_alg.tsv"
+        )
+        rearrangement_warnings = os.path.join(
+            output_dir, "rearrangement_index_warnings.tsv"
         )
         rearrangement_rows = {
             name: calculate_rearrangement_indices(name, busco_data, custom_algs)
@@ -605,6 +630,9 @@ def run(
             rearrangement_rows,
             rearrangement_summary,
             rearrangement_by_alg,
+            rearrangement_warnings,
+            min_ri_alg_genes=min_ri_alg_genes,
+            expected_algs=custom_algs.values(),
         )
 
     bed_files = []
@@ -619,25 +647,31 @@ def run(
     # Phase 1: Transitive ALG detection across all species
     # Skip only when custom colors are provided AND skip_alg is True
     all_chromosome_associations: List[ChromosomeAssociation] = []
-    gene_to_chain: Dict[str, int] = {}
+    gene_to_chains: Dict[str, List[int]] = {}
+    gene_to_display_chain: Dict[str, int] = {}
+    chain_support: Dict[int, int] = {}
     chain_colors: Dict[int, str] = {}
     chains: List[List[Tuple[str, str]]] = []
     if not (custom_colors and skip_alg):
-        _, chains, gene_to_chain, chain_colors, all_chromosome_associations = (
-            detect_algs_transitive(
-                species_busco,
-                alpha=alpha,
-                min_chain_genes=min_chain_genes,
-                permissive_alg=permissive_alg,
-            )
+        detection = detect_algs_transitive(
+            species_busco,
+            alpha=alpha,
+            min_chain_genes=min_chain_genes,
+            permissive_alg=permissive_alg,
         )
+        all_chromosome_associations = detection.chromosome_associations
+        gene_to_chains = detection.gene_to_chains
+        gene_to_display_chain = detection.gene_to_display_chain
+        chain_support = detection.chain_support
+        chain_colors = detection.chain_colors
+        chains = detection.chains
     save_chromosome_associations(all_chromosome_associations, associations_output)
 
     algs_output = os.path.join(output_dir, "algs.tsv")
     save_chains(
         chains,
         None if custom_colors else chain_colors,
-        gene_to_chain,
+        chain_support,
         [name for name, _ in species_busco],
         algs_output,
     )
@@ -648,13 +682,18 @@ def run(
     for _, busco_data in species_busco:
         all_gene_ids.update(busco_data.keys())
     gene_identity_colors = resolve_gene_identity_colors(
-        all_gene_ids, gene_to_chain, chain_colors, custom_colors, skip_alg
+        all_gene_ids,
+        gene_to_display_chain,
+        chain_colors,
+        custom_colors,
+        skip_alg,
     )
 
     gene_chains_output = os.path.join(output_dir, "gene_chains.tsv")
     save_gene_chains(
         species_busco,
-        gene_to_chain,
+        gene_to_chains,
+        gene_to_display_chain,
         gene_identity_colors,
         custom_algs,
         gene_chains_output,
@@ -672,7 +711,7 @@ def run(
             gene_colors = apply_custom_colors_with_algs(
                 sp1_busco,
                 sp2_busco,
-                gene_to_chain,
+                gene_to_display_chain,
                 chain_colors,
                 custom_colors,
                 chains=chains,
@@ -713,17 +752,31 @@ def run(
         reference_dir,
     )
 
+    # Record the exact track labels and input FASTAs, not the prepared copies
+    # whose filenames may hide an ordering mistake in --names / -r.
+    name_mapping_path = os.path.join(output_dir, "name_mapping.tsv")
+    with open(name_mapping_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="\t", lineterminator="\n")
+        writer.writerow(["track", "role", "name", "identifier", "fasta"])
+        for i, (key, label, fasta) in enumerate(
+            zip(species_keys, layout_labels, species_fastas, strict=True), start=1
+        ):
+            role = "assembly" if i == 1 else "reference"
+            writer.writerow([i, role, label, key, os.path.abspath(fasta)])
+
     layouts_path = os.path.join(output_dir, "layouts")
     generate_layouts_file(bed_files, links_files, layouts_path, labels=layout_labels)
 
     return {
         "seqids": seqids_path,
         "layouts": layouts_path,
+        "name_mapping": name_mapping_path,
         "chromosome_associations": associations_output,
         "algs": algs_output,
         "gene_chains": gene_chains_output,
         "rearrangement_index": rearrangement_summary,
         "rearrangement_index_by_alg": rearrangement_by_alg,
+        "rearrangement_index_warnings": rearrangement_warnings,
         "bed_files": [p for _, p in bed_files],
         "links_files": links_files,
     }
@@ -739,6 +792,12 @@ def main():
     )
     parser.add_argument(
         "--assembly-fasta", required=True, help="Path to the assembly fasta file"
+    )
+    parser.add_argument(
+        "--assembly-input-fasta",
+        default="",
+        help="Original assembly FASTA path for the name mapping (before preparation). "
+        "Defaults to --assembly-fasta. Used for provenance only.",
     )
     parser.add_argument(
         "--busco_references",
@@ -778,6 +837,13 @@ def main():
         type=int,
         default=0,
         help="Minimum complete BUSCO genes required per sequence (default: 0)",
+    )
+    parser.add_argument(
+        "--min-ri-alg-genes",
+        type=int,
+        default=5,
+        help="Minimum retained ALG-annotated BUSCO genes per ALG and species "
+        "for inclusion in the rearrangement index (at least 1; default: 5)",
     )
     parser.add_argument(
         "--jcvi-custom-colors",
@@ -820,9 +886,9 @@ def main():
         "--jcvi-min-chain-genes",
         type=int,
         default=5,
-        help="Minimum BUSCO genes a chromosome chain must be supported by. "
-        "Chains with fewer genes are dropped before sub-chain pruning, so "
-        "sub-chains hidden inside a dropped long chain can re-emerge "
+        help="Minimum distinct genes supporting an observed chromosome path. "
+        "Shared genes count once toward every supported alternative; missing "
+        "assemblies do not add support. Applied before sub-chain pruning "
         "(default: 5).",
     )
     parser.add_argument(
@@ -831,15 +897,18 @@ def main():
         default=False,
         help="Use a permissive threshold for chain validation. By default each "
         "node in a chain of length n must have significant associations "
-        "with at least n/2 other nodes; this flag relaxes the requirement "
+        "with at least floor(n/2) other nodes; this flag relaxes the requirement "
         "to just 1 significant link per node.",
     )
 
     args = parser.parse_args()
+    if args.min_ri_alg_genes < 1:
+        parser.error("--min-ri-alg-genes must be at least 1")
 
     run(
         assembly_busco=args.busco_assembly,
         assembly_fasta=args.assembly_fasta,
+        assembly_input_fasta=args.assembly_input_fasta,
         busco_refs=args.busco_references,
         accession_order=args.accession_order,
         manual_refs=args.manual_refs,
@@ -848,6 +917,7 @@ def main():
         assembly_display_name=args.assembly_display_name,
         reference_dir=args.reference_dir,
         min_busco_genes=args.min_busco_genes,
+        min_ri_alg_genes=args.min_ri_alg_genes,
         custom_color_file=args.jcvi_custom_colors,
         custom_names=args.jcvi_names,
         hide_non_significant=args.hide_non_significant,

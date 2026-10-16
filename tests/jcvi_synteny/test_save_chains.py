@@ -15,22 +15,23 @@ class TestSaveChains:
             [("ref_A", "chr3"), ("ref_B", "chr2")],
         ]
         chain_colors = {0: "#e6194b", 1: "#3cb44b"}
-        gene_to_chain = {
-            "g1": 0, "g2": 0, "g3": 0,
-            "g4": 1, "g5": 1,
-            "g6": -1,
-        }
+        chain_support = {0: 7, 1: 3}
         species_names = ["assembly", "ref_A", "ref_B"]
         out = tmp_path / "algs.tsv"
 
-        save_chains(chains, chain_colors, gene_to_chain, species_names, str(out))
+        save_chains(chains, chain_colors, chain_support, species_names, str(out))
 
         rows = _read(out)
         assert rows[0] == [
-            "chain_id", "color", "n_genes", "assembly", "ref_A", "ref_B",
+            "chain_id",
+            "color",
+            "n_genes",
+            "assembly",
+            "ref_A",
+            "ref_B",
         ]
-        assert rows[1] == ["0", "#e6194b", "3", "chr1", "chrX", "chr4"]
-        assert rows[2] == ["1", "#3cb44b", "2", "-", "chr3", "chr2"]
+        assert rows[1] == ["0", "#e6194b", "7", "chr1", "chrX", "chr4"]
+        assert rows[2] == ["1", "#3cb44b", "3", "-", "chr3", "chr2"]
 
     def test_header_only_when_no_chains(self, tmp_path):
         out = tmp_path / "algs.tsv"
@@ -40,18 +41,20 @@ class TestSaveChains:
         assert len(rows) == 1
         assert rows[0] == ["chain_id", "color", "n_genes", "assembly", "ref_A"]
 
-    def test_unassigned_genes_do_not_inflate_counts(self, tmp_path):
+    def test_n_genes_is_observed_support_not_display_assignment_count(self, tmp_path):
         chains = [[("assembly", "chr1"), ("ref_A", "chrX")]]
         chain_colors = {0: "#e6194b"}
-        gene_to_chain = {"g1": 0, "g2": -1, "g3": -1}
+        # The output receives observed support directly. A display assignment
+        # count is intentionally neither accepted nor derived by this writer.
+        chain_support = {0: 9}
         out = tmp_path / "algs.tsv"
 
         save_chains(
-            chains, chain_colors, gene_to_chain, ["assembly", "ref_A"], str(out),
+            chains, chain_colors, chain_support, ["assembly", "ref_A"], str(out)
         )
 
         rows = _read(out)
-        assert rows[1][2] == "1"
+        assert rows[1][2] == "9"
 
     def test_row_order_matches_chain_id(self, tmp_path):
         chains = [
@@ -62,7 +65,13 @@ class TestSaveChains:
         chain_colors = {0: "#111111", 1: "#222222", 2: "#333333"}
         out = tmp_path / "algs.tsv"
 
-        save_chains(chains, chain_colors, {}, ["a", "b"], str(out))
+        save_chains(
+            chains,
+            chain_colors,
+            {0: 2, 1: 4, 2: 3},
+            ["a", "b"],
+            str(out),
+        )
 
         rows = _read(out)
         assert [r[0] for r in rows[1:]] == ["0", "1", "2"]

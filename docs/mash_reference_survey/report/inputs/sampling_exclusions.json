@@ -1,0 +1,7 @@
+{
+  "missing_species_or_phylum": 29,
+  "non_full_or_excluded_from_refseq": 653,
+  "not_chromosome_or_complete": 51044,
+  "outside_scope_or_unknown_taxid": 9,
+  "unsupported_phylum": 1
+}

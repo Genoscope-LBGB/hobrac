@@ -1,0 +1,186 @@
+"""Per genome: download -> contig/scaffold/chromosome FASTAs -> one full hobrac
+run per level -> report, over an immutable sampling snapshot."""
+
+import json
+import math
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+# Resolve helpers independently of --directory (which is the experiment WORK).
+SCRIPTS = Path(workflow.basedir).resolve() / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+import fragmentation
+
+WORK = Path(config["work"]).expanduser().resolve()
+if Path.cwd().resolve() != WORK:
+    raise ValueError("Run with --directory set to the experiment work directory")
+fragmentation.load_snapshot(WORK)
+ROWS = {row["accession"]: row for row in fragmentation.read_tsv(WORK / "manifest.tsv")}
+if not ROWS:
+    raise ValueError("Empty manifest")
+LEVELS = fragmentation.LEVELS
+PYTHON = sys.executable
+SCRIPT = str(SCRIPTS / "fragmentation.py")
+CONTAINER = config.get("container", "none")
+CLEANUP = str(config.get("cleanup", True)).lower() == "true"
+CPUS = int(config.get("cpus", 24))
+HOBRAC_ARGS = " ".join(
+    shlex.quote("--hobrac-arg=" + arg) for arg in json.loads(config.get("hobrac_args", "[]"))
+)
+GRID_ROWS = int(config.get("grid_rows", 6))
+REPORTS = [
+    "report/summary.json",
+    "report/runs.tsv",
+    "report/benchmarks.tsv",
+    "report/reference_selection.tsv",
+    *(
+        f"report/{stem}.{suffix}"
+        for stem in ("runtime_vs_n50", "runtime_vs_total_length", "runtime_vs_sequences")
+        for suffix in ("png", "pdf")
+    ),
+    "report/dotplot_grid_busco.pdf",
+    "report/dotplot_grid_busco_bw.pdf",
+]
+
+
+def memory_mb(value):
+    match = re.fullmatch(r"(\d+)([KMGT]?)", str(value).upper())
+    if not match:
+        raise ValueError(f"Invalid memory {value!r}; use Slurm units, e.g. 24G")
+    units = {"": 1, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1024**2}
+    return max(1, math.ceil(int(match[1]) * units[match[2]]))
+
+
+def runtime_minutes(value):
+    # Config uses HH:MM:SS or D-HH:MM:SS; bare integers are minutes.
+    value = str(value)
+    if value.isdigit():
+        return max(1, int(value))
+    match = re.fullmatch(r"(?:(\d+)-)?(\d+):(\d{2}):(\d{2})", value)
+    if not match or int(match[3]) >= 60 or int(match[4]) >= 60:
+        raise ValueError(f"Invalid runtime {value!r}; use HH:MM:SS or D-HH:MM:SS")
+    minutes = (
+        int(match[1] or 0) * 1440 + int(match[2]) * 60
+        + int(match[3]) + int(match[4]) / 60
+    )
+    return max(1, math.ceil(minutes))
+
+
+def maybe_temp(path):
+    return temp(path) if CLEANUP else path
+
+
+ACCOUNT = config.get("account", "")
+PARTITION = config.get("partition", "")
+EXTRA = str(config.get("slurm_extra", ""))
+if config.get("qos"):
+    EXTRA += " " + shlex.quote("--qos=" + str(config["qos"]))
+
+wildcard_constraints:
+    accession="GCA_[0-9]+\\.[0-9]+",
+    level="|".join(LEVELS),
+
+localrules: all, report
+
+rule all:
+    input:
+        # Request each run explicitly: an onerror partial report must never
+        # hide missing upstream results on the next invocation.
+        expand("runs/{accession}/{level}/completed.json", accession=ROWS, level=LEVELS),
+        REPORTS,
+
+
+rule download_genome:
+    input:
+        snapshot=ancient("snapshot.json"),
+        manifest=ancient("manifest.tsv"),
+    output:
+        genome=maybe_temp("runs/{accession}/{accession}.fna.gz"),
+        receipt="runs/{accession}/{accession}.fna.gz.download.json",
+        report="runs/{accession}/sequence_report.jsonl",
+    params:
+        task_id=lambda wc: ROWS[wc.accession]["task_id"],
+    threads: 1
+    resources:
+        mem_mb=memory_mb(config.get("download_memory", "2G")),
+        runtime=runtime_minutes(config.get("download_time", "02:00:00")),
+        slurm_account=ACCOUNT,
+        slurm_partition=PARTITION,
+        slurm_extra=EXTRA,
+    log:
+        "logs/download/{accession}.log",
+    shell:
+        "{PYTHON:q} {SCRIPT:q} download --work {WORK:q} --task-id {params.task_id} "
+        "> {log:q} 2>&1"
+
+
+rule levels:
+    input:
+        genome=rules.download_genome.output.genome,
+        receipt=rules.download_genome.output.receipt,
+        report=rules.download_genome.output.report,
+    output:
+        fastas=[maybe_temp(f"runs/{{accession}}/levels/{level}.fna.gz") for level in LEVELS],
+        stats="runs/{accession}/levels/levels.json",
+    params:
+        task_id=lambda wc: ROWS[wc.accession]["task_id"],
+    threads: 1
+    resources:
+        mem_mb=memory_mb(config.get("levels_memory", "8G")),
+        runtime=runtime_minutes(config.get("levels_time", "02:00:00")),
+        slurm_account=ACCOUNT,
+        slurm_partition=PARTITION,
+        slurm_extra=EXTRA,
+    log:
+        "logs/levels/{accession}.log",
+    shell:
+        "{PYTHON:q} {SCRIPT:q} levels --work {WORK:q} --task-id {params.task_id} "
+        "> {log:q} 2>&1"
+
+
+rule hobrac:
+    input:
+        fasta="runs/{accession}/levels/{level}.fna.gz",
+        stats="runs/{accession}/levels/levels.json",
+    output:
+        "runs/{accession}/{level}/completed.json",
+    params:
+        task_id=lambda wc: ROWS[wc.accession]["task_id"],
+    # Prefer finishing started genomes over downloading new ones.
+    priority: 10
+    threads: CPUS
+    resources:
+        mem_mb=memory_mb(config.get("memory", "160G")),
+        runtime=runtime_minutes(config.get("time", "3-00:00:00")),
+        slurm_account=ACCOUNT,
+        slurm_partition=PARTITION,
+        slurm_extra=EXTRA,
+    log:
+        "logs/hobrac/{accession}_{level}.log",
+    shell:
+        "{PYTHON:q} {SCRIPT:q} run --work {WORK:q} --task-id {params.task_id} "
+        "--level {wildcards.level} --container {CONTAINER:q} {HOBRAC_ARGS} "
+        "> {log:q} 2>&1"
+
+
+rule report:
+    input:
+        complete=expand("runs/{accession}/{level}/completed.json", accession=ROWS, level=LEVELS),
+        stats=expand("runs/{accession}/levels/levels.json", accession=ROWS),
+        snapshot="snapshot.json",
+    output:
+        REPORTS,
+    threads: 1
+    shell:
+        "{PYTHON:q} {SCRIPT:q} summarize --work {WORK:q} --grid-rows {GRID_ROWS}"
+
+
+onerror:
+    # Keep failed/not-run levels visible without declaring their jobs successful.
+    subprocess.run(
+        [PYTHON, SCRIPT, "summarize", "--work", str(WORK), "--grid-rows", str(GRID_ROWS)],
+        check=False,
+    )
