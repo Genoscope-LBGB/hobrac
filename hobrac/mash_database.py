@@ -5,7 +5,7 @@ from html.parser import HTMLParser
 from urllib.error import URLError
 from urllib.request import urlopen
 
-MASH_DB_URL = "https://www.genoscope.cns.fr/lbgb/mash_versioned/"
+MASH_DB_URL = "https://www.genoscope.cns.fr/mash_versioned/"
 
 
 def validate_mash_db_version(value: str) -> str:
