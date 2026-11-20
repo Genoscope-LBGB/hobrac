@@ -164,7 +164,7 @@ def get_args():
         action="store",
         dest="minimap2_runtime",
         help="Maximum runtime in hours for Minimap2 jobs",
-        default=12,
+        default=20,
         type=int,
     )
     optional_args.add_argument(
